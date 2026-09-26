@@ -23,9 +23,24 @@ library CcaLib {
     uint24 internal constant LP_BRACKET_RATE = 1e7;
     uint256 internal constant Q96 = 1 << 96;
 
-    /// Verified on Sepolia fork (PR #41, CCAForkHelpers): official AuctionBaseTest floor/tick.
-    uint256 internal constant FLOOR_PRICE_Q96 = 1000 * Q96;
-    uint256 internal constant AUCTION_TICK_SPACING_Q96 = 100 * Q96;
+    /// Official CCA v2.1.0 `ConstantsLib`: floor >= 2^32+1, tickSpacing >= 2,
+    /// and `floor % tickSpacing == 0` (`TickStorage._getTick`).
+    uint256 internal constant MIN_FLOOR_PRICE_Q96 = (uint256(1) << 32) + 1;
+    uint256 internal constant MIN_AUCTION_TICK_SPACING_Q96 = 2;
+
+    /// Q96 currency-wei per token-wei. The official harness `1000<<96` / `100<<96`
+    /// was for an 800e18 toy token; at our 793.1M auction supply that floor would
+    /// raise ~793.1 billion ETH. Floor here is set so selling the full auction
+    /// supply at floor raises the 0.02 ETH graduation line:
+    ///   raw = ceil(REQUIRED_CURRENCY_RAISED * Q96 / AUCTION_SUPPLY)
+    ///   tick = ceil(raw / 100)   // 1% of floor (CCA docs: at least 1 bp; 1% or 10% ok)
+    ///   floor = tick * 100       // so floor % tick == 0 and floor >= raw
+    /// Constructor also requires floor + tickSpacing <= MAX_BID_PRICE
+    /// (MaxBidPriceLib.maxBidPrice(auctionSupply)).
+    uint256 internal constant _RAW_FLOOR_PRICE_Q96 =
+        (uint256(REQUIRED_CURRENCY_RAISED) * Q96 + AUCTION_SUPPLY - 1) / AUCTION_SUPPLY;
+    uint256 internal constant AUCTION_TICK_SPACING_Q96 = (_RAW_FLOOR_PRICE_Q96 + 99) / 100;
+    uint256 internal constant FLOOR_PRICE_Q96 = AUCTION_TICK_SPACING_Q96 * 100;
 
     error BadAuctionBlocks();
     error ProphetRecipient();

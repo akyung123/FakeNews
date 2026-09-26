@@ -23,6 +23,7 @@ contract LockerTest is Test {
 
     address internal prophet = address(0xA11CE);
     address internal protocol = address(0xFEE);
+    uint256 internal tokenId;
 
     receive() external payable {}
 
@@ -33,7 +34,7 @@ contract LockerTest is Test {
         posm = new MockPositionManager();
         locker.setPositionManager(address(posm));
         locker.prepare(address(token), prophet, protocol);
-        posm.mintTo(address(locker), address(token), hook);
+        tokenId = posm.mintTo(address(locker), address(token), hook);
     }
 
     function test_splitFeesExactAndDust() public pure {
@@ -57,7 +58,10 @@ contract LockerTest is Test {
 
     function test_holdsNftAndHasNoWithdraw() public {
         assertEq(locker.prophetOf(address(token)), prophet);
-        assertGt(locker.tokenIdOf(address(token)), 0);
+        uint256[] memory ids = locker.tokenIdsOf(address(token));
+        assertEq(ids.length, 1);
+        assertEq(ids[0], tokenId);
+        assertTrue(locker.isRegistered(address(token), tokenId));
         (bool okWithdraw,) = address(locker).call(abi.encodeWithSignature("withdraw(address)", address(token)));
         assertFalse(okWithdraw);
         (bool okDecrease,) = address(locker).call(
@@ -86,7 +90,7 @@ contract LockerTest is Test {
         vm.deal(address(posm), ethFee);
         posm.setFees(ethFee, address(token), tokFee);
 
-        locker.collect(address(token));
+        locker.collect(address(token), tokenId);
         _assertSplit(prophet.balance, protocol.balance);
         _assertSplit(token.balanceOf(prophet), token.balanceOf(protocol));
         assertEq(prophet.balance + protocol.balance, ethFee);
@@ -99,14 +103,19 @@ contract LockerTest is Test {
         token.transfer(address(posm), tokFee);
         vm.deal(address(posm), ethFee);
         posm.setFees(ethFee, address(token), tokFee);
-        locker.collect(address(token));
+        locker.collect(address(token), tokenId);
         _assertSplit(prophet.balance, protocol.balance);
         _assertSplit(token.balanceOf(prophet), token.balanceOf(protocol));
     }
 
     function test_collectUnknownReverts() public {
         vm.expectRevert(LiquidityLocker.UnknownLock.selector);
-        locker.collect(address(0xDEAD));
+        locker.collect(address(0xDEAD), 1);
+    }
+
+    function test_collectUnregisteredTokenIdReverts() public {
+        vm.expectRevert(LiquidityLocker.UnknownLock.selector);
+        locker.collect(address(token), tokenId + 99);
     }
 
     function test_secondPrepareReverts() public {
@@ -118,14 +127,14 @@ contract LockerTest is Test {
         RejectingProphet rejector = new RejectingProphet();
         ProphecyToken tok = new ProphecyToken("reject.prophecy.eth", "REJECT", address(this));
         locker.prepare(address(tok), address(rejector), protocol);
-        posm.mintTo(address(locker), address(tok), hook);
+        uint256 id = posm.mintTo(address(locker), address(tok), hook);
 
         uint256 ethFee = 100;
         vm.deal(address(posm), ethFee);
         posm.setFees(ethFee, address(0), 0);
 
         uint256 protocolBefore = protocol.balance;
-        locker.collect(address(tok));
+        locker.collect(address(tok), id);
         assertGt(protocol.balance, protocolBefore);
         assertEq(address(rejector).balance, 0);
         uint256 accrued = locker.accruedEth(address(rejector));
@@ -162,6 +171,7 @@ contract LockerRegisterTest is Test {
 
     address internal prophet = address(0xA11CE);
     address internal protocol = address(0xFEE);
+    address internal attacker = address(0xBAD);
 
     receive() external payable {}
 
@@ -177,14 +187,18 @@ contract LockerRegisterTest is Test {
     function test_collectRevertsUnknownLockBeforeRegister() public {
         uint256 id = posm.mintSilent(address(locker), address(token), hook);
         assertEq(posm.ownerOf(id), address(locker));
+        assertFalse(locker.isRegistered(address(token), id));
         vm.expectRevert(LiquidityLocker.UnknownLock.selector);
-        locker.collect(address(token));
+        locker.collect(address(token), id);
     }
 
     function test_registerThenCollectSplits24_76() public {
         uint256 id = posm.mintSilent(address(locker), address(token), hook);
         locker.register(address(token), id);
-        assertEq(locker.tokenIdOf(address(token)), id);
+        uint256[] memory ids = locker.tokenIdsOf(address(token));
+        assertEq(ids.length, 1);
+        assertEq(ids[0], id);
+        assertTrue(locker.isRegistered(address(token), id));
 
         uint256 ethFee = 100;
         uint256 tokFee = 100;
@@ -192,11 +206,56 @@ contract LockerRegisterTest is Test {
         vm.deal(address(posm), ethFee);
         posm.setFees(ethFee, address(token), tokFee);
 
-        locker.collect(address(token));
+        locker.collect(address(token), id);
         _assertSplit(prophet.balance, protocol.balance);
         _assertSplit(token.balanceOf(prophet), token.balanceOf(protocol));
         assertEq(prophet.balance + protocol.balance, ethFee);
         assertEq(token.balanceOf(prophet) + token.balanceOf(protocol), tokFee);
+    }
+
+    function test_frontRunDustDoesNotFreezeRealNft() public {
+        uint256 dustId = posm.mintSilent(address(locker), address(token), hook);
+        vm.prank(attacker);
+        locker.register(address(token), dustId);
+        assertTrue(locker.isRegistered(address(token), dustId));
+
+        uint256 realId = posm.mintSilent(address(locker), address(token), hook);
+        locker.register(address(token), realId);
+        assertTrue(locker.isRegistered(address(token), realId));
+
+        uint256[] memory ids = locker.tokenIdsOf(address(token));
+        assertEq(ids.length, 2);
+        assertEq(ids[0], dustId);
+        assertEq(ids[1], realId);
+
+        uint256 ethFee = 100;
+        uint256 tokFee = 100;
+        token.transfer(address(posm), tokFee);
+        vm.deal(address(posm), ethFee);
+        posm.setFees(ethFee, address(token), tokFee);
+
+        locker.collect(address(token), realId);
+        _assertSplit(prophet.balance, protocol.balance);
+        _assertSplit(token.balanceOf(prophet), token.balanceOf(protocol));
+        assertEq(prophet.balance + protocol.balance, ethFee);
+        assertEq(token.balanceOf(prophet) + token.balanceOf(protocol), tokFee);
+    }
+
+    function test_collectWrongTokenIdReverts() public {
+        uint256 id = posm.mintSilent(address(locker), address(token), hook);
+        locker.register(address(token), id);
+
+        ProphecyToken other = new ProphecyToken("other.prophecy.eth", "OTHER", address(this));
+        locker.prepare(address(other), prophet, protocol);
+        uint256 otherId = posm.mintSilent(address(locker), address(other), hook);
+        locker.register(address(other), otherId);
+
+        vm.expectRevert(LiquidityLocker.UnknownLock.selector);
+        locker.collect(address(token), otherId);
+        vm.expectRevert(LiquidityLocker.UnknownLock.selector);
+        locker.collect(address(other), id);
+        vm.expectRevert(LiquidityLocker.UnknownLock.selector);
+        locker.collect(address(token), id + 99);
     }
 
     function test_registerRevertsWrongOwner() public {
@@ -262,8 +321,29 @@ contract LockerRegisterTest is Test {
 
     function test_registerRevertsAfterCallbackMint() public {
         uint256 id = posm.mintTo(address(locker), address(token), hook);
+        assertTrue(locker.isRegistered(address(token), id));
         vm.expectRevert(LiquidityLocker.AlreadyReceived.selector);
         locker.register(address(token), id);
+    }
+
+    function test_callbackSecondNftStillRegisters() public {
+        uint256 first = posm.mintTo(address(locker), address(token), hook);
+        uint256 second = posm.mintTo(address(locker), address(token), hook);
+        assertTrue(locker.isRegistered(address(token), first));
+        assertTrue(locker.isRegistered(address(token), second));
+        uint256[] memory ids = locker.tokenIdsOf(address(token));
+        assertEq(ids.length, 2);
+        assertEq(ids[0], first);
+        assertEq(ids[1], second);
+
+        uint256 ethFee = 100;
+        uint256 tokFee = 100;
+        token.transfer(address(posm), tokFee);
+        vm.deal(address(posm), ethFee);
+        posm.setFees(ethFee, address(token), tokFee);
+        locker.collect(address(token), second);
+        _assertSplit(prophet.balance, protocol.balance);
+        _assertSplit(token.balanceOf(prophet), token.balanceOf(protocol));
     }
 
     function _assertSplit(uint256 prophetShare, uint256 protocolShare) internal pure {

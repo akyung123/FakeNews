@@ -16,8 +16,9 @@ interface IPositionManagerLite {
     function ownerOf(uint256 tokenId) external view returns (address);
 }
 
-/// Holds the v4 PositionManager LP NFT. No path to take the principal out.
-/// `collect` sends accrued pool fees only: prophet 24, protocol 76.
+/// Holds v4 PositionManager LP NFTs. No path to take the principal out.
+/// `collect` is per NFT: prophet 24, protocol 76. Multiple tokenIds per token
+/// so a dust front-run cannot freeze the real position.
 contract LiquidityLocker {
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
@@ -34,14 +35,18 @@ contract LiquidityLocker {
     struct Position {
         address prophet;
         address protocolFeeRecipient;
-        uint256 tokenId;
+        bool prepared;
+    }
+
+    struct NftLock {
         Currency currency0;
         Currency currency1;
-        bool prepared;
-        bool received;
+        bool registered;
     }
 
     mapping(address token => Position) public positions;
+    mapping(address token => uint256[]) internal _tokenIds;
+    mapping(address token => mapping(uint256 tokenId => NftLock)) internal _nfts;
     mapping(address prophet => uint256) public accruedEth;
     uint256 public totalAccruedEth;
 
@@ -50,6 +55,7 @@ contract LiquidityLocker {
     event PositionReceived(address indexed token, uint256 indexed tokenId);
     event Collected(
         address indexed token,
+        uint256 indexed tokenId,
         uint256 prophetAmount0,
         uint256 protocolAmount0,
         uint256 prophetAmount1,
@@ -116,7 +122,8 @@ contract LiquidityLocker {
     }
 
     /// Official PositionManager `_mint` does not call `onERC721Received`. Anyone
-    /// may bind the NFT the locker already owns after `prepare`.
+    /// may bind an NFT the locker already owns after `prepare`. Multiple NFTs
+    /// per token are allowed; the same tokenId cannot be bound twice.
     function register(address token, uint256 tokenId) external {
         if (token == address(0)) revert ZeroAddress();
         _register(token, tokenId);
@@ -142,19 +149,23 @@ contract LiquidityLocker {
         }
         Position storage p = positions[token];
         if (!p.prepared) revert UnknownLock();
-        if (p.received) revert AlreadyReceived();
-        p.tokenId = tokenId;
-        p.currency0 = key.currency0;
-        p.currency1 = key.currency1;
-        p.received = true;
+        NftLock storage nft = _nfts[token][tokenId];
+        if (nft.registered) revert AlreadyReceived();
+        nft.currency0 = key.currency0;
+        nft.currency1 = key.currency1;
+        nft.registered = true;
+        _tokenIds[token].push(tokenId);
         emit Registered(token, tokenId);
         emit PositionReceived(token, tokenId);
     }
 
-    /// Anyone may call. Fees go only to the two recipients stored at prepare.
-    function collect(address token) external nonReentrant {
+    /// Anyone may call. Fees from this NFT go only to the two recipients stored at prepare.
+    /// One tokenId per call — dust spam must not force a loop over every position.
+    function collect(address token, uint256 tokenId) external nonReentrant {
         Position storage p = positions[token];
-        if (!p.received) revert UnknownLock();
+        if (!p.prepared) revert UnknownLock();
+        NftLock storage nft = _nfts[token][tokenId];
+        if (!nft.registered) revert UnknownLock();
         if (address(positionManager) == address(0)) revert PositionManagerNotSet();
 
         uint256 ethBefore = address(this).balance;
@@ -164,8 +175,8 @@ contract LiquidityLocker {
         actions[0] = bytes1(uint8(DECREASE_LIQUIDITY));
         actions[1] = bytes1(uint8(TAKE_PAIR));
         bytes[] memory params = new bytes[](2);
-        params[0] = abi.encode(p.tokenId, uint256(0), uint128(0), uint128(0), bytes(""));
-        params[1] = abi.encode(p.currency0, p.currency1, address(this));
+        params[0] = abi.encode(tokenId, uint256(0), uint128(0), uint128(0), bytes(""));
+        params[1] = abi.encode(nft.currency0, nft.currency1, address(this));
         positionManager.modifyLiquidities(abi.encode(actions, params), block.timestamp);
 
         uint256 amount0 = address(this).balance - ethBefore;
@@ -173,12 +184,12 @@ contract LiquidityLocker {
         (uint256 prophet0, uint256 protocol0) = Graduation.splitFees(amount0);
         (uint256 prophet1, uint256 protocol1) = Graduation.splitFees(amount1);
 
-        _pay(p.currency0, p.protocolFeeRecipient, protocol0);
-        _pay(p.currency1, p.protocolFeeRecipient, protocol1);
+        _pay(nft.currency0, p.protocolFeeRecipient, protocol0);
+        _pay(nft.currency1, p.protocolFeeRecipient, protocol1);
         _payEthOrAccrue(p.prophet, prophet0);
-        _pay(p.currency1, p.prophet, prophet1);
+        _pay(nft.currency1, p.prophet, prophet1);
 
-        emit Collected(token, prophet0, protocol0, prophet1, protocol1);
+        emit Collected(token, tokenId, prophet0, protocol0, prophet1, protocol1);
     }
 
     function withdrawAccrued() external nonReentrant {
@@ -191,9 +202,12 @@ contract LiquidityLocker {
         if (!ok) revert EthTransferFailed();
     }
 
-    function tokenIdOf(address token) external view returns (uint256) {
-        if (!positions[token].received) revert UnknownLock();
-        return positions[token].tokenId;
+    function tokenIdsOf(address token) external view returns (uint256[] memory) {
+        return _tokenIds[token];
+    }
+
+    function isRegistered(address token, uint256 tokenId) external view returns (bool) {
+        return _nfts[token][tokenId].registered;
     }
 
     /// Prophet stored at `prepare`. There is no `prophetOf(uint256 tokenId)`.

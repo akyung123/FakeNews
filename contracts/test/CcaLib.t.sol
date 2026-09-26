@@ -3,6 +3,9 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
+import {TickMath} from "v4-core/src/libraries/TickMath.sol";
+import {FullMath} from "v4-core/src/libraries/FullMath.sol";
+
 import {CcaLib} from "../src/cca/CcaLib.sol";
 import {
     AuctionParameters,
@@ -10,6 +13,7 @@ import {
     MigratorParameters,
     PositionDefinition
 } from "../src/cca/CcaTypes.sol";
+import {Graduation} from "../src/uniswap/Graduation.sol";
 
 contract CcaLibTest is Test {
     function test_defaultAuctionBlocksIs25() public pure {
@@ -46,9 +50,56 @@ contract CcaLibTest is Test {
         assertGt(migrationBlock, endBlock);
     }
 
-    function test_floorAndTickMatchForkVerifiedValues() public pure {
-        assertEq(CcaLib.FLOOR_PRICE_Q96, uint256(1000) << 96);
-        assertEq(CcaLib.AUCTION_TICK_SPACING_Q96, uint256(100) << 96);
+    function test_floorSellsAuctionSupplyAtGraduationLine() public pure {
+        uint256 raw = (uint256(CcaLib.REQUIRED_CURRENCY_RAISED) * CcaLib.Q96 + CcaLib.AUCTION_SUPPLY - 1)
+            / CcaLib.AUCTION_SUPPLY;
+        uint256 tick = (raw + 99) / 100;
+        uint256 floor = tick * 100;
+
+        assertEq(CcaLib.AUCTION_TICK_SPACING_Q96, tick);
+        assertEq(CcaLib.FLOOR_PRICE_Q96, floor);
+        assertEq(CcaLib.FLOOR_PRICE_Q96, 1997936263126070900);
+        assertEq(CcaLib.AUCTION_TICK_SPACING_Q96, 19979362631260709);
+
+        assertGe(CcaLib.FLOOR_PRICE_Q96, CcaLib.MIN_FLOOR_PRICE_Q96);
+        assertGe(CcaLib.AUCTION_TICK_SPACING_Q96, CcaLib.MIN_AUCTION_TICK_SPACING_Q96);
+        assertEq(CcaLib.FLOOR_PRICE_Q96 % CcaLib.AUCTION_TICK_SPACING_Q96, 0);
+        assertEq(CcaLib.FLOOR_PRICE_Q96 / CcaLib.AUCTION_TICK_SPACING_Q96, 100);
+        assertGe(CcaLib.FLOOR_PRICE_Q96, raw);
+
+        uint256 raisedAtFloor = CcaLib.AUCTION_SUPPLY * CcaLib.FLOOR_PRICE_Q96 / CcaLib.Q96;
+        assertEq(raisedAtFloor, CcaLib.REQUIRED_CURRENCY_RAISED);
+        assertEq(raisedAtFloor, 0.02 ether);
+
+        // CCA v2.1.0 constructor: floor + tickSpacing <= MAX_BID_PRICE
+        // (ContinuousClearingAuction.sol; MaxBidPriceLib.maxBidPrice(auctionSupply)).
+        // Auction supply is TOTAL_SUPPLY - LP_SUPPLY (LBP initializeDistribution).
+        assertLe(CcaLib.AUCTION_SUPPLY, uint256(1) << 100);
+        uint256 maxLiq = uint256((uint256(1) << 154) / CcaLib.AUCTION_SUPPLY) ** 2;
+        uint256 maxCur = uint256(1 << 222) / CcaLib.AUCTION_SUPPLY;
+        uint256 maxBid = maxLiq < maxCur ? maxLiq : maxCur;
+        assertLe(CcaLib.FLOOR_PRICE_Q96 + CcaLib.AUCTION_TICK_SPACING_Q96, maxBid);
+
+        // TokenPricing.convertToPriceX192: (Q192 / floor) must fit uint160 (same as MIN_FLOOR).
+        assertEq(((uint256(1) << 192) / CcaLib.FLOOR_PRICE_Q96) >> 160, 0);
+    }
+
+    function test_floorSqrtPriceFitsV4TickSpacing200() public pure {
+        // LBP TokenPricing.convertToPriceX192(price, currencyIsCurrency0=true): Q192 * Q96 / floor
+        uint256 priceX192 = FullMath.mulDiv(uint256(1) << 192, CcaLib.Q96, CcaLib.FLOOR_PRICE_Q96);
+        uint160 sqrtPriceX96 = uint160(Graduation.sqrt(priceX192));
+        assertEq(sqrtPriceX96, 15777150227996145099409266077380864);
+        assertTrue(sqrtPriceX96 >= TickMath.MIN_SQRT_PRICE);
+        assertTrue(sqrtPriceX96 < TickMath.MAX_SQRT_PRICE);
+
+        int24 tick = TickMath.getTickAtSqrtPrice(sqrtPriceX96);
+        int24 minUsable = TickMath.minUsableTick(CcaLib.POOL_TICK_SPACING);
+        int24 maxUsable = TickMath.maxUsableTick(CcaLib.POOL_TICK_SPACING);
+        assertGe(tick, minUsable);
+        assertLe(tick, maxUsable);
+        assertEq(CcaLib.POOL_TICK_SPACING, 200);
+        // TickMath tick ≈ 244047; nearest spacing-200 bucket below is 244000.
+        assertEq((tick / CcaLib.POOL_TICK_SPACING) * CcaLib.POOL_TICK_SPACING, 244000);
     }
 
     function test_buildNeverSetsProphetAsRecipient() public pure {
@@ -68,8 +119,8 @@ contract CcaLibTest is Test {
         assertEq(ap.tokensRecipient, protocol);
         assertTrue(ap.tokensRecipient != prophet);
         assertEq(ap.requiredCurrencyRaised, 0.02 ether);
-        assertEq(ap.floorPrice, uint256(1000) << 96);
-        assertEq(ap.tickSpacing, uint256(100) << 96);
+        assertEq(ap.floorPrice, CcaLib.FLOOR_PRICE_Q96);
+        assertEq(ap.tickSpacing, CcaLib.AUCTION_TICK_SPACING_Q96);
         assertEq(ap.endBlock, 60);
         assertEq(ap.claimBlock, 60);
         assertEq(mp.recipient, protocol);
