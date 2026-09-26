@@ -1,4 +1,5 @@
 import { MAX_PROPHECY_BYTES, isProphecyWithinLimit } from "./limits";
+import { revertErrorName } from "./writeErrors";
 import type { WorldErrorKind } from "./world";
 
 export type WorldStatus = "idle" | "pending" | "success" | "cancelled" | "failed";
@@ -152,10 +153,27 @@ export function worldUserMessage(kind: WorldErrorKind | null | undefined): strin
   return ISSUE_COPY.checkFailed;
 }
 
+/** registerProphet / launch reverts the issue screen tells apart (Launchpad.sol custom errors). */
+export const REGISTER_REVERT_NAMES = [
+  "NullifierUsed",
+  "AlreadyProphet",
+  "LabelTaken",
+  "InvalidSignature",
+  "ProphetRecipient",
+  "NotProphet",
+  "BadLabel",
+] as const;
+
+export type RegisterRevertName = (typeof REGISTER_REVERT_NAMES)[number];
+
+/** The decoded revert name, or null for anything else (a wallet rejection, a network error). */
+export function registerRevertName(error: unknown): RegisterRevertName | null {
+  const name = revertErrorName(error);
+  return name && (REGISTER_REVERT_NAMES as readonly string[]).includes(name) ? (name as RegisterRevertName) : null;
+}
+
 export function worldErrorKindFromRegisterProphet(error: unknown): WorldErrorKind {
-  const text = error instanceof Error ? `${error.name} ${error.message}` : String(error);
-  if (/nullifier/i.test(text)) return "nullifier_reuse";
-  return "network";
+  return registerRevertName(error) === "NullifierUsed" ? "nullifier_reuse" : "network";
 }
 
 export function worldErrorMessage(status: WorldStatus, returningProphet: boolean): string | null {

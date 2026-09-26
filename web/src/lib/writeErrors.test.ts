@@ -74,7 +74,7 @@ describe("classifyWriteError", () => {
   });
 
   it("treats an unmapped contract error name as unknown", () => {
-    expect(classifyWriteError({ data: { errorName: "BadLabel" } })).toEqual({ kind: "unknown" });
+    expect(classifyWriteError({ data: { errorName: "UniswapNotSet" } })).toEqual({ kind: "unknown" });
     expect(classifyWriteError({ data: { errorName: "NotARealError" } })).toEqual({ kind: "unknown" });
   });
 
