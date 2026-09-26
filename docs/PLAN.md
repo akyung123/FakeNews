@@ -39,14 +39,14 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [x] `Launchpad.registerProphet`: server signature and nullifier checks, then prophet name + prophet registry + prophet resolver @cursor
 - [x] `Launchpad.launch`: initialize the prophecy resolver (sentence, deadline, address), register the name, mint the token @cursor
 - [ ] Graduation: fill only the remaining supply and refund, `complete`, V4 pool, `LiquidityLocker`
-- [ ] `ProphecyHook`: `beforeInitialize` allows only the Launchpad. Mine the CREATE2 salt
-- [ ] `LiquidityLocker.collect`: 24 : 76
+- [x] `ProphecyHook`: `beforeInitialize` allows only the Launchpad. Mine the CREATE2 salt @cursor-agent
+- [x] `LiquidityLocker.collect`: 24 : 76 @cursor-agent
 - [ ] `memo` on `buy` / `sell`, emitted in `Trade`, reverts above 140 bytes
 - [ ] Tests
   - [x] Lock tests: editing the sentence reverts, transfer reverts, swapping the resolver reverts, `hasAssignees(ROOT, UNREGISTER) == false` @cursor
-  - [ ] Three fuzz tests: solvency (done @cursor-agent), a round trip never gains (done @cursor-agent), graduation vs pool start price gap < 0.0068%
+  - [x] Three fuzz tests: solvency (done @cursor-agent), a round trip never gains (done @cursor-agent), graduation vs pool start price gap < 0.0068% @cursor-agent
   - [x] World: reusing a nullifier reverts, a bad signature reverts @cursor
-- [ ] Sepolia deploy script (skill `deploy-sepolia`)
+- [x] Sepolia deploy script (skill `deploy-sepolia`) @cursor-agent
 
 ## 3. Web (`web/`)
 
