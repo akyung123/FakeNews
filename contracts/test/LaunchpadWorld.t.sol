@@ -23,7 +23,9 @@ contract LaunchpadWorldTest is LaunchpadTestBase {
     address internal constant FIXTURE_SIGNER = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
 
     event ProphetRegistered(address indexed wallet, string label, uint256 nullifier);
-    event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
+    event Launched(
+        address indexed token, address indexed prophet, address indexed auction, string prophetLabel, string slug
+    );
 
     function setUp() public {
         _deployLaunchpad();
@@ -122,14 +124,14 @@ contract LaunchpadWorldTest is LaunchpadTestBase {
     function test_launchByNonProphetReverts() public {
         vm.prank(buyer);
         vm.expectRevert(Launchpad.NotProphet.selector);
-        launchpad.launch("lingo-2028", "a prophecy sentence", 1_800_000_000, 0);
+        launchpad.launch("lingo-2028", "a prophecy sentence", 1_800_000_000);
     }
 
     function test_reusedSlugReverts() public {
         _registerAndLaunch();
         vm.prank(prophet);
         vm.expectRevert(Launchpad.SlugTaken.selector);
-        launchpad.launch("lingo-2028", "another sentence here", 1_800_000_001, 0);
+        launchpad.launch("lingo-2028", "another sentence here", 1_800_000_001);
     }
 
     function test_sameSlugDifferentProphetsOk() public {
@@ -137,7 +139,7 @@ contract LaunchpadWorldTest is LaunchpadTestBase {
         _registerProphet(buyer, "mina");
         address a = _launch("lingo-2028");
         vm.prank(buyer);
-        address b = launchpad.launch("lingo-2028", "a prophecy sentence", 1_800_000_000, 0);
+        address b = launchpad.launch("lingo-2028", "a prophecy sentence", 1_800_000_000);
         assertTrue(a != b);
         assertEq(ProphecyToken(a).name(), "lingo-2028.ringo.prophecy.eth");
         assertEq(ProphecyToken(b).name(), "lingo-2028.mina.prophecy.eth");
@@ -153,8 +155,11 @@ contract LaunchpadWorldTest is LaunchpadTestBase {
         _registerProphet(prophet, "ringo");
         address predicted = vm.computeCreateAddress(address(launchpad), vm.getNonce(address(launchpad)));
         vm.expectEmit(true, true, false, true, address(launchpad));
-        emit Launched(predicted, prophet, "ringo", "lingo-2028");
-        _launch("lingo-2028");
+        emit Launched(predicted, prophet, address(0), "ringo", "lingo-2028");
+        address token = _launch("lingo-2028");
+        address auction = launchpad.auctionOf(token);
+        assertTrue(auction != address(0));
+        assertTrue(auction.code.length > 0);
     }
 
     function test_constructorRejectsZeroEns() public {

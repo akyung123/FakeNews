@@ -8,8 +8,8 @@ import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 /// is never called.
 ///
 /// Deploy Launchpad first, then mine a salt so this hook lands on a flagged
-/// address whose constructor stores that Launchpad. The Launchpad then calls
-/// `setUniswap` once with the hook and locker.
+/// address whose constructor stores `authorized` (LBPStrategy). The Launchpad
+/// then calls `setUniswap` once with the hook and locker.
 library HookMiner {
     uint160 internal constant FLAG_MASK = Hooks.ALL_HOOK_MASK;
     uint256 internal constant MAX_LOOP = 160_000;
