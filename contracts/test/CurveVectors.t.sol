@@ -4,18 +4,18 @@ pragma solidity ^0.8.24;
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {ProphecyToken} from "../src/ProphecyToken.sol";
-import {LaunchpadTestBase} from "./LaunchpadHelpers.sol";
+import {LaunchpadStack} from "./LaunchpadStack.sol";
 
 /// Reads `test/Curve.vectors.json` so web/src/lib/curve.ts can reuse
 /// the same SPEC-derived integers.
-contract CurveVectorsTest is LaunchpadTestBase {
+contract CurveVectorsTest is LaunchpadStack {
     using stdJson for string;
 
     address internal token;
     string internal vectors;
 
     function setUp() public {
-        _deployLaunchpad();
+        _deployStack();
         prophet = address(this);
         vm.deal(address(this), 10 ether);
         token = _registerAndLaunch();
