@@ -83,6 +83,48 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 - On success it signs `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` with EIP-191.
 - The Launchpad checks that the signer is `WORLD_SIGNER` and that the nullifier is unused.
 
+### Web → World server `(draft)`
+
+The web app never holds the RP signing key. HTTP matches `world/` (PR #10, now on main): `GET /rp-context`, then `POST /verify`.
+
+`GET {VITE_WORLD_SERVER_URL}/rp-context`
+
+```json
+{
+  "app_id": "app_...",
+  "action": "register-prophet",
+  "environment": "production",
+  "rp_context": {
+    "rp_id": "rp_...",
+    "nonce": "0x...",
+    "created_at": 1700000000,
+    "expires_at": 1700000300,
+    "signature": "0x..."
+  }
+}
+```
+
+`POST {VITE_WORLD_SERVER_URL}/verify`
+
+```json
+{
+  "wallet": "0x...",
+  "chainId": 11155111,
+  "launchpad": "0x...",
+  "idkitResponse": { }
+}
+```
+
+`idkitResponse` is the IDKit 4 result, forwarded as-is (`proof` is an accepted alias on the server). On success:
+
+```json
+{ "nullifier": "0x<uint256>", "serverSig": "0x<eip191>" }
+```
+
+`serverSig` is EIP-191 personal_sign of `keccak256(abi.encode(uint256 chainId, address launchpad, address wallet, uint256 nullifier))`. Fixture: `world/fixture/register-prophet-signature.json`. While `VITE_WORLD_MOCK` is not `0`/`false`, the web app uses the mock client in `web/src/lib/world.ts` instead of these URLs.
+
+Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check can take a minute when the World server has been idle. The issue button stays off while the check is running. The retry sentence is shown only after a timeout or a dropped connection — not while the request is still open.
+
 ## 4. How the web app reads
 
 1. List: `Launched` logs.
@@ -103,5 +145,7 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 | `VITE_PARENT_NAME` | web (e.g. `prophecy.eth`) |
 | `VITE_UNIVERSAL_RESOLVER` | web ([`ENSV2.md`](ENSV2.md) section 0) |
 | `VITE_WORLD_APP_ID`, `VITE_WORLD_ACTION` | web |
+| `VITE_WORLD_MOCK` | web (default on; set `0` to call the world server) |
+| `VITE_WORLD_SERVER_URL` | web (world/ base URL; unused while mock) |
 | `RPC_URL`, `PRIVATE_KEY` | contract deployment (people only) |
 | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |

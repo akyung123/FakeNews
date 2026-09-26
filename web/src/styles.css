@@ -88,6 +88,8 @@ button { font: inherit; cursor: pointer; }
 .btn.sell { background: var(--down); color: #fff; }
 .btn.full { width: 100%; padding: 12px; font-size: 15px; }
 .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn.ghost { background: var(--soft); color: var(--text); border: 1px solid var(--line); }
+.btn.ghost:hover { border-color: var(--blue); }
 .link { background: none; border: 0; color: var(--blue); padding: 0; }
 
 /* page frame */
@@ -215,6 +217,37 @@ input:focus, textarea:focus { outline: none; border-color: var(--blue); }
 /* create */
 .create { display: flex; flex-direction: column; gap: 16px; }
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.banner-lock {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--sub);
+  font-weight: 600;
+}
+.banner-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--down-soft);
+  color: var(--down);
+  font-weight: 600;
+}
+.world-gate {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+}
+.world-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.name-preview {
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
+}
 
 /* prophet page */
 .prophet-hero { display: flex; flex-direction: column; gap: 8px; }
