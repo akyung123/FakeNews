@@ -154,14 +154,14 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 | `VITE_WORLD_MOCK` | web (default on; set `0` to call the world server) |
 | `VITE_WORLD_SERVER_URL` | web (world/ base URL; unused while mock) |
 | `VITE_WALLETCONNECT_PROJECT_ID` | web (optional; injected wallets work without it) |
-| `RPC_URL`, `PRIVATE_KEY` | contract deployment (people only) |
+| `SEPOLIA_RPC_URL`, `DEPLOYER_PRIVATE_KEY` | contract deployment (people only) |
 | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |
 
 Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0.
 
 ## 6. Curve quote vectors
 
-Canonical rows live in backend M1 PR #8 as `contracts/test/Curve.vectors.json`. Web keeps a byte-matching copy at `web/src/lib/Curve.vectors.json` so tests run before that PR merges. Do not re-derive the numbers. Do not edit `contracts/` from this lane.
+Canonical rows live in backend M1 PR #8 as `contracts/test/Curve.vectors.json`. Web keeps a byte-matching copy at `web/src/lib/Curve.vectors.json`. Do not re-derive the numbers. Do not edit `contracts/` from this lane.
 
 - Web: `web/src/lib/curve.vectors.test.ts` imports the web copy.
 - Contracts: forge tests read `contracts/test/Curve.vectors.json`.
