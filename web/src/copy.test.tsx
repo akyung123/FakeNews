@@ -2,6 +2,26 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "./App";
+import { eth, mcap } from "./lib/format";
+import { SEED_EVENTS } from "./lib/mock";
+
+const NEW_MEMOS = [
+  "I've met this router before.",
+  "Router light is blinking amber already.",
+  "Wi-Fi flickered at the demo table just now.",
+  "Wi-Fi still up at midnight. Checking again at 3.",
+  "They refilled the coffee at 10pm.",
+  "Still haven't written a test.",
+  "Half the team is still awake at 4am.",
+];
+
+const FLAGGED_MEMOS = [
+  "LFG 📡",
+  "buying the dip anyway",
+  "I panic sold. classic",
+  "ugh, why is it dropping AGAIN",
+  "It's coming.",
+];
 
 const REMOVED = [
   "Holder talk",
@@ -19,9 +39,12 @@ const REMOVED = [
   "If sold now",
   "Return if sold now",
   "moon_park",
+  "degen_kim",
+  "wagmi_lee",
   "profit",
   "yield",
   "prediction market",
+  ...FLAGGED_MEMOS,
 ];
 
 /** Signed gain/loss figures such as +861% or -12.3%. Curve fill (70%) has no sign. */
@@ -51,8 +74,14 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(held).toContain("Add a one-line memo (optional)");
     expect(held).toContain("Curve progress");
     expect(held).toContain("Holder");
+    expect(held).toContain("62% 0.0124 / 0.02 ETH");
+    expect(held).not.toContain("3.19 ETH");
     expect(held).not.toContain("Holder +");
     expect(held).not.toContain("Holder -");
+    expect(held).toContain("I've met this router before.");
+    expect(held).toContain("Router light is blinking amber already.");
+    expect(held).toContain("Wi-Fi flickered at the demo table just now.");
+    expect(held).toContain("Wi-Fi still up at midnight. Checking again at 3.");
     assertRemoved(held);
   });
 
@@ -61,12 +90,16 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(empty).toContain("No trades yet. The first memo shows up here.");
     expect(empty).toContain("Trade memos");
     expect(empty).toContain("Curve progress");
+    expect(empty).toContain("0% 0.0000 / 0.02 ETH");
+    expect(empty).not.toContain("0.93 ETH");
     assertRemoved(empty);
 
     const graduated = renderApp("/n/two-min.ringo.prophecy.eth");
     expect(graduated).toContain("Graduated to Uniswap V4");
     expect(graduated).toContain("Trade memos");
+    expect(graduated).toContain("100% 0.0200 / 0.02 ETH");
     expect(graduated).not.toContain("Curve progress");
+    expect(graduated).not.toContain("3.74 ETH");
     assertRemoved(graduated);
   });
 
@@ -77,6 +110,9 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(home).toContain("Curve");
     expect(home).toContain("Trade memos");
     expect(home).toContain("june_kim");
+    expect(home).toContain("rin_park");
+    expect(home).toContain("sam_lee");
+    for (const memo of NEW_MEMOS) expect(home).toContain(memo);
     expect(home).not.toContain("Since launch");
     expect(home).not.toContain("Market cap");
     assertRemoved(home);
@@ -96,6 +132,23 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(mine).toContain("Sell quote");
     expect(mine).toContain("trade memos");
     expect(mine).not.toContain("Return");
+    expect(mine).not.toContain("5.59 ETH");
+    expect(mine).not.toContain("3.19 ETH");
+    expect(mine).toContain(eth(5.591798695246977e-9, 12));
+    expect(mine).toContain(eth(3.194819350589578e-9, 12));
+    expect(mine).not.toContain(mcap(5.591798695246977));
+    expect(mine).not.toContain(mcap(3.194819350589578));
     assertRemoved(mine);
+  });
+
+  test("seed memos replace price-sentiment lines and old usernames", () => {
+    const says = SEED_EVENTS.map((e) => e.say).filter((s): s is string => Boolean(s));
+    for (const memo of NEW_MEMOS) expect(says).toContain(memo);
+    for (const memo of FLAGGED_MEMOS) expect(says).not.toContain(memo);
+    const home = renderApp("/");
+    expect(home).not.toContain("degen_kim");
+    expect(home).not.toContain("wagmi_lee");
+    expect(home).not.toContain("moon_park");
+    assertRemoved(home);
   });
 });
