@@ -99,6 +99,10 @@ Sending is opt-in and needs `DEPLOYER_PRIVATE_KEY` in the environment, never on 
 
 `grantAdapterRegistrar()` gives `ROLE_REGISTRAR` on the parent UserRegistry to the **adapter** (`ProphecyEns`), not the Launchpad. The old `grantLaunchpadRegistrar()` name reverts.
 
+The deployer must be a **plain EOA**. `ETHRegistrar.register` mints an ERC-1155 to the owner; a wallet with code or an EIP-7702 delegation (the well-known Anvil addresses have 23-byte designations on Sepolia) reverts on `onERC1155Received`. Fork rehearsals should `anvil_setCode` that account to empty first.
+
+Gas on a Sepolia fork (10 txs, ~4.27M gas, mint skipped because the account already held MockUSDC): about 0.0043 ETH at 1 gwei, 0.021 ETH at 5 gwei, 0.085 ETH at 20 gwei. A 0.05 ETH deployer balance covers 1–5 gwei, not 20 gwei. If `Deploy.s.sol` is split from `deployAdapter()`, do not send any other deployer transaction in between — the Launchpad CREATE nonce is predicted.
+
 The script prints paste-ready lines for a visual check: `WORLD_CHAIN_ID=11155111`, `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`, and `worldSigner address: 0x…` (address only, never the private key).
 
 **Mandatory after Launchpad deploy.** Set these on Render and restart the world service. Empty `WORLD_CHAIN_ID` / `WORLD_LAUNCHPAD_ADDRESS` turns the server-side context check off (PR #16).
