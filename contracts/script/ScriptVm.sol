@@ -13,6 +13,7 @@ interface Vm {
     function envUint(string calldata name) external view returns (uint256);
     function envExists(string calldata name) external view returns (bool);
     function addr(uint256 privateKey) external pure returns (address);
+    function toString(address value) external pure returns (string memory);
     function startBroadcast() external;
     function startBroadcast(uint256 privateKey) external;
     function stopBroadcast() external;
@@ -26,6 +27,16 @@ abstract contract ScriptVm {
             vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         } else {
             vm.startBroadcast();
+        }
+    }
+
+    /// Foundry console, no forge-std import (that lane owns lib/).
+    function _pasteLine(string memory line) internal pure {
+        bytes memory payload = abi.encodeWithSignature("log(string)", line);
+        address console_ = address(0x000000000000000000636F6e736F6c652e6c6f67);
+        uint256 len = payload.length;
+        assembly {
+            pop(staticcall(gas(), console_, add(payload, 32), len, 0, 0))
         }
     }
 }

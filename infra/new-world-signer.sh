@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Create WORLD_SIGNER_KEY locally. Never commit the key or this output.
-# The Launchpad constructor takes WORLD_SIGNER_ADDRESS, not the key.
+# The Launchpad constructor takes worldSigner (PR #8). Derive it from this key.
 set -euo pipefail
 
 if ! command -v cast >/dev/null 2>&1; then
@@ -26,7 +26,7 @@ echo "  WORLD_SIGNER_ADDRESS=$addr"
 echo "  WORLD_SIGNER_KEY=<the private key printed by cast — not shown again>"
 echo
 echo "cast Address: $addr"
-echo "The deploy script reads WORLD_SIGNER_ADDRESS, or derives it from WORLD_SIGNER_KEY."
+echo "The deploy script derives worldSigner from WORLD_SIGNER_KEY (PR #8)."
 echo "Re-print the private key? It is only in the cast output above this script's capture."
 # Show the key once so a person can copy it. Agents must not commit this output.
 echo "  WORLD_SIGNER_KEY=$key"
