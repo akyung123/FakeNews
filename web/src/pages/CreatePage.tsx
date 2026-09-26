@@ -26,7 +26,6 @@ import {
   createLaunch,
   ethInputToWei,
   refreshCoinFromChain,
-  runRegisterProphet,
   writeErrorMessage,
   writePhaseCopy,
   WRITE_COPY,
@@ -169,13 +168,18 @@ export function IssueScreen({
             if (canRegister) {
               if (!verified) return;
               setRegisterStatus("pending");
-              const result = await runRegisterProphet(registerProphet, {
-                label: prophetLabel,
-                nullifier: verified.nullifier,
-                serverSig: verified.serverSig,
-              });
-              setRegisterStatus(result.status);
-              setWriteError(result.message);
+              try {
+                await registerProphet({
+                  label: prophetLabel,
+                  nullifier: verified.nullifier,
+                  serverSig: verified.serverSig,
+                });
+                setRegisterStatus("success");
+              } catch (err) {
+                const message = writeErrorMessage(err, "registerProphet");
+                setRegisterStatus(message ? "failed" : "idle");
+                setWriteError(message);
+              }
               return;
             }
             if (!canLaunch) return;

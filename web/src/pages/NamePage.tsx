@@ -12,7 +12,7 @@ import {
 } from "../lib/issue";
 import { createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_PARENT_NAME } from "../lib/mock";
-import { runRegisterProphet } from "../lib/writes";
+import { writeErrorMessage } from "../lib/writes";
 import { resolveIssueSession } from "./CreatePage";
 import {
   createWorldClient,
@@ -97,14 +97,19 @@ export function ClaimNameScreen({
             setWriteError(null);
             if (!returningProphet && verified) {
               setRegisterStatus("pending");
-              const result = await runRegisterProphet(registerProphet, {
-                label: prophetLabel,
-                nullifier: verified.nullifier,
-                serverSig: verified.serverSig,
-              });
-              setRegisterStatus(result.status);
-              setWriteError(result.message);
-              if (result.status !== "success") return;
+              try {
+                await registerProphet({
+                  label: prophetLabel,
+                  nullifier: verified.nullifier,
+                  serverSig: verified.serverSig,
+                });
+                setRegisterStatus("success");
+              } catch (err) {
+                const message = writeErrorMessage(err, "registerProphet");
+                setRegisterStatus(message ? "failed" : "idle");
+                setWriteError(message);
+                return;
+              }
             }
             if (!returningProphet) storeProphetLabel(prophetLabel);
             navigate("/create");

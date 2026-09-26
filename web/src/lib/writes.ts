@@ -10,8 +10,7 @@ import {
 import { quoteBuyWei, quoteSellWei, toCurveWei, type CurveState } from "./curve";
 import { contracts } from "./contracts";
 import { erc20Abi } from "./erc20Abi";
-import { ISSUE_COPY, type RegisterStatus } from "./issue";
-import type { RegisterProphetInput } from "./launchpad";
+import { ISSUE_COPY } from "./issue";
 import { launchpadAbi } from "./launchpadAbi";
 import { MOCK_PROPHECIES, SEED_COINS } from "./mock";
 import { actions } from "./store";
@@ -68,20 +67,6 @@ export function writeErrorMessage(error: unknown, source: WriteErrorSource = "wr
   if (classified.kind === "rejected") return null;
   if (classified.kind === "revert") return classified.message;
   return source === "registerProphet" ? ISSUE_COPY.registerFailed : WRITE_COPY.failed;
-}
-
-/** One registerProphet write path for CreatePage and /name. */
-export async function runRegisterProphet(
-  send: (input: RegisterProphetInput) => Promise<void>,
-  input: RegisterProphetInput,
-): Promise<{ status: RegisterStatus; message: string | null }> {
-  try {
-    await send(input);
-    return { status: "success", message: null };
-  } catch (err) {
-    const message = writeErrorMessage(err, "registerProphet");
-    return { status: message ? "failed" : "idle", message };
-  }
 }
 
 export function writePhaseCopy(phase: WritePhase | null): string | null {
