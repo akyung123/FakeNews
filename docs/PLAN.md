@@ -10,11 +10,25 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 ## 0. Decide first (people)
 
-- [ ] Parent name: check that `prophecy.eth` is free on Sepolia
+- [x] Parent name: `prophecy.eth` is **available** (unregistered) on Sepolia @pm
+  - **When:** 2026-09-26 00:44:45 UTC, Sepolia block `11782784` (chain id `11155111`)
+  - **How (read-only, no transaction):** `cast call` on the ENSv2 Sepolia contracts from [`ENSV2.md`](ENSV2.md) section 0
+    - `ETHRegistrar.isAvailable("prophecy")` → `true` at `0xAbe76F6C8DFcEd81AA5A2bB8034202A7136b94ca`
+    - `ETHRegistry.getStatus(labelhash("prophecy"))` → `0` (AVAILABLE); `findOwner` → `0x000…000`
+  - **RPC:** `https://ethereum-sepolia-rpc.publicnode.com` (no API key). Rechecked `isAvailable` → `true` on `https://sepolia.gateway.tenderly.co` at block `11782786`
+  - **Labelhash:** `0xf87aa1f4cb920e28a5053843170f04ad57b375ed62a4bf90c08fc577e3631e44`
 - [x] DECISIONS #14: prophecy names never expire
 - [x] DECISIONS #15: trade memos yes, holder talk not now
-- [ ] Protocol fee recipient
-- [ ] Who owns which lane (write names here)
+- [x] Protocol fee recipient: **TBD** (person provides the address at deploy). Launchpad takes it as a constructor argument (DECISIONS #16, INTERFACE §2) @pm
+- [x] Who owns which lane @pm
+
+| Lane | Owns |
+|------|------|
+| PM | Scope, PLAN, DECISIONS, demo timing |
+| Backend | `contracts/` and the `world/` verification server |
+| Frontend | `web/` |
+| Infra | CI, Sepolia deploy skeleton, static hosting |
+| Designer | UI copy and the demo storyboard |
 
 ## 1. ENS setup (`contracts/script`, one team wallet)
 
