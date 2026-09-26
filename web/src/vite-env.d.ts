@@ -3,7 +3,6 @@
 interface ImportMetaEnv {
   readonly VITE_RPC_URL: string;
   readonly VITE_CHAIN_ID: string;
-  readonly VITE_FACTORY_ADDRESS: string;
   readonly VITE_LAUNCHPAD_ADDRESS: string;
   readonly VITE_LAUNCHPAD_DEPLOY_BLOCK?: string;
   readonly VITE_HOOK_ADDRESS?: string;

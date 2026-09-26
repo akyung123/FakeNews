@@ -223,9 +223,13 @@ describe("Launched log fromBlock", () => {
 
   it("uses VITE_LAUNCHPAD_ADDRESS and VITE_LAUNCHPAD_DEPLOY_BLOCK env names", () => {
     const src = readFileSync(resolve(import.meta.dirname, "./env.ts"), "utf8");
+    const envTypes = readFileSync(resolve(import.meta.dirname, "../vite-env.d.ts"), "utf8");
     expect(src).toContain("VITE_LAUNCHPAD_ADDRESS");
     expect(src).toContain("VITE_LAUNCHPAD_DEPLOY_BLOCK");
     expect(src).not.toContain("VITE_FACTORY_ADDRESS");
+    expect(envTypes).toContain("VITE_LAUNCHPAD_ADDRESS");
+    expect(envTypes).toContain("VITE_LAUNCHPAD_DEPLOY_BLOCK");
+    expect(envTypes).not.toContain("VITE_FACTORY_ADDRESS");
   });
 
   it("uses VITE_LAUNCHPAD_DEPLOY_BLOCK when it is a decimal block number", () => {

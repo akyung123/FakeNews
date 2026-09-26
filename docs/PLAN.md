@@ -13,7 +13,6 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] Parent name: check that `prophecy.eth` is free on Sepolia
 - [x] DECISIONS #14: prophecy names never expire
 - [x] DECISIONS #15: trade memos yes, holder talk not now
-- [x] DECISIONS #18–#22: apply on `cca`; supersede #7/#11/#15 when `cca` merges to main @cursor
 - [ ] Protocol fee recipient
 - [ ] Who owns which lane (write names here)
 

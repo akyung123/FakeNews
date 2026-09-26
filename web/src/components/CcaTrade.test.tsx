@@ -1,13 +1,14 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { parseEther } from "viem";
+import { encodeAbiParameters, encodeEventTopics, parseEther } from "viem";
 import {
   CCA_COPY,
   FEE_COLLECT_COPY,
   SWAP_SECTION_COPY,
   type AuctionView,
 } from "../lib/cca";
+import { lbpStrategyAbi } from "../lib/cca/abi/lbpStrategy";
 import type { CcaAuctionSnapshot } from "../lib/cca/loadAuction";
 import type { Coin } from "../lib/store";
 import { CcaTrade } from "./CcaTrade";
@@ -214,6 +215,49 @@ describe("CcaTrade CCA states", () => {
     expect(screen.queryByText(CCA_COPY.openMarket)).toBeNull();
     expect(screen.queryByText(SWAP_SECTION_COPY.title)).toBeNull();
     expect(screen.getByText(CCA_COPY.claimTokens)).toBeInTheDocument();
+  });
+
+  it("shows the MigrationFailed toast as an error banner, not success", async () => {
+    const user = userEvent.setup();
+    const topics = encodeEventTopics({
+      abi: lbpStrategyAbi,
+      eventName: "MigrationFailed",
+      args: { initializer: AUCTION },
+    });
+    const data = encodeAbiParameters([{ type: "bytes" }], ["0x"]);
+    const simulateContract = vi.fn(async () => ({}));
+    const writeContract = vi.fn(async () => "0xabc" as const);
+    const waitForTransactionReceipt = vi.fn(async () => ({
+      status: "success" as const,
+      logs: [{ address: STRATEGY, topics, data }],
+    }));
+    render(
+      <CcaTrade
+        coin={coin}
+        balance={0.05}
+        held={0}
+        chain
+        loadAuction={async () =>
+          snap({
+            copyStatus: "graduated",
+            view: view({
+              phase: "ended_goal_reached",
+              goalReached: true,
+              isGraduated: true,
+              blocksRemaining: 0,
+              canOpenMarket: true,
+            }),
+            finalized: true,
+          })
+        }
+        writes={{ simulateContract, writeContract, waitForTransactionReceipt }}
+      />,
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: CCA_COPY.openMarket })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: CCA_COPY.openMarket }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(CCA_COPY.marketFailedToast));
+    expect(screen.getByRole("alert").className).toContain("banner-error");
+    expect(screen.queryByText(CCA_COPY.marketFailedToast, { selector: ".up" })).toBeNull();
   });
 
   it("shows one Collect fees button after the pool opens, including when register is still needed", async () => {

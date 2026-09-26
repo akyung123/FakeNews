@@ -141,7 +141,11 @@ export function CcaTrade({
     setSuccess(null);
     try {
       const result = await work();
-      setSuccess(typeof result === "string" ? result : done);
+      if (result && typeof result === "object" && result !== null && "bannerError" in result) {
+        setError(String((result as { bannerError: unknown }).bannerError));
+      } else {
+        setSuccess(typeof result === "string" ? result : done);
+      }
       await reload();
     } catch (err) {
       setError(
@@ -291,7 +295,7 @@ export function CcaTrade({
             onClick={() => {
               void run(CCA_COPY.openingMarket, async () => {
                 const { outcome, receipt } = await openMarketResult(snap.auction!, writes, snap.lbpStrategy);
-                if (outcome === "failed") return CCA_COPY.marketFailedToast;
+                if (outcome === "failed") return { bannerError: CCA_COPY.marketFailedToast };
                 if (snap.locker) {
                   const tokenId = tokenIdFromMigrateReceipt(receipt, snap.locker, snap.positionManager);
                   if (tokenId != null) {

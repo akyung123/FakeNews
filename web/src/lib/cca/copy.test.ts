@@ -179,8 +179,9 @@ describe("designer FINAL CCA copy", () => {
       "Tokens can't be claimed yet. Try again from block 125.",
     );
     expect(CCA_CLAIM_ERROR_COPY.AuctionIsNotFinalized).toBe(
-      "The final price isn't set yet. Set it first, then claim.",
+      "Get back unused ETH first, then claim your tokens.",
     );
+    expect(CCA_CLAIM_ERROR_COPY.AuctionIsNotFinalized).toBe(CCA_CLAIM_ERROR_COPY.BidNotExited);
     expect(CCA_CLAIM_ERROR_COPY.BidNotExited).toBe("Get back unused ETH first, then claim your tokens.");
     expect(CCA_CLAIM_ERROR_COPY.BatchClaimDifferentOwner).toBe(
       "These bids belong to different wallets. Claim them one by one.",

@@ -171,7 +171,7 @@ export const CCA_EXIT_ERROR_COPY = {
 export const CCA_CLAIM_ERROR_COPY = {
   NotGraduated: "The goal wasn't reached, so there are no tokens to claim.",
   NotClaimable: "Tokens can't be claimed yet. Try again from block {claimBlock}.",
-  AuctionIsNotFinalized: "The final price isn't set yet. Set it first, then claim.",
+  AuctionIsNotFinalized: "Get back unused ETH first, then claim your tokens.",
   BidNotExited: "Get back unused ETH first, then claim your tokens.",
   BatchClaimDifferentOwner: "These bids belong to different wallets. Claim them one by one.",
 } as const;
