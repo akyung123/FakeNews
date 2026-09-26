@@ -22,21 +22,22 @@ One row per decision, with the reason.
 | 9 | 09-26 | Prophecies have a **deadline**. After it, the screen shows **Departed**. Still no judging | A departed prophecy stays next to the next buy |
 | 10 | 09-26 | **World ID (Proof of Human) only when creating a prophet name.** Store the nullifier: one prophet name per person. Buying and browsing are not verified | Issuing creates a lasting public record; the same person must not be able to reset it |
 | 11 | 09-26 | On graduation, open a Uniswap V4 pool (ETH/token, 1%, tickSpacing 200, `ProphecyHook`) and lock the position in `LiquidityLocker`. `collect` only pays prophet 24 : protocol 76 | Principal can never be withdrawn; fees keep flowing |
-| 12 | 09-26 | **(Proposed, needs team confirmation) Prophecy names never expire in ENS either** (`type(uint64).max`). The deadline lives only in the `deadline` text record, and Departed is computed from it | Review A: an expired name stops pointing at the token, which breaks "the name keeps pointing at the token after the deadline" |
+| 12 | 09-26 | ~~(Proposed) Prophecy names never expire in ENS either~~ → #14 | |
 | 13 | 09-26 | **(Needs team confirmation) Holder talk and trade memos** (short notes attached to buys/sells) | Not in SPEC's four screens. If added, they go on the prophecy detail screen |
+| 14 | 09-26 | **Prophecy names never expire in ENS** (`type(uint64).max`), like prophet names. The deadline lives only in the `deadline` text record, and Departed is computed from it | Review A: an expired name stops pointing at the token and its label could be registered again. A departed prophecy must keep its name and token |
 
 ## Not decided yet
 
 - Parent name (`prophecy.eth`?)
 - Protocol fee recipient address
 - Whether to run the final lock (emancipation) before or during the demo
-- #12, #13
+- #13
 
 ## Spec review (checked against code, 09-26)
 
 Checked against `PermissionedRegistry.sol` and `PermissionedResolver.sol` at `71a3b73`, the Sepolia deployment the docs reference.
 
-### A. An expired name stops pointing at the token → #12
+### A. An expired name stops pointing at the token → #14
 
 - Once expired, `getResolver(label)` and `getSubregistry(label)` return `address(0)` (`_isExpired`: `block.timestamp >= expiry`).
 - Resolution then falls back to the nearest ancestor's resolver. `lingo-2028.ringo...` could resolve through the prophet's resolver and return **the wrong address**.
@@ -63,7 +64,7 @@ Checked against `PermissionedRegistry.sol` and `PermissionedResolver.sol` at `71
 - Only accounts holding `ROLE_UNREGISTER` (on the root or on that name) can call `unregister`.
 - If no registry's init grants and no `register` role bitmap include it, no path exists.
 - Test it: `hasAssignees(ROOT, ROLE_UNREGISTER) == false`.
-- **Remaining hole:** re-registering an expired label. Closed by #12. The launchpad also rejects labels it has already used.
+- **Remaining hole:** re-registering an expired label. Closed by #14. The launchpad also rejects labels it has already used.
 
 ### E. Each prophet needs a registry
 

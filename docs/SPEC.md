@@ -242,7 +242,7 @@ eth
     │     ├── lingo-2028                 prophecy. A coin in the address book
     │     │     points to: token
     │     │     text: sentence, deadline
-    │     │     expiry: deadline (see DECISIONS #22)
+    │     │     expiry: none (deadline is a text record)
     │     │     transfer: not allowed
     │     │     edit sentence: not allowed
     │     │
@@ -261,7 +261,7 @@ Names are looked up in three places:
 
 Curve balances, price and graduation live in the contracts. ENS only points at them.
 
-Prophet names never expire: if the person in the address book expired, fees would have nowhere to go. Only prophecy names were planned to expire. `expiry = 0` must not be used (it reverts, see DECISIONS review B); use `type(uint64).max`.
+No name expires. A prophet name that expired would leave fees with nowhere to go, and a prophecy name that expired would stop pointing at its token (DECISIONS #14). Every name uses `type(uint64).max`; `expiry = 0` reverts (DECISIONS review B).
 
 The screen does not rely on ENS expiry for Departed. It reads the `deadline` text record. ENS expiry is about ownership.
 
@@ -337,7 +337,7 @@ Nobody should wait for a deadline during the demo. Create a 2-minute prophecy be
 | `Launchpad` | Curve, fee ledger, graduation. Reserves in a struct |
 | `ProphecyHook` | `beforeInitialize` allows only the launchpad |
 | `LiquidityLocker` | Holds positions. No withdraw. Only `collect`, split 24:76 |
-| ENS adapter | Registers subnames, sets address records, locks records, sets expiry |
+| ENS adapter | Registers subnames, sets address records, locks records |
 | World verification | Checks the proof before issuing, stores the nullifier |
 
 Checklist:

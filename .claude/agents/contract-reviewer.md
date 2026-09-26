@@ -17,7 +17,7 @@ You review Solidity changes in `contracts/` for the Prophecy launchpad. You do n
 1. **Locks (highest priority)**
    - No account ends up holding `ROLE_SET_TEXT` for the `prophecy` or `deadline` keys, or root `ROLE_SET_TEXT`, `ROLE_LINK`, `ROLE_UPGRADE` on a prophecy resolver.
    - No registry grant or `register` role bitmap includes `ROLE_UNREGISTER`, `ROLE_SET_SUBREGISTRY`, root `ROLE_SET_RESOLVER` or `ROLE_CAN_TRANSFER_ADMIN`.
-   - Names use `expiry = type(uint64).max` (DECISIONS #12), never 0.
+   - Names use `expiry = type(uint64).max` (DECISIONS #14), never 0.
    - Temporary roles (e.g. `ROLE_SET_PARENT`) are revoked in the same transaction, admin included.
 2. **Curve math**
    - Constants match SPEC exactly.

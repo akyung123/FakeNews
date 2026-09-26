@@ -11,7 +11,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 ## 0. Decide first (people)
 
 - [ ] Parent name: check that `prophecy.eth` is free on Sepolia
-- [ ] DECISIONS #12: prophecy names never expire (recommended)
+- [x] DECISIONS #14: prophecy names never expire
 - [ ] DECISIONS #13: holder talk and trade memos, yes or no
 - [ ] Protocol fee recipient
 - [ ] Who owns which lane (write names here)

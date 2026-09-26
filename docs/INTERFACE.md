@@ -20,7 +20,7 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 - **Label rules** `(draft)`
   - Prophet: 3–16 chars, `[a-z0-9]`
   - Prophecy: 3–32 chars, `[a-z0-9-]`, no leading or trailing hyphen
-- **Expiry:** `type(uint64).max` for every name, so names never expire (DECISIONS #12, pending team confirmation).
+- **Expiry:** `type(uint64).max` for every name, so names never expire (DECISIONS #14).
 - **Transfer:** not allowed. The owner's role bitmap is 0.
 - **Departed:** `now >= deadline`. Computed by the UI; there is no on-chain status.
 
