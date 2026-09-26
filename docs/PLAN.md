@@ -78,10 +78,10 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 ## 6. Infra (CI, Sepolia deploy skeleton, hosting)
 
-- [ ] GitHub Actions: `forge build` + `forge test`; web install / lint / typecheck / build; world when the folder exists @cursor-agent
-- [ ] Sepolia deploy skeleton (Foundry scripts, dry-run by default) @cursor-agent
-- [ ] Public hosting for `web/` as a static site (zero extra secrets) @cursor-agent
-- [ ] `docs/INFRA.md` and `.env.example` placeholders (names only) @cursor-agent
+- [x] GitHub Actions: `forge build` + `forge test`; web install / lint / typecheck / build; world when the folder exists @cursor-agent
+- [x] Sepolia deploy skeleton (Foundry scripts, dry-run by default) @cursor-agent
+- [x] Public hosting for `web/` as a static site (zero extra secrets) @cursor-agent
+- [x] `docs/INFRA.md` and `.env.example` placeholders (names only) @cursor-agent
 
 ## If there is time
 
