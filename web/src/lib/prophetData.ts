@@ -9,7 +9,8 @@
  *
  * Sentences must come through this module. Screen components never hardcode them.
  */
-import { MOCK_PARENT_NAME, MOCK_PROPHETS, MOCK_PROPHECIES } from "./mock";
+import { CURVE_SUPPLY as PROTOTYPE_CURVE_SUPPLY } from "./curve";
+import { GRADUATION_ETH, MOCK_PARENT_NAME, MOCK_PROPHETS, MOCK_PROPHECIES } from "./mock";
 import { marketCap, type Coin } from "./store";
 
 /** Curve supply from SPEC.md. Used only to turn `sold` into a 0–1 bar. */
@@ -90,7 +91,7 @@ export function getProphecyByName(name: string, nowSec = Math.floor(Date.now() /
 export function prototypeCoinFromName(name: string, nowSec?: number): Coin | null {
   const p = getProphecyByName(name, nowSec);
   if (!p) return null;
-  const sold = Number(p.sold / 10n ** 18n);
+  const sold = p.complete ? PROTOTYPE_CURVE_SUPPLY : Number(p.sold / 10n ** 18n);
   const createdAt = (nowSec ?? Math.floor(Date.now() / 1000)) * 1000;
   const coin: Coin = {
     id: p.slug,
@@ -100,7 +101,7 @@ export function prototypeCoinFromName(name: string, nowSec?: number): Coin | nul
     creator: p.ensName.split(".").slice(1).join("."),
     createdAt,
     sold,
-    ethRaised: p.complete ? 0.02 : sold > 0 ? 0.001 : 0,
+    ethRaised: p.complete ? GRADUATION_ETH : sold > 0 ? 0.001 : 0,
     history: [],
   };
   coin.history = [

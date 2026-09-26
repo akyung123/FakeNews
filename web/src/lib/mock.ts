@@ -7,6 +7,19 @@
  */
 
 // ---------------------------------------------------------------------------
+// Screen 1 — home list (prototype store seed)
+// ---------------------------------------------------------------------------
+
+export const SEED_COINS = [
+  { id: "wifi", ticker: "WIFI", name: "Wifi Dies", prophecy: "The venue Wi-Fi dies at 3am on Saturday", creator: "yuki.eth", min: 180 },
+  { id: "oops", ticker: "OOPS", name: "Mainnet Oops", prophecy: "Someone deploys to mainnet by accident before Sunday", creator: "0xHana", min: 140 },
+  { id: "coffee", ticker: "COFFEE", name: "No Coffee", prophecy: "Coffee runs out before Sunday breakfast", creator: "tokyo_bob", min: 95 },
+  { id: "yolo", ticker: "YOLO", name: "Zero Tests", prophecy: "A team with zero tests ships on time", creator: "rin_park", min: 60 },
+  { id: "why", ticker: "WHY", name: "Why Blockchain", prophecy: "Someone asks “why blockchain?” more than 10 times today", creator: "sam_lee", min: 25 },
+  { id: "sleep", ticker: "SLEEP", name: "No Sleep", prophecy: "Nobody on our team sleeps before 5am", creator: "june_kim", min: 6 },
+];
+
+// ---------------------------------------------------------------------------
 // Screen 2 — issue
 // Another frontend agent owns this section. Add issue-screen mocks below.
 // Do not mix those exports with the Screen 4 block.
@@ -99,6 +112,45 @@ export const MOCK_ISSUE_PLACEHOLDER = {
   prophetLabel: "ringo",
   slug: "lingo-2028",
 };
+
+/** Real ETH at graduation (SPEC). Screen 3 header shows raised vs this target. */
+export const GRADUATION_ETH = 0.02;
+
+// ---------------------------------------------------------------------------
+// Screen 3 — trade memos (prototype store seed)
+// ---------------------------------------------------------------------------
+
+export type SeedEvent =
+  | { min: number; coin: string; user: string; buy: number; say?: string }
+  | { min: number; coin: string; user: string; sellShare: number; say?: string }
+  | { min: number; coin: string; user: string; say: string };
+
+export const SEED_EVENTS: readonly SeedEvent[] = [
+  { min: 178, coin: "wifi", user: "yuki.eth", buy: 0.0015, say: "I've met this router before." },
+  { min: 170, coin: "wifi", user: "tokyo_bob", buy: 0.0025 },
+  { min: 150, coin: "wifi", user: "rin_park", buy: 0.002, say: "Router light is blinking amber already." },
+  { min: 138, coin: "oops", user: "0xHana", buy: 0.001, say: "trust me, I know my teammates" },
+  { min: 120, coin: "wifi", user: "0xHana", buy: 0.001 },
+  { min: 110, coin: "oops", user: "satoshi_jr", buy: 0.003, say: "someone always does it" },
+  { min: 100, coin: "wifi", user: "you", buy: 0.0005 },
+  { min: 93, coin: "coffee", user: "tokyo_bob", buy: 0.00075 },
+  { min: 80, coin: "wifi", user: "tokyo_bob", sellShare: 0.8 },
+  { min: 75, coin: "wifi", user: "rin_park", say: "Wi-Fi flickered at the demo table just now." },
+  { min: 70, coin: "oops", user: "june_kim", buy: 0.0015 },
+  { min: 60, coin: "coffee", user: "yuki.eth", buy: 0.001, say: "there is no more coffee…" },
+  { min: 58, coin: "yolo", user: "rin_park", buy: 0.004, say: "tests are for people who doubt" },
+  { min: 50, coin: "yolo", user: "sam_lee", buy: 0.002 },
+  { min: 40, coin: "wifi", user: "sam_lee", buy: 0.0005, say: "Wi-Fi still up at midnight. Checking again at 3." },
+  { min: 35, coin: "yolo", user: "june_kim", buy: 0.003, say: "this is literally us" },
+  { min: 24, coin: "why", user: "sam_lee", buy: 0.0005 },
+  { min: 20, coin: "coffee", user: "rin_park", buy: 0.00025 },
+  { min: 18, coin: "why", user: "yuki.eth", buy: 0.00025, say: "count is at 3 already" },
+  { min: 15, coin: "yolo", user: "0xHana", buy: 0.0015 },
+  { min: 12, coin: "coffee", user: "tokyo_bob", sellShare: 0.6 },
+  { min: 10, coin: "coffee", user: "tokyo_bob", say: "They refilled the coffee at 10pm." },
+  { min: 5, coin: "yolo", user: "sam_lee", say: "Still haven't written a test." },
+  { min: 5, coin: "sleep", user: "june_kim", buy: 0.0001, say: "Half the team is still awake at 4am." },
+];
 
 // ---------------------------------------------------------------------------
 // Screen 4 — prophet page
