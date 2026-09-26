@@ -5,6 +5,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {FullMath} from "v4-core/src/libraries/FullMath.sol";
+import {SqrtPriceMath} from "v4-core/src/libraries/SqrtPriceMath.sol";
+import {LiquidityAmounts} from "v4-core/test/utils/LiquidityAmounts.sol";
 
 import {CcaLib} from "../src/cca/CcaLib.sol";
 import {
@@ -22,6 +24,8 @@ contract CcaLibTest is Test {
         assertEq(CcaLib.POOL_FEE, 10_000);
         assertEq(CcaLib.POOL_TICK_SPACING, 200);
         assertEq(CcaLib.AUCTION_SUPPLY + CcaLib.LP_SUPPLY, CcaLib.TOTAL_SUPPLY);
+        assertEq(CcaLib.AUCTION_SUPPLY, CcaLib.LP_SUPPLY);
+        assertEq(CcaLib.AUCTION_SUPPLY, 500_000_000e18);
     }
 
     function test_packSteps25And10SumToMps() public pure {
@@ -58,8 +62,8 @@ contract CcaLibTest is Test {
 
         assertEq(CcaLib.AUCTION_TICK_SPACING_Q96, tick);
         assertEq(CcaLib.FLOOR_PRICE_Q96, floor);
-        assertEq(CcaLib.FLOOR_PRICE_Q96, 1997936263126070900);
-        assertEq(CcaLib.AUCTION_TICK_SPACING_Q96, 19979362631260709);
+        assertEq(CcaLib.FLOOR_PRICE_Q96, 3169126500570573600);
+        assertEq(CcaLib.AUCTION_TICK_SPACING_Q96, 31691265005705736);
 
         assertGe(CcaLib.FLOOR_PRICE_Q96, CcaLib.MIN_FLOOR_PRICE_Q96);
         assertGe(CcaLib.AUCTION_TICK_SPACING_Q96, CcaLib.MIN_AUCTION_TICK_SPACING_Q96);
@@ -68,7 +72,7 @@ contract CcaLibTest is Test {
         assertGe(CcaLib.FLOOR_PRICE_Q96, raw);
 
         uint256 raisedAtFloor = CcaLib.AUCTION_SUPPLY * CcaLib.FLOOR_PRICE_Q96 / CcaLib.Q96;
-        assertEq(raisedAtFloor, CcaLib.REQUIRED_CURRENCY_RAISED);
+        assertGe(raisedAtFloor, CcaLib.REQUIRED_CURRENCY_RAISED);
         assertEq(raisedAtFloor, 0.02 ether);
 
         // CCA v2.1.0 constructor: floor + tickSpacing <= MAX_BID_PRICE
@@ -88,7 +92,7 @@ contract CcaLibTest is Test {
         // LBP TokenPricing.convertToPriceX192(price, currencyIsCurrency0=true): Q192 * Q96 / floor
         uint256 priceX192 = FullMath.mulDiv(uint256(1) << 192, CcaLib.Q96, CcaLib.FLOOR_PRICE_Q96);
         uint160 sqrtPriceX96 = uint160(Graduation.sqrt(priceX192));
-        assertEq(sqrtPriceX96, 15777150227996145099409266077380864);
+        assertEq(sqrtPriceX96, 12527072418752396369073634927742441);
         assertTrue(sqrtPriceX96 >= TickMath.MIN_SQRT_PRICE);
         assertTrue(sqrtPriceX96 < TickMath.MAX_SQRT_PRICE);
 
@@ -98,8 +102,51 @@ contract CcaLibTest is Test {
         assertGe(tick, minUsable);
         assertLe(tick, maxUsable);
         assertEq(CcaLib.POOL_TICK_SPACING, 200);
-        // TickMath tick ≈ 244047; nearest spacing-200 bucket below is 244000.
-        assertEq((tick / CcaLib.POOL_TICK_SPACING) * CcaLib.POOL_TICK_SPACING, 244000);
+        // TickMath tick ≈ 239433; nearest spacing-200 bucket below is 239400.
+        assertEq((tick / CcaLib.POOL_TICK_SPACING) * CcaLib.POOL_TICK_SPACING, 239400);
+    }
+
+    /// LBP v3.3.0 PositionPlanner: empty definitions → one full-range mint;
+    /// unused currency0/token after mint go to `mp.recipient` (protocol).
+    /// Floor + 50/50 + 100% bracket ⇒ leftover ETH is mint-rounding dust.
+    function test_floorGraduationLeftoverEthIsDust() public pure {
+        uint256 raised = CcaLib.AUCTION_SUPPLY * CcaLib.FLOOR_PRICE_Q96 / CcaLib.Q96;
+        (uint256 leftoverEth, uint256 leftoverTok) = _lbpFullRangeLeftover(CcaLib.FLOOR_PRICE_Q96, raised, CcaLib.LP_SUPPLY);
+        assertLe(leftoverEth, 1 gwei);
+        // Token leftover may be a few wei from round-up quotes; must not dwarf ETH.
+        assertLe(leftoverTok, 1e12);
+    }
+
+    /// Clearing above floor with a full auction sell still matches 50/50 (dust ETH).
+    /// Clearing above floor with only the 0.02 ETH graduation line (partial fill)
+    /// leaves leftover tokens for protocol; leftover ETH stays dust.
+    function test_aboveFloorLeftoverGoesToTokensNotEth() public pure {
+        uint256 twiceFloor = CcaLib.FLOOR_PRICE_Q96 * 2;
+        uint256 fullRaise = CcaLib.AUCTION_SUPPLY * twiceFloor / CcaLib.Q96;
+        (uint256 leftoverEthFull,) = _lbpFullRangeLeftover(twiceFloor, fullRaise, CcaLib.LP_SUPPLY);
+        assertLe(leftoverEthFull, 1 gwei);
+
+        uint256 minRaise = CcaLib.REQUIRED_CURRENCY_RAISED;
+        (uint256 leftoverEthMin, uint256 leftoverTokMin) =
+            _lbpFullRangeLeftover(twiceFloor, minRaise, CcaLib.LP_SUPPLY);
+        assertLe(leftoverEthMin, 1 gwei);
+        assertGt(leftoverTokMin, CcaLib.LP_SUPPLY / 3);
+    }
+
+    function _lbpFullRangeLeftover(uint256 priceQ96, uint256 raisedEth, uint256 lpTokens)
+        internal
+        pure
+        returns (uint256 leftoverEth, uint256 leftoverTok)
+    {
+        uint256 priceX192 = FullMath.mulDiv(uint256(1) << 192, CcaLib.Q96, priceQ96);
+        uint160 sqrtP = uint160(Graduation.sqrt(priceX192));
+        uint160 lower = TickMath.getSqrtPriceAtTick(Graduation.tickLower());
+        uint160 upper = TickMath.getSqrtPriceAtTick(Graduation.tickUpper());
+        uint128 liq = LiquidityAmounts.getLiquidityForAmounts(sqrtP, lower, upper, raisedEth, lpTokens);
+        uint256 used0 = SqrtPriceMath.getAmount0Delta(sqrtP, upper, liq, true);
+        uint256 used1 = SqrtPriceMath.getAmount1Delta(lower, sqrtP, liq, true);
+        leftoverEth = raisedEth - used0;
+        leftoverTok = lpTokens - used1;
     }
 
     function test_buildNeverSetsProphetAsRecipient() public pure {

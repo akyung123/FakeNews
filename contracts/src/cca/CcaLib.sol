@@ -13,8 +13,11 @@ import {
 /// Auction length is not a constant: callers pass `auctionBlocks`.
 library CcaLib {
     uint256 internal constant TOTAL_SUPPLY = 1_000_000_000e18;
-    uint256 internal constant AUCTION_SUPPLY = 793_100_000e18;
-    uint256 internal constant LP_SUPPLY = 206_900_000e18;
+    /// 50/50 so a floor-clearing migrate seeds the full-range v4 position at the
+    /// same price LBP initializes (LBP bracket rate 1e7 = 100% of raised ETH).
+    /// Official CCA factory protocol fee is 0 when the controller is unset.
+    uint256 internal constant AUCTION_SUPPLY = 500_000_000e18;
+    uint256 internal constant LP_SUPPLY = 500_000_000e18;
     uint128 internal constant REQUIRED_CURRENCY_RAISED = 0.02 ether;
     uint24 internal constant POOL_FEE = 10_000;
     int24 internal constant POOL_TICK_SPACING = 200;
@@ -28,15 +31,15 @@ library CcaLib {
     uint256 internal constant MIN_FLOOR_PRICE_Q96 = (uint256(1) << 32) + 1;
     uint256 internal constant MIN_AUCTION_TICK_SPACING_Q96 = 2;
 
-    /// Q96 currency-wei per token-wei. The official harness `1000<<96` / `100<<96`
-    /// was for an 800e18 toy token; at our 793.1M auction supply that floor would
-    /// raise ~793.1 billion ETH. Floor here is set so selling the full auction
+    /// Q96 currency-wei per token-wei. Floor is set so selling the full auction
     /// supply at floor raises the 0.02 ETH graduation line:
     ///   raw = ceil(REQUIRED_CURRENCY_RAISED * Q96 / AUCTION_SUPPLY)
     ///   tick = ceil(raw / 100)   // 1% of floor (CCA docs: at least 1 bp; 1% or 10% ok)
     ///   floor = tick * 100       // so floor % tick == 0 and floor >= raw
     /// Constructor also requires floor + tickSpacing <= MAX_BID_PRICE
     /// (MaxBidPriceLib.maxBidPrice(auctionSupply)).
+    /// With AUCTION_SUPPLY == LP_SUPPLY and a 100% LP currency bracket, leftover
+    /// ETH at floor graduation is mint-rounding dust, not ~0.0148 ETH.
     uint256 internal constant _RAW_FLOOR_PRICE_Q96 =
         (uint256(REQUIRED_CURRENCY_RAISED) * Q96 + AUCTION_SUPPLY - 1) / AUCTION_SUPPLY;
     uint256 internal constant AUCTION_TICK_SPACING_Q96 = (_RAW_FLOOR_PRICE_Q96 + 99) / 100;
