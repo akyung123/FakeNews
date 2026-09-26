@@ -28,22 +28,7 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 
 ### `Launchpad` `(draft)`
 
-Constructor argument order is frozen from the left. This PR implements 1–3.
-The graduation PR appends 4–6 after `ens` and does not reorder.
-
-```solidity
-// Final constructor order:
-constructor(
-    address protocolFeeRecipient, // 1
-    address worldSigner,          // 2
-    address ens,                  // 3  this PR (`IProphecyEns`)
-    address poolManager,          // 4  graduation PR
-    address hook,                 // 5  graduation PR
-    address locker                // 6  graduation PR
-);
-```
-
-This PR's ABI is the first three arguments only:
+Final constructor. Graduation does not add constructor arguments.
 
 ```solidity
 constructor(address protocolFeeRecipient, address worldSigner, address ens);
@@ -83,6 +68,7 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 
 - The sentence and deadline are not in `Launched`. Both are read from ENS (DECISIONS #5).
 - `registerProphet` recovers EIP-191 `personal_sign` of `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` (section 3). `chainId` must be `block.chainid` and `launchpad` must be this contract; the signed wallet must be `msg.sender`. Label is chosen by the caller and is not in the signed payload.
+- Deploy order: Launchpad, Hook (CREATE2 with the Launchpad address), Locker, then a deployer-only one-time `setUniswap(poolManager, hook, locker)` added by the graduation PR. Uniswap addresses are not constructor args.
 - Constants are exactly the "Constants" section of SPEC.md.
 - `memo` is only emitted, never stored. `buy`/`sell` revert if it is longer than 140 bytes (DECISIONS #15).
 - Rounding:

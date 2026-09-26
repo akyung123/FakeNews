@@ -135,8 +135,8 @@ contract Launchpad {
         _status = _NOT_ENTERED;
     }
 
-    /// Argument order (team agreement): protocolFeeRecipient, worldSigner, ens.
-    /// Graduation appends poolManager, hook, locker after `ens` — do not reorder.
+    /// Final constructor: protocolFeeRecipient, worldSigner, ens.
+    /// Uniswap addresses are set once after deploy via `setUniswap` (graduation PR).
     constructor(address protocolFeeRecipient_, address worldSigner_, IProphecyEns ens_) {
         if (
             protocolFeeRecipient_ == address(0) || worldSigner_ == address(0) || address(ens_) == address(0)
