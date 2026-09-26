@@ -75,6 +75,13 @@ export const launchpadCcaAbi = [
     outputs: [{ name: "", type: "address" }],
   },
   {
+    type: "function",
+    name: "auctionBlocks",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint64" }],
+  },
+  {
     type: "event",
     name: "Launched",
     inputs: [

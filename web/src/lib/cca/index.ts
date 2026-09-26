@@ -16,7 +16,10 @@ export {
 export {
   AUCTION_BLOCKS,
   AUCTION_STEPS_MPS_TOTAL,
+  CCA_AUCTION_SUPPLY,
   CCA_CONFIG,
+  CCA_LP_SUPPLY,
+  CCA_TOTAL_SUPPLY,
   FIRST_BID_ID,
   FLOOR_PRICE_Q96,
   GRADUATION_ETH_WEI,
@@ -159,6 +162,7 @@ export {
   INTERFACE_CCA_PENDING,
   INTERFACE_CCA_TBD,
   InterfaceCcaPendingError,
+  auctionBlocksRead,
   auctionOfRead,
   backendLaunchErrorNames,
   collectCcaWrite,

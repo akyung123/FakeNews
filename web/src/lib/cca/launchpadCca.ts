@@ -84,6 +84,16 @@ export function positionManagerRead(launchpad: Address) {
   };
 }
 
+/** Live auction length. Never hardcode 25 — demo deploy may set 10. */
+export function auctionBlocksRead(launchpad: Address) {
+  return {
+    address: launchpad,
+    abi: launchpadCcaAbi,
+    functionName: "auctionBlocks" as const,
+    args: [] as const,
+  };
+}
+
 /**
  * `launch(slug, prophecy, deadline)` — not payable, no first buy.
  * Returns the token only — read auction from Launched or auctionOf.

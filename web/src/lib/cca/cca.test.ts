@@ -48,6 +48,7 @@ import {
   INTERFACE_CCA_PENDING,
   INTERFACE_CCA_TBD,
   InterfaceCcaPendingError,
+  auctionBlocksRead,
   auctionOfRead,
   backendLaunchErrorNames,
   collectCcaWrite,
@@ -726,6 +727,12 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
     });
     expect(initializerFromAuction(AUCTION)).toBe(AUCTION);
     expect(hookRead(launchpad).functionName).toBe("hook");
+    expect(auctionBlocksRead(launchpad)).toMatchObject({
+      address: launchpad,
+      functionName: "auctionBlocks",
+      args: [],
+    });
+    expect(names(launchpadCcaAbi, "function")).toEqual(expect.arrayContaining(["auctionBlocks"]));
     const launched = launchCcaWrite(launchpad, "lingo-2028", "hello", 1_800_000_000n);
     expect(launched.functionName).toBe("launch");
     expect(launched.args).toEqual(["lingo-2028", "hello", 1_800_000_000n]);

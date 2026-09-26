@@ -10,6 +10,11 @@ import { encodePacked, parseEther, zeroAddress, type Address, type Hex } from "v
 export const Q96 = 0x1000000000000000000000000n;
 export const WAD = 10n ** 18n;
 
+/** CcaLib 50/50 split. Live auction length is `launchpad.auctionBlocks()`, not a constant. */
+export const CCA_TOTAL_SUPPLY = 1_000_000_000n * WAD;
+export const CCA_AUCTION_SUPPLY = 500_000_000n * WAD;
+export const CCA_LP_SUPPLY = 500_000_000n * WAD;
+
 export type CcaConfig = {
   currency: Address;
   floorPriceQ96: bigint;
@@ -64,6 +69,7 @@ export function auctionMigrationBlock(startBlock: bigint, n = CCA_CONFIG.auction
 }
 
 export const NATIVE_ETH = CCA_CONFIG.currency;
+/** CcaLib default only. Live UI reads `launchpad.auctionBlocks()`. */
 export const AUCTION_BLOCKS = CCA_CONFIG.auctionBlocks;
 export const GRADUATION_ETH_WEI = CCA_CONFIG.graduationWei;
 export const POOL_FEE = CCA_CONFIG.poolFee;

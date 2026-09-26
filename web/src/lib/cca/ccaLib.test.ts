@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { lockerCcaAbi } from "./abi/launchpadCca";
-import { FLOOR_PRICE_Q96, Q96, TICK_SPACING_Q96 } from "./config";
+import { CCA_AUCTION_SUPPLY, CCA_LP_SUPPLY, CCA_TOTAL_SUPPLY, FLOOR_PRICE_Q96, Q96, TICK_SPACING_Q96 } from "./config";
 
 const LOCAL_CCA_LIB = resolve(import.meta.dirname, "../../../../contracts/src/cca/CcaLib.sol");
 
@@ -27,6 +27,15 @@ describe("CcaLib.sol floor / tick parity (#42 9c6b163)", () => {
     expect(TICK_SPACING_Q96).toBe(31_691_265_005_705_736n);
     expect(FLOOR_PRICE_Q96).toBe(3_169_126_500_570_573_600n);
     expect(FLOOR_PRICE_Q96 % TICK_SPACING_Q96).toBe(0n);
+
+    expect(src).toContain("uint256 internal constant AUCTION_SUPPLY = 500_000_000e18");
+    expect(src).toContain("uint256 internal constant LP_SUPPLY = 500_000_000e18");
+    expect(src).toContain("uint256 internal constant TOTAL_SUPPLY = 1_000_000_000e18");
+    expect(CCA_AUCTION_SUPPLY).toBe(500_000_000n * 10n ** 18n);
+    expect(CCA_LP_SUPPLY).toBe(500_000_000n * 10n ** 18n);
+    expect(CCA_TOTAL_SUPPLY).toBe(1_000_000_000n * 10n ** 18n);
+    expect(CCA_AUCTION_SUPPLY).toBe(CCA_LP_SUPPLY);
+    expect(CCA_AUCTION_SUPPLY + CCA_LP_SUPPLY).toBe(CCA_TOTAL_SUPPLY);
   });
 });
 

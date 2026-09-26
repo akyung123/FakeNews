@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { readLaunchpadDeployBlock, webEnv } from "./env";
 import { MOCK_WORLD_LAUNCHPAD, MOCK_WORLD_VERIFY } from "./mock";
@@ -218,6 +220,13 @@ describe("registerProphet write shape", () => {
 
 describe("Launched log fromBlock", () => {
   const latest = 80_000n;
+
+  it("uses VITE_LAUNCHPAD_ADDRESS and VITE_LAUNCHPAD_DEPLOY_BLOCK env names", () => {
+    const src = readFileSync(resolve(import.meta.dirname, "./env.ts"), "utf8");
+    expect(src).toContain("VITE_LAUNCHPAD_ADDRESS");
+    expect(src).toContain("VITE_LAUNCHPAD_DEPLOY_BLOCK");
+    expect(src).not.toContain("VITE_FACTORY_ADDRESS");
+  });
 
   it("uses VITE_LAUNCHPAD_DEPLOY_BLOCK when it is a decimal block number", () => {
     expect(readLaunchpadDeployBlock("12345678")).toBe(12_345_678n);

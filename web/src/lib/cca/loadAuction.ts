@@ -21,7 +21,7 @@ import {
 } from "./auction";
 import { ccaAbi } from "./abi/cca";
 import type { AuctionCopyStatus } from "./copy";
-import { auctionOfRead, hookRead, lockerRead, lbpStrategyRead, positionManagerRead } from "./launchpadCca";
+import { auctionBlocksRead, auctionOfRead, hookRead, lockerRead, lbpStrategyRead, positionManagerRead } from "./launchpadCca";
 import { ccaLogsFromBlock } from "./logs";
 import { bidAmountQ96ToWei } from "./price";
 import { findLockerTokenId, isRegisteredRead } from "./register";
@@ -50,6 +50,7 @@ export type CcaAuctionSnapshot = {
   poolManager?: Address;
   floorPriceQ96?: bigint;
   tickSpacingQ96?: bigint;
+  auctionBlocks?: bigint;
   refundWei: bigint;
   owner?: Address;
 };
@@ -100,6 +101,7 @@ export async function loadCcaAuction(token: Address): Promise<CcaAuctionSnapshot
     owner,
   });
 
+  let auctionBlocks: bigint | undefined;
   if (!launchpad) return empty("not_funded");
 
   try {
@@ -109,6 +111,9 @@ export async function loadCcaAuction(token: Address): Promise<CcaAuctionSnapshot
     if (fromPadStrategy) lbpStrategy = fromPadStrategy;
     const fromPadPm = asAddress(await readContract(wagmiConfig, positionManagerRead(launchpad)).catch(() => undefined));
     if (fromPadPm) positionManager = fromPadPm;
+    auctionBlocks = (await readContract(wagmiConfig, auctionBlocksRead(launchpad)).catch(() => undefined)) as
+      | bigint
+      | undefined;
   } catch {
     // keep whatever we already have
   }
@@ -116,7 +121,7 @@ export async function loadCcaAuction(token: Address): Promise<CcaAuctionSnapshot
   if (!locker) missing.push("locker");
 
   const auction = asAddress(await readContract(wagmiConfig, auctionOfRead(launchpad, token)).catch(() => undefined));
-  if (!auction) return { ...empty("not_funded"), hook, locker };
+  if (!auction) return { ...empty("not_funded"), hook, locker, auctionBlocks };
 
   const schedule = auctionScheduleRequest(auction);
   const [lens, startBlock, endBlock, currentBlock, floorPriceQ96, tickSpacingQ96, lastCheckpointedBlock, nextBidId, totalSupply] =
@@ -255,6 +260,7 @@ export async function loadCcaAuction(token: Address): Promise<CcaAuctionSnapshot
     poolManager,
     floorPriceQ96,
     tickSpacingQ96,
+    auctionBlocks,
     refundWei,
     owner,
   };
