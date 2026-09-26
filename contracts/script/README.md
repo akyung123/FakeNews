@@ -24,6 +24,6 @@ ENS: set `PARENT_USER_REGISTRY` to create the adapter, or set `ENS_ADAPTER_ADDRE
 
 Official addresses live in `SepoliaConfig.sol`. Optional env overrides: `UNISWAP_V4_POOL_MANAGER`, `LBP_STRATEGY`, `POSITION_MANAGER`, `CCA_FACTORY`, `INITIALIZER_HOOK`, `HOOK_SALT`.
 
-Floor, tick, and the auction/LP supply split are **not** constants in this script. They are read from `CcaLib` at compile time and printed as `CCA_*` paste lines so a 50:50 split (or a later floor) follows `contracts/src/cca/CcaLib.sol` without a script edit.
+Floor, tick, and the auction/LP supply split are **not** constants in this script. They are read from `CcaLib` at compile time, cross-checked against Launchpad public constants, and printed as `CCA_*` paste lines. After deploy the script also prints `AUCTION_BLOCKS=` from `launchpad.auctionBlocks()` (default `CcaLib.DEFAULT_AUCTION_BLOCKS` = 25). Do not call `setAuctionBlocks` from this script — a person sets `10` just before recording (see `infra/README.md`). The locker surface is `collect(address,uint256)`, `tokenIdsOf(address)`, `isRegistered(address,uint256)` — there is no `tokenIdOf`.
 
 After a send, paste `VITE_LAUNCHPAD_ADDRESS`, `VITE_LAUNCHPAD_DEPLOY_BLOCK`, `VITE_HOOK_ADDRESS`, `VITE_LOCKER_ADDRESS`, plus the LBP / CCA / PositionManager lines the script prints. Record: repo-root `deployments/sepolia.json`.

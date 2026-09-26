@@ -103,7 +103,20 @@ The deployer must be a **plain EOA**. `ETHRegistrar.register` mints an ERC-1155 
 
 Gas for `Deploy.s.sol` only on a Sepolia fork against #42 `89e45f0` (5 txs, no parent register): Launchpad CREATE 3,522,395; Hook CREATE2 385,398; Locker CREATE 1,476,031; `setUniswap` 133,255; `setCca` 125,052; total 5,642,131. At the fork basefee (~1.010 gwei) that is ~0.00570 ETH; at 2× basefee ~0.01140 ETH. A 0.05 ETH deployer budget covers both. If `Deploy.s.sol` is split from `deployAdapter()`, do not send any other deployer transaction in between — the Launchpad CREATE nonce is predicted.
 
-The script prints paste-ready lines for a visual check: `WORLD_CHAIN_ID=11155111`, `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`, and `worldSigner address: 0x…` (address only, never the private key). After a send it also writes the deployment record below and prints `chainId`, `launchpad`, `launchpadBlock`, `adapter`, `parentUserRegistry`, `hook`, `locker`, `poolManager`, `deployer`, and `commit`.
+The script prints paste-ready lines for a visual check: `WORLD_CHAIN_ID=11155111`, `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`, `worldSigner address: 0x…` (address only, never the private key), `CCA_*` values from `CcaLib`, and `AUCTION_BLOCKS=` from `launchpad.auctionBlocks()`. After a send it also writes the deployment record below and prints `chainId`, `launchpad`, `launchpadBlock`, `adapter`, `parentUserRegistry`, `hook`, `locker`, `poolManager`, `deployer`, and `commit`.
+
+### After Launchpad send, just before recording
+
+Deploy leaves `auctionBlocks()` at the default 25. For the demo recording the deployer shortens it to 10, then reads it back. **Person-only.** Do not put the private key on argv. The key stays in the environment (same wallet as `Deploy.s.sol`).
+
+```bash
+# after VITE_LAUNCHPAD_ADDRESS is set from the deploy paste lines
+cast send "$VITE_LAUNCHPAD_ADDRESS" "setAuctionBlocks(uint64)" 10 --rpc-url "$SEPOLIA_RPC_URL"
+cast call "$VITE_LAUNCHPAD_ADDRESS" "auctionBlocks()(uint64)" --rpc-url "$SEPOLIA_RPC_URL"
+# expect 10
+```
+
+`setAuctionBlocks` is deployer-only. Do not run it from `Deploy.s.sol`. The locker has `collect(address token, uint256 tokenId)` and `tokenIdsOf(address)` — there is no `tokenIdOf`.
 
 ## Deployment record
 
@@ -263,7 +276,7 @@ This repo has one `.env.example`. Do not add `world/.env.example`.
 2. Script mints MockUSDC via public `mint(address,uint256)` on the 71a3b73 token (`docs/ENSV2.md` section 0). If that mint is gone, fund the deployer by hand (5+ chars ≈ $8 / year).
 3. `commit()` → wait **~70 seconds** → `registerName()` (`approve` the ETHRegistrar, `subregistry=0`, `resolver=0`). Same `DEPLOYER_PRIVATE_KEY` for every step.
 4. `deployUserRegistry()` — VerifiableFactory proxy of `UserRegistryImpl`.
-5. `Deploy.s.sol` — **adapter first** with a predicted Launchpad CREATE address, then Launchpad, CREATE2 Hook (mined flags, `authorized` = LBPStrategy), Locker, deployer `setUniswap(poolManager, hook, locker)` once, then `setCca(lbpStrategy, positionManager)` once, in one broadcast. Constructor: `protocolFeeRecipient`, `worldSigner`, `ens`.
+5. `Deploy.s.sol` — **adapter first** with a predicted Launchpad CREATE address, then Launchpad, CREATE2 Hook (mined flags, `authorized` = LBPStrategy), Locker, deployer `setUniswap(poolManager, hook, locker)` once, then `setCca(lbpStrategy, positionManager)` once, in one broadcast. Constructor: `protocolFeeRecipient`, `worldSigner`, `ens`. Just before recording, the deployer calls `setAuctionBlocks(10)` and reads `auctionBlocks()` back (see above).
 6. `linkParent()` — `setSubregistry` on ETHRegistry, `setParent` on the new registry, revoke `SET_PARENT`.
 7. `grantAdapterRegistrar()` — `ROLE_REGISTRAR` to `ENS_ADAPTER_ADDRESS` (`ProphecyEns`) only.
 8. Final lock is irreversible. **Do not run it from this script.** A person confirms before anyone prepares it.

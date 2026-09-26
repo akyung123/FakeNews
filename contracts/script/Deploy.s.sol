@@ -163,6 +163,10 @@ contract Deploy is ScriptVm {
         require(launchpad.REQUIRED_CURRENCY_RAISED() == CcaLib.REQUIRED_CURRENCY_RAISED, "CcaLib.REQUIRED_CURRENCY_RAISED");
         require(launchpad.POOL_FEE() == CcaLib.POOL_FEE, "CcaLib.POOL_FEE");
         require(launchpad.POOL_TICK_SPACING() == CcaLib.POOL_TICK_SPACING, "CcaLib.POOL_TICK_SPACING");
+        require(
+            launchpad.DEFAULT_AUCTION_BLOCKS() == CcaLib.DEFAULT_AUCTION_BLOCKS, "CcaLib.DEFAULT_AUCTION_BLOCKS"
+        );
+        require(launchpad.auctionBlocks() == CcaLib.DEFAULT_AUCTION_BLOCKS, "auctionBlocks");
 
         (address hookAddr, address lockerAddr, bytes32 hookSalt) =
             _wireCca(launchpad, poolManager, lbpStrategy, positionManager);
@@ -226,6 +230,7 @@ contract Deploy is ScriptVm {
         _pasteLine(string.concat("CCA_POOL_FEE=", vm.toString(uint256(CcaLib.POOL_FEE))));
         _pasteLine(string.concat("CCA_POOL_TICK_SPACING=", vm.toString(uint256(uint24(CcaLib.POOL_TICK_SPACING)))));
         _pasteLine(string.concat("CCA_DEFAULT_AUCTION_BLOCKS=", vm.toString(uint256(CcaLib.DEFAULT_AUCTION_BLOCKS))));
+        _pasteLine(string.concat("AUCTION_BLOCKS=", vm.toString(uint256(launchpad.auctionBlocks()))));
         _pasteLine(string.concat("DEPLOYER=", vm.toString(deployer)));
         _pasteLine(signerLine);
     }
