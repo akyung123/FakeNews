@@ -86,6 +86,15 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] If the ENS app cannot read Sepolia ENSv2 names: use the viem lookup script in `infra/` (`getEnsAddress` and text record) output as the external lookup evidence for scenes 1 and 2.
 - [ ] `FEEDBACK.md` (Uniswap): keep notes of blockers during development; it is the fallback deliverable if Uniswap graduation is cut.
 
+## 6. CCA Path B2 (`cca` branch only — do not merge to `main`)
+
+Team decision B2: replace the bonding curve with official Uniswap LBPStrategy. The curve on `main` stays the fallback.
+
+- [ ] `Launchpad`: drop curve `buy`/`sell`/`graduate`; `launch` mints and calls `LBPStrategy.initializeDistribution`; `auctionOf(token)` @cursor
+- [ ] `ProphecyHook`: official `InitializerHook` pattern so LBP can initialize the v4 pool (`authorized` = LBPStrategy); 24:76 stays on the locker @cursor
+- [ ] `LiquidityLocker`: hold the v4 PositionManager LP NFT; no withdraw; `collect` splits prophet 24 : protocol 76 @cursor
+- [ ] Unit tests with mocks; `forge build && forge test` green @cursor
+
 ## If there is time
 
 - [ ] Holder talk: a holder-only board (DECISIONS #15 leaves it for later)
