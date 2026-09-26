@@ -303,6 +303,19 @@ contract LockerRegisterTest is Test {
         );
         vm.expectRevert(LiquidityLocker.BadPoolKey.selector);
         locker.register(address(token), badTick);
+
+        uint256 badCurrency0 = posm.mintSilentWithKey(
+            address(locker),
+            PoolKey({
+                currency0: Currency.wrap(address(uint160(0xC0))),
+                currency1: Currency.wrap(address(token)),
+                fee: 10_000,
+                tickSpacing: 200,
+                hooks: IHooks(hook)
+            })
+        );
+        vm.expectRevert(LiquidityLocker.BadPoolKey.selector);
+        locker.register(address(token), badCurrency0);
     }
 
     function test_registerRevertsNotPrepared() public {
