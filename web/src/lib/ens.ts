@@ -12,6 +12,7 @@ import { sepolia } from "viem/chains";
 import { normalize } from "viem/ens";
 import { SEPOLIA_CHAIN_ID, webEnv } from "./env";
 import { MOCK_PARENT_NAME, MOCK_PROPHECIES, MOCK_PROPHETS } from "./mock";
+import { getPublicClient } from "./rpc";
 
 export const ENS_TEXT_PROPHECY = "prophecy";
 
@@ -51,7 +52,9 @@ export function mockEnsAddress(name: string): Address | null {
   return prophet?.wallet ?? null;
 }
 
-export function createEnsClient(rpcUrl = webEnv.rpcUrl): PublicClient {
+/** Default reuses the app-wide client. Pass rpcUrl only to point a call elsewhere (tests). */
+export function createEnsClient(rpcUrl?: string): PublicClient {
+  if (!rpcUrl) return getPublicClient();
   return createPublicClient({
     chain: sepolia,
     transport: http(rpcUrl),

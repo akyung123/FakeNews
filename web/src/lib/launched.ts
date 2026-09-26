@@ -3,14 +3,14 @@
  * Sentence comes from ENS when a resolver is set — never from Launched.
  * On the cca branch, raised / complete come from auctionOf + CCALens.
  */
-import { createPublicClient, formatEther, http, isAddress, zeroAddress, type Address, type PublicClient } from "viem";
-import { sepolia } from "viem/chains";
+import { formatEther, isAddress, zeroAddress, type Address, type PublicClient } from "viem";
 import { auctionOfRead, readAuctionView } from "./cca";
 import { contracts, hasLaunchpad } from "./contracts";
 import { TOTAL_SUPPLY } from "./curve";
 import { ENS_TEXT_PROPHECY, getEnsText } from "./ens";
 import { webEnv } from "./env";
-import { fetchLaunchedLogs } from "./launchpad";
+import { fetchLaunchedLogs, fetchLaunchedLogsChunked } from "./launchpad";
+import { getPublicClient } from "./rpc";
 import type { Coin } from "./store";
 
 export type LaunchedLogLike = {
@@ -115,16 +115,13 @@ export type LoadLaunchedOptions = {
 };
 
 function defaultClient(): PublicClient {
-  return createPublicClient({
-    chain: sepolia,
-    transport: http(webEnv.rpcUrl),
-  });
+  return getPublicClient();
 }
 
 export async function loadLaunchedCoins(options: LoadLaunchedOptions = {}): Promise<Coin[]> {
   if (!hasLaunchpad() && !options.fetchLogs && !options.client) return [];
   const client = options.client ?? defaultClient();
-  const logs = await (options.fetchLogs ?? fetchLaunchedLogs)(client);
+  const logs = await (options.fetchLogs ?? fetchLaunchedLogsChunked)(client);
   const list = Array.isArray(logs) ? logs : [];
   const coins = coinsFromLaunchedLogs(list);
   return Promise.all(

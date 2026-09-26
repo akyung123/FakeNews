@@ -15,6 +15,20 @@ import {
   type WorldServerSignature,
 } from "../lib/world";
 
+/** True once `active` has stayed true for slowMs — a stalled check, not the normal first-load wait. */
+function useSlowPending(active: boolean, slowMs = 20_000): boolean {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), slowMs);
+    return () => clearTimeout(timer);
+  }, [active, slowMs]);
+  return slow;
+}
+
 type Props = {
   returningProphet: boolean;
   prophetName: string;
@@ -37,6 +51,8 @@ export function WorldGate({
   onVerified,
 }: Props) {
   const [resolved, setResolved] = useState<WorldClient | null>(world.isMock ? world : null);
+  const [attempt, setAttempt] = useState(0);
+  const slow = useSlowPending(!resolved);
 
   useEffect(() => {
     if (world.isMock) {
@@ -51,7 +67,7 @@ export function WorldGate({
     return () => {
       cancelled = true;
     };
-  }, [world]);
+  }, [world, attempt]);
 
   if (returningProphet) {
     return (
@@ -69,6 +85,16 @@ export function WorldGate({
         <p className="strong">Proof of Human</p>
         <p className="faint">{ISSUE_COPY.worldHelp}</p>
         <p className="faint">{ISSUE_COPY.pending}</p>
+        {slow ? (
+          <>
+            <p className="faint small" data-testid="world-slow">
+              {ISSUE_COPY.pendingSlow}
+            </p>
+            <button type="button" className="btn ghost" onClick={() => setAttempt((a) => a + 1)}>
+              {ISSUE_COPY.retry}
+            </button>
+          </>
+        ) : null}
       </section>
     );
   }
@@ -275,6 +301,9 @@ function IdKitHost({
     environment: "production" | "staging";
   } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const loading = !Widget || !rpContext || !idKitApp;
+  const slow = useSlowPending(loading && !loadError);
 
   useEffect(() => {
     let cancelled = false;
@@ -298,10 +327,33 @@ function IdKitHost({
     return () => {
       cancelled = true;
     };
-  }, [wallet, world, onStatus]);
+  }, [wallet, world, onStatus, attempt]);
 
   if (loadError) return <p className="banner-error">{loadError}</p>;
-  if (!Widget || !rpContext || !idKitApp) return <p className="faint">{ISSUE_COPY.pending}</p>;
+  if (loading) {
+    return (
+      <>
+        <p className="faint">{ISSUE_COPY.pending}</p>
+        {slow ? (
+          <>
+            <p className="faint small" data-testid="world-slow">
+              {ISSUE_COPY.pendingSlow}
+            </p>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => {
+                setLoadError(null);
+                setAttempt((a) => a + 1);
+              }}
+            >
+              {ISSUE_COPY.retry}
+            </button>
+          </>
+        ) : null}
+      </>
+    );
+  }
 
   return (
     <Widget

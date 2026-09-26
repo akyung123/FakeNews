@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readLaunchpadDeployBlock, webEnv } from "./env";
 import { MOCK_WORLD_LAUNCHPAD, MOCK_WORLD_VERIFY } from "./mock";
 import {
@@ -12,6 +12,8 @@ import {
   curveRead,
   ensAdapterRead,
   fetchLaunchedLogs,
+  fetchLaunchedLogsChunked,
+  LAUNCHED_LOGS_CHUNK_BLOCKS,
   LAUNCHED_LOOKBACK_BLOCKS,
   launchedFromBlock,
   launchedLogsQuery,
@@ -19,6 +21,7 @@ import {
   readEnsAdapter,
   registerProphetArgs,
   registerProphetWrite,
+  resetLaunchedLogsCacheForTests,
   type RegisterProphetInput,
 } from "./launchpad";
 import { launchpadCcaAbi } from "./cca/abi/launchpadCca";
@@ -314,5 +317,85 @@ describe("Launched log fromBlock", () => {
       undefined,
     );
     expect(mockMode).toEqual([]);
+  });
+});
+
+describe("fetchLaunchedLogsChunked", () => {
+  beforeEach(() => {
+    resetLaunchedLogsCacheForTests();
+  });
+
+  it("splits a wide block range into LAUNCHED_LOGS_CHUNK_BLOCKS windows", async () => {
+    const seen: { fromBlock: bigint; toBlock: bigint }[] = [];
+    const latest = 12_000n;
+    await fetchLaunchedLogsChunked(
+      {
+        async getBlockNumber() {
+          return latest;
+        },
+        async getContractEvents(query) {
+          seen.push({ fromBlock: query.fromBlock, toBlock: query.toBlock });
+          return [];
+        },
+      },
+      MOCK_WORLD_LAUNCHPAD,
+      0n,
+    );
+    expect(seen).toEqual([
+      { fromBlock: 0n, toBlock: LAUNCHED_LOGS_CHUNK_BLOCKS - 1n },
+      { fromBlock: LAUNCHED_LOGS_CHUNK_BLOCKS, toBlock: 2n * LAUNCHED_LOGS_CHUNK_BLOCKS - 1n },
+      { fromBlock: 2n * LAUNCHED_LOGS_CHUNK_BLOCKS, toBlock: latest },
+    ]);
+  });
+
+  it("on a later call, only scans blocks after what it already cached", async () => {
+    let calls = 0;
+    const client = {
+      async getBlockNumber() {
+        return calls === 0 ? 100n : 200n;
+      },
+      async getContractEvents(query: { fromBlock: bigint; toBlock: bigint }) {
+        calls += 1;
+        return [{ eventName: "Launched", blockNumber: query.fromBlock }];
+      },
+    };
+    const first = await fetchLaunchedLogsChunked(client, MOCK_WORLD_LAUNCHPAD, 0n);
+    expect(first).toHaveLength(1);
+    const seenSecondCall: { fromBlock: bigint }[] = [];
+    const second = await fetchLaunchedLogsChunked(
+      {
+        async getBlockNumber() {
+          return 200n;
+        },
+        async getContractEvents(query) {
+          seenSecondCall.push({ fromBlock: query.fromBlock });
+          return [{ eventName: "Launched", blockNumber: query.fromBlock }];
+        },
+      },
+      MOCK_WORLD_LAUNCHPAD,
+      0n,
+    );
+    expect(seenSecondCall.every((q) => q.fromBlock > 100n)).toBe(true);
+    expect(second.length).toBeGreaterThan(first.length);
+  });
+
+  it("retries a 429 with backoff instead of failing the whole scan", async () => {
+    let attempts = 0;
+    const logs = await fetchLaunchedLogsChunked(
+      {
+        async getBlockNumber() {
+          return 10n;
+        },
+        async getContractEvents() {
+          attempts += 1;
+          if (attempts === 1) throw new Error("429 Too Many Requests");
+          return [{ eventName: "Launched" }];
+        },
+      },
+      MOCK_WORLD_LAUNCHPAD,
+      0n,
+    );
+    expect(attempts).toBe(2);
+    expect(logs).toEqual([{ eventName: "Launched" }]);
   });
 });

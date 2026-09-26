@@ -4,6 +4,7 @@ import { launchpadCcaAbi } from "./cca/abi/launchpadCca";
 import { launchpadAbi } from "./launchpadAbi";
 import { contracts } from "./contracts";
 import { webEnv } from "./env";
+import { withRpcRetry } from "./rpc";
 import { wagmiConfig } from "./wagmi";
 import type { Hex } from "./world";
 
@@ -230,4 +231,61 @@ export async function fetchLaunchedLogs(
   if (!address) return [];
   const latest = await client.getBlockNumber();
   return client.getContractEvents(launchedLogsQuery(latest, address, deployBlock));
+}
+
+/** getLogs range per call. Public Sepolia RPCs commonly cap much higher, but a
+ *  smaller window keeps each call quick and cheap to retry on a 429. */
+export const LAUNCHED_LOGS_CHUNK_BLOCKS = 5_000n;
+
+type LaunchedLogsCacheEntry = { scannedTo: bigint; logs: unknown[] };
+const launchedLogsCache = new Map<string, LaunchedLogsCacheEntry>();
+
+/** Test-only: clear the module cache between scenarios. */
+export function resetLaunchedLogsCacheForTests(): void {
+  launchedLogsCache.clear();
+}
+
+/**
+ * Same result as fetchLaunchedLogs, but scans in bounded windows (retrying a 429
+ * with backoff) and remembers, per address, how far it already scanned — a later
+ * call only fetches the new blocks since then instead of re-scanning from deployBlock.
+ */
+export async function fetchLaunchedLogsChunked(
+  client: {
+    getBlockNumber: () => Promise<bigint>;
+    getContractEvents: (query: ReturnType<typeof launchedLogsQuery>) => Promise<unknown>;
+  },
+  address = contracts.launchpad,
+  deployBlock = webEnv.launchpadDeployBlock,
+): Promise<unknown[]> {
+  if (!address) return [];
+  const latest = await withRpcRetry(() => client.getBlockNumber());
+  const cached = launchedLogsCache.get(address);
+  const scanFrom = cached && cached.scannedTo >= launchedFromBlock(deployBlock, latest)
+    ? cached.scannedTo + 1n
+    : launchedFromBlock(deployBlock, latest);
+  const priorLogs = scanFrom === launchedFromBlock(deployBlock, latest) ? [] : (cached?.logs ?? []);
+
+  if (scanFrom > latest) {
+    return priorLogs;
+  }
+
+  const freshLogs: unknown[] = [];
+  for (let from = scanFrom; from <= latest; from += LAUNCHED_LOGS_CHUNK_BLOCKS) {
+    const to = from + LAUNCHED_LOGS_CHUNK_BLOCKS - 1n > latest ? latest : from + LAUNCHED_LOGS_CHUNK_BLOCKS - 1n;
+    const chunk = await withRpcRetry(() =>
+      client.getContractEvents({
+        address,
+        abi: launchpadCcaAbi,
+        eventName: "Launched" as const,
+        fromBlock: from,
+        toBlock: to,
+      }),
+    );
+    if (Array.isArray(chunk)) freshLogs.push(...chunk);
+  }
+
+  const logs = [...priorLogs, ...freshLogs];
+  launchedLogsCache.set(address, { scannedTo: latest, logs });
+  return logs;
 }

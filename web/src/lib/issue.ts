@@ -21,6 +21,8 @@ export const ISSUE_COPY = {
   launch: "Issue prophecy",
   disabledLaunch: "Verify with World ID to launch",
   pending: "Still checking. This can take a minute the first time.",
+  pendingSlow: "Taking longer than expected — the World server or the network may be slow right now.",
+  retry: "Retry",
   registerPending: "Confirm your name in your wallet.",
   registerSuccess: "Your name is claimed on Sepolia.",
   registerFailed: "Name claim failed. Nothing was charged except gas. Try again.",
