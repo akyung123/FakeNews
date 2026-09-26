@@ -33,6 +33,24 @@ export type MyHoldings = {
   bidSpentWei: bigint;
   /** Locker.accruedEth for a prophet; null when the wallet has no prophet name. */
   feesWei: bigint | null;
+  /** Every prophecy token this wallet holds (bids claimed, swaps, transfers), largest value first. */
+  held?: HeldRow[];
+  /** Prophecies this wallet launched, newest first, held or not. */
+  launched?: LaunchedRow[];
+};
+
+export type HeldRow = {
+  coin: Coin & { token: Address };
+  balanceWei: bigint;
+  /** Clearing price or pool price, per whole token. 0 when unknown. */
+  priceWei: bigint;
+  valueWei: bigint;
+  launchedByYou: boolean;
+};
+
+export type LaunchedRow = {
+  coin: Coin & { token: Address };
+  balanceWei: bigint;
 };
 
 export type HoldingsReadClient = {
@@ -121,10 +139,11 @@ export async function readMyHoldings(wallet: Address, options: LoadHoldingsOptio
 
   const [balances, label, bids] = await Promise.all([balancesRead, labelRead, bidsRead]);
 
-  const held: { token: Address; auction?: Address; balance: bigint }[] = [];
+  const held: { token: Address; auction?: Address; balance: bigint; coin: Coin & { token: Address } }[] = [];
   coins.forEach((c, i) => {
-    if (balances[i] > 0n) held.push({ token: c.token, auction: c.auction, balance: balances[i] });
+    if (balances[i] > 0n) held.push({ token: c.token, auction: c.auction, balance: balances[i], coin: c });
   });
+  const mine = (c: Coin) => Boolean(c.prophet && c.prophet.toLowerCase() === wallet.toLowerCase());
   const markets = held.length
     ? await (options.loadMarkets ?? ((rows) => loadMarketSnapshots(rows)))(
         held.map(({ token, auction }) => ({ token, auction })),
@@ -133,11 +152,19 @@ export async function readMyHoldings(wallet: Address, options: LoadHoldingsOptio
 
   let holdingsValueWei = 0n;
   let tokensHeldWei = 0n;
+  const heldRows: HeldRow[] = [];
   for (const row of held) {
     tokensHeldWei += row.balance;
     const price = markets.get(row.token)?.priceWei ?? 0n;
-    holdingsValueWei += (row.balance * price) / WAD;
+    const value = (row.balance * price) / WAD;
+    holdingsValueWei += value;
+    heldRows.push({ coin: row.coin, balanceWei: row.balance, priceWei: price, valueWei: value, launchedByYou: mine(row.coin) });
   }
+  heldRows.sort((a, b) => (b.valueWei > a.valueWei ? 1 : b.valueWei < a.valueWei ? -1 : b.balanceWei > a.balanceWei ? 1 : -1));
+  const launchedRows: LaunchedRow[] = coins
+    .map((coin, i) => ({ coin, balanceWei: balances[i] ?? 0n }))
+    .filter((row) => mine(row.coin))
+    .sort((a, b) => (b.coin.launchedBlock ?? 0) - (a.coin.launchedBlock ?? 0));
 
   const spent = sumArg(bids.submitted, "amount") - sumArg(bids.exited, "currencyRefunded");
 
@@ -156,6 +183,8 @@ export async function readMyHoldings(wallet: Address, options: LoadHoldingsOptio
     tokensHeldWei,
     bidSpentWei: spent > 0n ? spent : 0n,
     feesWei,
+    held: heldRows,
+    launched: launchedRows,
   };
 }
 
