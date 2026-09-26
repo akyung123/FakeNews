@@ -4,11 +4,10 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {CurveMath} from "../src/CurveMath.sol";
-import {Launchpad} from "../src/Launchpad.sol";
+import {CurveMath, Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
 
-contract LaunchpadTest is Test {
+contract CurveTest is Test {
     Launchpad internal launchpad;
     address internal prophet = address(0xA11CE);
     address internal buyer = address(0xB0B);
@@ -34,6 +33,16 @@ contract LaunchpadTest is Test {
         assertEq(launchpad.FEE_BPS(), 125);
         assertEq(launchpad.CREATOR_BPS(), 30);
         assertEq(launchpad.PROTOCOL_BPS(), 95);
+    }
+
+    function test_mintsFullSupplyToLaunchpad() public {
+        address pad = address(0xB0B);
+        ProphecyToken token = new ProphecyToken("lingo-2028.prophecy.eth", "LINGO-2028", pad);
+        assertEq(token.decimals(), 18);
+        assertEq(token.totalSupply(), 1_000_000_000e18);
+        assertEq(token.balanceOf(pad), 1_000_000_000e18);
+        assertEq(token.name(), "lingo-2028.prophecy.eth");
+        assertEq(token.symbol(), "LINGO-2028");
     }
 
     function test_formulaSmallIntegers() public pure {

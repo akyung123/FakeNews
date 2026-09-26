@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
 
-contract LaunchpadFuzzTest is Test {
+contract CurveFuzzTest is Test {
     Launchpad internal launchpad;
     address internal prophet = address(0xA11CE);
 

@@ -7,9 +7,9 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
 
-/// Reads `docs/fixtures/curve-vectors.json` so web/src/lib/curve.ts can reuse
+/// Reads `test/Curve.vectors.json` so web/src/lib/curve.ts can reuse
 /// the same SPEC-derived integers.
-contract LaunchpadVectorsTest is Test {
+contract CurveVectorsTest is Test {
     using stdJson for string;
 
     Launchpad internal launchpad;
@@ -20,7 +20,7 @@ contract LaunchpadVectorsTest is Test {
         launchpad = new Launchpad(address(0xFEE));
         vm.deal(address(this), 10 ether);
         token = launchpad.launch("lingo-2028", "", 0, 0);
-        vectors = vm.readFile(string.concat(vm.projectRoot(), "/../docs/fixtures/curve-vectors.json"));
+        vectors = vm.readFile(string.concat(vm.projectRoot(), "/test/Curve.vectors.json"));
     }
 
     function test_fixtureConstantsMatchLaunchpad() public view {

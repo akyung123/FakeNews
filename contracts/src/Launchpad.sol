@@ -5,8 +5,48 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {CurveMath} from "./CurveMath.sol";
 import {ProphecyToken} from "./ProphecyToken.sol";
+
+/// Constant-product quotes and fee rounding. Multiply first, divide once.
+library CurveMath {
+    uint256 internal constant BPS = 10_000;
+    uint256 public constant FEE_BPS = 125;
+    uint256 public constant CREATOR_BPS = 30;
+    uint256 public constant PROTOCOL_BPS = 95;
+
+    function ceilMulDiv(uint256 a, uint256 b, uint256 denominator) internal pure returns (uint256) {
+        return (a * b + (denominator - 1)) / denominator;
+    }
+
+    function feeOn(uint256 amount) internal pure returns (uint256) {
+        return ceilMulDiv(amount, FEE_BPS, BPS);
+    }
+
+    function grossFromNet(uint256 ethNet) internal pure returns (uint256 ethIn) {
+        if (ethNet == 0) return 0;
+        ethIn = ceilMulDiv(ethNet, BPS, BPS - FEE_BPS);
+        while (true) {
+            uint256 fee = feeOn(ethIn);
+            if (ethIn > fee && ethIn - fee >= ethNet) return ethIn;
+            unchecked {
+                ++ethIn;
+            }
+        }
+    }
+
+    function splitFee(uint256 fee) internal pure returns (uint256 creatorShare, uint256 protocolShare) {
+        creatorShare = fee * CREATOR_BPS / FEE_BPS;
+        protocolShare = fee - creatorShare;
+    }
+
+    function tokensOut(uint256 vEth, uint256 vToken, uint256 ethNet) internal pure returns (uint256) {
+        return vToken * ethNet / (vEth + ethNet);
+    }
+
+    function ethOut(uint256 vEth, uint256 vToken, uint256 tokensIn) internal pure returns (uint256) {
+        return vEth * tokensIn / (vToken + tokensIn);
+    }
+}
 
 /// Bonding-curve launchpad. Price is the ratio of two reserves; fees sit in a
 /// separate ledger so they never move that price.
