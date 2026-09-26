@@ -51,6 +51,11 @@ describe("uniswap href", () => {
     const href = uniswapPoolUrl(POOL_ID);
     expect(href).toBe(`https://app.uniswap.org/explore/pools/${UNISWAP_SEPOLIA_CHAIN}/${POOL_ID}`);
     expect(uniswapGraduationHref({ graduated: true, poolId: POOL_ID, token: TOKEN })).toBe(href);
+    // Live Sepolia V4 pool that the Uniswap app opened by this same URL shape.
+    const live = uniswapPoolUrl("0x6c71acabd92a7d8ed27cdfb6fba8cf0bab74dc9f1a93b55c15537528e1e7443f");
+    expect(live).toBe(
+      "https://app.uniswap.org/explore/pools/ethereum_sepolia/0x6c71acabd92a7d8ed27cdfb6fba8cf0bab74dc9f1a93b55c15537528e1e7443f",
+    );
   });
 
   it("falls back to the token on Uniswap Sepolia when poolId is missing", () => {

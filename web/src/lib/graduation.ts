@@ -15,7 +15,15 @@ export const GRADUATED_LINK = "View pool on Uniswap";
 export const V4_POOL_FEE = 10_000;
 export const V4_TICK_SPACING = 200;
 
-/** Uniswap app chain slug for Sepolia. */
+/**
+ * Uniswap app chain slug for Sepolia.
+ *
+ * Verified 2026-09-26 against a live Sepolia V4 pool (not guessed):
+ * `https://app.uniswap.org/explore/pools/ethereum_sepolia/0x6c71acabd92a7d8ed27cdfb6fba8cf0bab74dc9f1a93b55c15537528e1e7443f`
+ * opened as "LLL/ETH · Sepolia · v4" via LiquidityService/GetPool.
+ * Source: Uniswap/interface `SEPOLIA_CHAIN_INFO` (`urlParam` + `supportsV4` +
+ * `backendSupported`) and route `/explore/pools/:chainName/:poolAddress`.
+ */
 export const UNISWAP_SEPOLIA_CHAIN = "ethereum_sepolia";
 
 export type GraduationState = {
