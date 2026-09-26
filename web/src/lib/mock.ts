@@ -54,7 +54,6 @@ export const SEED_EVENTS: readonly SeedEvent[] = [
   { min: 50, coin: "yolo", user: "sam_lee", buy: 0.4 },
   { min: 40, coin: "wifi", user: "sam_lee", buy: 0.1, say: "Wi-Fi still up at midnight. Checking again at 3." },
   { min: 35, coin: "yolo", user: "june_kim", buy: 0.6, say: "this is literally us" },
-  { min: 30, coin: "oops", user: "satoshi_jr", say: "just saw a PRIVATE_KEY on the big screen 👀" },
   { min: 24, coin: "why", user: "sam_lee", buy: 0.1 },
   { min: 20, coin: "coffee", user: "rin_park", buy: 0.05 },
   { min: 18, coin: "why", user: "yuki.eth", buy: 0.05, say: "count is at 3 already" },
