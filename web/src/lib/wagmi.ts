@@ -1,7 +1,8 @@
-import { http, createConfig, injected } from "wagmi";
+import { createConfig, injected } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { walletConnect } from "wagmi/connectors";
 import { SEPOLIA_CHAIN_ID, webEnv } from "./env";
+import { sepoliaTransport } from "./rpc";
 
 const connectors = [
   injected(),
@@ -10,12 +11,12 @@ const connectors = [
     : []),
 ];
 
-/** Ethereum Sepolia only (chainId 11155111). RPC comes from VITE_RPC_URL when set. */
+/** Ethereum Sepolia only (chainId 11155111). Same fallback transport as getPublicClient(). */
 export const wagmiConfig = createConfig({
   chains: [sepolia],
   connectors,
   transports: {
-    [sepolia.id]: http(webEnv.rpcUrl),
+    [sepolia.id]: sepoliaTransport(),
   },
 });
 

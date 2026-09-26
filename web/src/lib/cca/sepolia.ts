@@ -2,7 +2,8 @@
  * EIP-1193 Sepolia gate. Writes wait until chainId is 11155111.
  * Wrong chain: wallet_switchEthereumChain, then wallet_addEthereumChain on 4902.
  */
-import { SEPOLIA_CHAIN_ID, webEnv } from "../env";
+import { SEPOLIA_CHAIN_ID } from "../env";
+import { sepoliaRpcUrls } from "../rpc";
 
 export const SEPOLIA_HEX_CHAIN_ID = "0xaa36a7";
 
@@ -14,7 +15,7 @@ export const SEPOLIA_ADD_CHAIN_PARAMS = {
   chainId: SEPOLIA_HEX_CHAIN_ID,
   chainName: "Sepolia",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: [webEnv.rpcUrl ?? "https://rpc.sepolia.org"],
+  rpcUrls: sepoliaRpcUrls(),
   blockExplorerUrls: ["https://sepolia.etherscan.io"],
 } as const;
 
