@@ -4,7 +4,7 @@ name: pages
 # A person must enable Pages once: Settings → Pages → source GitHub Actions.
 # Until that is on, the deploy job will fail. Expected URL:
 #   https://<owner>.github.io/<repo>/
-#   (this repo: https://prism-toggle-ai.github.io/FakeNews/)
+#   (this repo: https://prism-toggle-ai.github.io/Prophit/)
 #
 # Vite base is set here from the repo name (`vite build --base $BASE_PATH`).
 # No change to web/vite.config.* — other lanes own that file.
