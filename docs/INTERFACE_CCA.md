@@ -668,7 +668,7 @@ Shown as `clearingPrice / 2^96` ETH per token (`clearingPrice()` or CCALens `sta
 |---|---|
 | Label, live | `Current clearing price` |
 | Label, after `endBlock` | `Final clearing price` |
-| Helper | `Bids in the same block pay the same price per token. You never pay more than your max price.` — **`TBD(backend): confirm clearing price is set per block`**. Do not ship until contracts confirms. |
+| Helper | `Everyone buying in the same block pays that block's price per token. You never pay more than your max price.` |
 | Progress | `{raised} of 0.02 ETH raised to open the market` |
 
 ### 7.3 Bid form (`submitBid` 5-arg; `BidSubmitted`)
@@ -717,17 +717,15 @@ Hide `Claim tokens` and `Open market` (`claimTokens` reverts `NotGraduated`; `mi
 |---|---|
 | Header | `Auction ended · goal not reached` |
 | Progress | `{raised} of 0.02 ETH raised to open the market` |
-| Helper | `The goal wasn't reached, so no tokens were issued and the market won't open. Every bid is refunded in full.` |
+| Helper | `The goal wasn't reached, so no tokens were issued and the market won't open. Every bid is returned in full.` |
 | CTA (`exitBid`, full refund) | `Get your ETH back ({amount} ETH)` / pending: `Sending ETH…` / done: `ETH returned` |
-
-Designer override vs the attached §6 (which still said “unused”): failed-auction `exitBid` is **Get your ETH back**, because the refund is the full bid.
 
 ### 7.6 Exit / claim / open-market errors
 
 | Error | Copy |
 |---|---|
 | `AuctionIsNotOver` | `You can get your ETH back after the auction ends.` |
-| `BidAlreadyExited` | `You already got the unused ETH back for this bid.` |
+| `BidAlreadyExited` | `You already got your ETH back for this bid.` |
 | `CannotExitBid` | `This bid can't be settled this way. Refresh and try again.` |
 | `CannotPartiallyExitBidBeforeGraduation`, `CannotPartiallyExitBidBeforeEndBlock` | `This bid can be settled after the auction ends.` |
 | `InvalidLastFullyFilledCheckpointHint`, `InvalidOutbidBlockCheckpointHint` | `Auction data changed. Refresh and try again.` |
@@ -819,7 +817,6 @@ Copy these into the contracts PR. Do not invent answers here.
 14. Universal Router 2.1.2 `V4_SWAP` command + inputs encoding.
 15. Whether `receive()` must accept ETH from LBPStrategy / PositionManager when Launchpad is `recipient`.
 16. Hook CREATE2 flags if any permission besides `BEFORE_INITIALIZE` is added.
-17. Confirm clearing price is set per block (designer helper in section 7.2). Do not ship that helper until this is yes.
 
 ## 11. Copy (user-facing)
 
