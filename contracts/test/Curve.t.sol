@@ -4,8 +4,6 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
-
 import {CurveMath, Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
 import {LaunchpadStack} from "./LaunchpadStack.sol";
@@ -176,17 +174,18 @@ contract CurveTest is LaunchpadStack {
 
     function test_constructorRejectsZeroRecipient() public {
         vm.expectRevert(Launchpad.ZeroAddress.selector);
-        new Launchpad(address(0), signer, manager, IHooks(address(hook)), locker);
+        new Launchpad(address(0), signer);
     }
 
     function test_constructorRejectsZeroWorldSigner() public {
         vm.expectRevert(Launchpad.ZeroAddress.selector);
-        new Launchpad(protocol, address(0), manager, IHooks(address(hook)), locker);
+        new Launchpad(protocol, address(0));
     }
 
     function test_constructorStoresProtocolRecipient() public view {
         assertEq(launchpad.protocolFeeRecipient(), protocol);
         assertEq(launchpad.worldSigner(), signer);
+        assertEq(launchpad.deployer(), address(this));
         assertEq(address(launchpad.poolManager()), address(manager));
         assertEq(address(launchpad.hook()), address(hook));
         assertEq(address(launchpad.locker()), address(locker));

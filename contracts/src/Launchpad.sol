@@ -54,20 +54,10 @@ library CurveMath {
 /// Bonding-curve launchpad. Price is the ratio of two reserves; fees sit in a
 /// separate ledger so they never move that price.
 ///
-/// Constructor order (infra must match this in `script/Deploy.s.sol`):
-/// Agreed final: protocolFeeRecipient_, worldSigner_, ens_ (ENS PR),
-/// then poolManager_, hook_, locker_ (this PR). Until the ENS PR is on
-/// main, ens_ is absent and the three graduation args follow worldSigner_.
-///   1. protocolFeeRecipient_
-///   2. worldSigner_
-///   3. poolManager_
-///   4. hook_
-///   5. locker_
-///
-/// Hook needs this address and this contract needs the hook. Predict this
-/// Launchpad's CREATE address from the deployer nonce (CREATE does not hash
-/// constructor args), mine the hook CREATE2 salt with that address, deploy
-/// hook then locker, then deploy this contract at the predicted nonce.
+/// Constructor stays (protocolFeeRecipient_, worldSigner_, plus ENS args
+/// from the ENS wiring PR). Uniswap addresses are set once by the deployer
+/// via `setUniswap`. Deploy: Launchpad, Hook (CREATE2 with this address),
+/// Locker, then `setUniswap` once.
 contract Launchpad {
     using PoolIdLibrary for PoolKey;
     uint256 private constant _NOT_ENTERED = 1;
@@ -108,9 +98,10 @@ contract Launchpad {
     uint256 public protocolFees;
     address public immutable protocolFeeRecipient;
     address public immutable worldSigner;
-    IPoolManager public immutable poolManager;
-    IHooks public immutable hook;
-    LiquidityLocker public immutable locker;
+    address public immutable deployer;
+    IPoolManager public poolManager;
+    IHooks public hook;
+    LiquidityLocker public locker;
 
     event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
     event Trade(
@@ -126,6 +117,7 @@ contract Launchpad {
     );
     event CreatorFeeClaimed(address indexed prophet, uint256 amount);
     event ProtocolFeeClaimed(address indexed recipient, uint256 amount);
+    event UniswapSet(address poolManager, address hook, address locker);
     event Graduated(
         address indexed token,
         bytes32 indexed poolId,
@@ -150,6 +142,9 @@ contract Launchpad {
     error Reentrant();
     error TokenTransferFailed();
     error UnexpectedEth();
+    error NotDeployer();
+    error UniswapAlreadySet();
+    error UniswapNotSet();
 
     modifier nonReentrant() {
         if (_status == _ENTERED) revert Reentrant();
@@ -158,22 +153,24 @@ contract Launchpad {
         _status = _NOT_ENTERED;
     }
 
-    constructor(
-        address protocolFeeRecipient_,
-        address worldSigner_,
-        IPoolManager poolManager_,
-        IHooks hook_,
-        LiquidityLocker locker_
-    ) {
+    constructor(address protocolFeeRecipient_, address worldSigner_) {
         if (protocolFeeRecipient_ == address(0) || worldSigner_ == address(0)) revert ZeroAddress();
-        if (address(poolManager_) == address(0) || address(hook_) == address(0) || address(locker_) == address(0)) {
-            revert ZeroAddress();
-        }
         protocolFeeRecipient = protocolFeeRecipient_;
         worldSigner = worldSigner_;
+        deployer = msg.sender;
+    }
+
+    /// Deployer-only, once. Call after Hook (CREATE2) and Locker exist.
+    function setUniswap(IPoolManager poolManager_, address hook_, address locker_) external {
+        if (msg.sender != deployer) revert NotDeployer();
+        if (address(poolManager) != address(0) || address(hook) != address(0) || address(locker) != address(0)) {
+            revert UniswapAlreadySet();
+        }
+        if (address(poolManager_) == address(0) || hook_ == address(0) || locker_ == address(0)) revert ZeroAddress();
         poolManager = poolManager_;
-        hook = hook_;
-        locker = locker_;
+        hook = IHooks(hook_);
+        locker = LiquidityLocker(payable(locker_));
+        emit UniswapSet(address(poolManager_), hook_, locker_);
     }
 
     /// Seed leftovers from the locker (and PoolManager native take/settle).
@@ -360,6 +357,9 @@ contract Launchpad {
 
     /// Last curve buy: open the V4 pool at the curve-end price and lock LP.
     function _graduate(address token, Curve storage c) internal {
+        if (address(poolManager) == address(0) || address(hook) == address(0) || address(locker) == address(0)) {
+            revert UniswapNotSet();
+        }
         PoolKey memory key = Graduation.poolKey(token, hook);
         uint160 sqrtPriceX96 = Graduation.initializePool(poolManager, key, c.vEth, c.vToken);
         uint256 ethToPool = c.realEth;

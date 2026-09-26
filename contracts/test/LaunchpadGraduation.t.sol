@@ -293,13 +293,36 @@ contract LaunchpadGraduationTest is LaunchpadStack {
         assertEq(ProphecyToken(token).balanceOf(buyer), launchpad.CURVE_SUPPLY());
     }
 
-    function test_constructorRejectsZeroGraduationDeps() public {
+    function test_setUniswapSecondCallReverts() public {
+        vm.expectRevert(Launchpad.UniswapAlreadySet.selector);
+        launchpad.setUniswap(manager, address(hook), address(locker));
+    }
+
+    function test_setUniswapNonDeployerReverts() public {
+        Launchpad pad = new Launchpad(protocol, signer);
+        vm.prank(buyer);
+        vm.expectRevert(Launchpad.NotDeployer.selector);
+        pad.setUniswap(manager, address(hook), address(locker));
+    }
+
+    function test_graduationBeforeSetUniswapReverts() public {
+        Launchpad pad = new Launchpad(protocol, signer);
+        vm.deal(prophet, 1 ether);
+        vm.prank(prophet);
+        address token = pad.launch("no-uniswap", "", 0, 0);
+        vm.prank(buyer);
+        vm.expectRevert(Launchpad.UniswapNotSet.selector);
+        pad.buy{value: 1 ether}(token, 0, "");
+    }
+
+    function test_setUniswapRejectsZero() public {
+        Launchpad pad = new Launchpad(protocol, signer);
         vm.expectRevert(Launchpad.ZeroAddress.selector);
-        new Launchpad(protocol, signer, IPoolManager(address(0)), IHooks(address(hook)), locker);
+        pad.setUniswap(IPoolManager(address(0)), address(hook), address(locker));
         vm.expectRevert(Launchpad.ZeroAddress.selector);
-        new Launchpad(protocol, signer, manager, IHooks(address(0)), locker);
+        pad.setUniswap(manager, address(0), address(locker));
         vm.expectRevert(Launchpad.ZeroAddress.selector);
-        new Launchpad(protocol, signer, manager, IHooks(address(hook)), LiquidityLocker(payable(address(0))));
+        pad.setUniswap(manager, address(hook), address(0));
     }
 
     function _assertSplit(uint256 prophetShare, uint256 protocolShare) internal pure {

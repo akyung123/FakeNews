@@ -3,9 +3,6 @@ src = "src"
 out = "out"
 libs = ["lib"]
 test = "test"
-# Deploy.s.sol still uses the 2-arg constructor. Infra updates it; skip
-# that file so `forge build` stays green on this PR.
-skip = ["script/Deploy.s.sol"]
 solc_version = "0.8.26"
 evm_version = "cancun"
 via_ir = true

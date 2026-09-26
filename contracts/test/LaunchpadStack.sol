@@ -12,10 +12,8 @@ import {ProphecyHook} from "../src/uniswap/ProphecyHook.sol";
 import {HookMiner} from "../src/uniswap/HookMiner.sol";
 import {LiquidityLocker} from "../src/uniswap/LiquidityLocker.sol";
 
-/// Shared CREATE-prediction deploy used by curve and graduation tests.
-/// Hook constructor needs the Launchpad address; Launchpad constructor needs
-/// the hook. CREATE of Launchpad does not hash constructor args, so we predict
-/// it from the deployer nonce after the hook CREATE2 and locker CREATE.
+/// Shared deploy: Launchpad, Hook (CREATE2 with the Launchpad address),
+/// Locker, then a one-time `setUniswap` from the deployer (this test).
 contract LaunchpadStack is Test {
     IPoolManager internal manager;
     ProphecyHook internal hook;
@@ -28,15 +26,13 @@ contract LaunchpadStack is Test {
 
     function _newStack(address protocol, address signer) internal returns (Launchpad pad) {
         IPoolManager pm = new PoolManager(address(this));
-        uint64 nonce = vm.getNonce(address(this));
-        address predicted = vm.computeCreateAddress(address(this), nonce + 2);
-        bytes memory ctorArgs = abi.encode(pm, predicted);
+        pad = new Launchpad(protocol, signer);
+        bytes memory ctorArgs = abi.encode(pm, address(pad));
         (, bytes32 salt) =
             HookMiner.find(address(this), HookMiner.prophecyFlags(), type(ProphecyHook).creationCode, ctorArgs);
-        ProphecyHook h = new ProphecyHook{salt: salt}(pm, predicted);
-        LiquidityLocker loc = new LiquidityLocker(pm, predicted, IHooks(address(h)));
-        pad = new Launchpad(protocol, signer, pm, IHooks(address(h)), loc);
-        require(address(pad) == predicted, "CREATE mismatch");
+        ProphecyHook h = new ProphecyHook{salt: salt}(pm, address(pad));
+        LiquidityLocker loc = new LiquidityLocker(pm, address(pad), IHooks(address(h)));
+        pad.setUniswap(pm, address(h), address(loc));
         require(h.launchpad() == address(pad), "hook launchpad");
         require(loc.launchpad() == address(pad), "locker launchpad");
         manager = pm;

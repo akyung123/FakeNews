@@ -29,16 +29,15 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 ### `Launchpad` `(draft)`
 
 ```solidity
-// Agreed final constructor order. Infra must match this in contracts/script/Deploy.s.sol.
-// ENS wiring PR (merges first) adds `ens`. This PR appends the three graduation args after it.
+// Constructor. This PR does not add args. ENS wiring PR (merges first) adds `ens`.
 constructor(
     address protocolFeeRecipient, // 1
     address worldSigner,          // 2
-    address ens,                  // 3  ENS adapter (ENS wiring PR)
-    address poolManager,          // 4  this PR
-    address hook,                 // 5  this PR
-    address locker                // 6  this PR
+    address ens                   // 3  ENS adapter (ENS wiring PR only)
 );
+
+// Deployer-only, once. After Launchpad, Hook (CREATE2), and Locker exist.
+function setUniswap(address poolManager, address hook, address locker) external;
 
 // Create a prophet name. Needs a World ID server signature. Once per nullifier.
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
@@ -61,6 +60,7 @@ function prophetOf(address wallet) external view returns (string label);
 function creatorFeeOf(address wallet) external view returns (uint256);
 function protocolFeeRecipient() external view returns (address);
 function worldSigner() external view returns (address);
+function deployer() external view returns (address);
 function ens() external view returns (address); // ENS wiring PR
 function poolManager() external view returns (address);
 function hook() external view returns (address);
@@ -83,11 +83,13 @@ event Graduated(
     address hooks
 );
 event CreatorFeeClaimed(address indexed prophet, uint256 amount);
+event UniswapSet(address poolManager, address hook, address locker);
 ```
 
 - `Graduated` is emitted in the buy that sells the last curve tokens. `poolId` is the V4 `PoolId` (`keccak256` of the `PoolKey`). `currency0` is native ETH (`address(0)`); `currency1` is `token`. The frontend reconstructs the key from `token`, `fee`, `tickSpacing`, and `hooks`.
-- Constructor order (team-agreed): `protocolFeeRecipient`, `worldSigner`, `ens` (ENS wiring PR, merges first), then `poolManager`, `hook`, `locker` (this PR). Until that ENS PR is on `main`, this branch compiles `(protocolFeeRecipient, worldSigner, poolManager, hook, locker)` — graduation args sit after `worldSigner`. After it lands, merge `origin/main` and keep the three graduation args last.
-- Constructor circularity: `ProphecyHook` stores the Launchpad address; Launchpad stores the hook and locker. CREATE of Launchpad does not hash constructor args, so the deployer predicts that address from its nonce, mines the hook CREATE2 salt with it, deploys hook then locker, then deploys Launchpad at the predicted nonce. `receive()` accepts leftover seed ETH only from the locker and the PoolManager.
+- Constructor stays `(protocolFeeRecipient, worldSigner)` plus `ens` from the ENS wiring PR. This PR does not add constructor arguments.
+- Deploy order: Launchpad, then Hook (CREATE2 using the Launchpad address), then Locker, then a deployer-only one-time `setUniswap(poolManager, hook, locker)`. A second call or a non-deployer call reverts. Graduation reverts if Uniswap is not set.
+- `receive()` accepts leftover seed ETH only from the locker and the PoolManager.
 
 - The sentence is not in `Launched`. It is read from ENS (DECISIONS #5).
 - Constants are exactly the "Constants" section of SPEC.md.
