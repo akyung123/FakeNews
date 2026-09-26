@@ -35,6 +35,7 @@ export const CCA_COPY = {
   auctionLive: "Auction live · ends in {blocks} blocks",
   soldOut: "Auction live · all tokens are bid for",
   soldOutSub: "New bids are closed. Come back when the auction ends.",
+  auctionEnded: "Auction ended",
   endedNotFinalized: "Auction ended · final price not set yet",
   setFinalPrice: "Set final price",
   settingFinalPrice: "Setting final price…",
@@ -309,7 +310,7 @@ export function auctionStatusCopy(
     case "sold_out":
       return CCA_COPY.soldOut;
     case "ended_not_finalized":
-      return CCA_COPY.endedNotFinalized;
+      return CCA_COPY.auctionEnded;
     case "graduated":
       return CCA_COPY.graduated;
     case "failed":

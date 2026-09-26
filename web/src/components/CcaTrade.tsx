@@ -26,7 +26,6 @@ import {
   tokenApprovePermit2Write,
   permit2ApproveRouterWrite,
   yourBidCopy,
-  checkpoint,
   claimTokens,
   exitBid,
   openMarketResult,
@@ -227,16 +226,6 @@ export function CcaTrade({
 
       {showSettle ? (
         <>
-          {copyStatus === "ended_not_finalized" && snap?.auction ? (
-            <button
-              type="button"
-              className="btn primary full"
-              disabled={writesBlocked}
-              onClick={() => void run(CCA_COPY.settingFinalPrice, () => checkpoint(snap.auction!, writes), CCA_COPY.finalClearingPrice)}
-            >
-              {pending === CCA_COPY.settingFinalPrice ? CCA_COPY.settingFinalPrice : CCA_COPY.setFinalPrice}
-            </button>
-          ) : null}
           {openBids.length > 0 || (demo && prototype) ? (
             <>
               <p className="faint small">{exitHelpCopy(goalReached, refundWei)}</p>
@@ -456,16 +445,18 @@ export function CcaTrade({
               <button
                 type="button"
                 className="btn primary full"
-                disabled={writesBlocked || !snap?.locker || !token}
+                disabled={writesBlocked || !snap?.locker || !token || snap.tokenId == null}
                 onClick={() => {
-                  if (demo && (prototype || !snap?.locker || !token)) {
+                  if (demo && (prototype || !snap?.locker || !token || snap.tokenId == null)) {
                     setSuccess(FEE_COLLECT_COPY.feesSent);
                     return;
                   }
-                  if (!snap?.locker || !token) return;
+                  if (!snap?.locker || !token || snap.tokenId == null) return;
+                  const locker = snap.locker;
+                  const tokenId = snap.tokenId;
                   void run(
                     FEE_COLLECT_COPY.collectingFees,
-                    () => sendCcaWrite(collectCcaWrite(snap.locker!, token), "collect", writes),
+                    () => sendCcaWrite(collectCcaWrite(locker, token, tokenId), "collect", writes),
                     FEE_COLLECT_COPY.feesSent,
                   );
                 }}

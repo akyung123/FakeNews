@@ -30,8 +30,8 @@ export type CcaConfig = {
 /** Default config. INTERFACE_CCA may replace fields via `resolveCcaConfig`. */
 export const CCA_CONFIG: CcaConfig = {
   currency: zeroAddress,
-  floorPriceQ96: 1000n << 96n,
-  tickSpacingQ96: 100n << 96n,
+  floorPriceQ96: 3_169_126_500_570_573_600n,
+  tickSpacingQ96: 31_691_265_005_705_736n,
   graduationWei: parseEther("0.02"),
   poolFee: 10_000,
   poolTickSpacing: 200,

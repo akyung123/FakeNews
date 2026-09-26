@@ -43,6 +43,7 @@ describe("designer FINAL CCA copy", () => {
     expect(CCA_COPY.auctionLive).toBe("Auction live · ends in {blocks} blocks");
     expect(CCA_COPY.soldOut).toBe("Auction live · all tokens are bid for");
     expect(CCA_COPY.soldOutSub).toBe("New bids are closed. Come back when the auction ends.");
+    expect(CCA_COPY.auctionEnded).toBe("Auction ended");
     expect(CCA_COPY.endedNotFinalized).toBe("Auction ended · final price not set yet");
     expect(CCA_COPY.setFinalPrice).toBe("Set final price");
     expect(CCA_COPY.settingFinalPrice).toBe("Setting final price…");
@@ -54,7 +55,7 @@ describe("designer FINAL CCA copy", () => {
     expect(auctionStatusCopy("live", { blocks: 25 })).toBe("Auction live · ends in 25 blocks");
     expect(auctionStatusCopy("sold_out")).toBe("Auction live · all tokens are bid for");
     expect(auctionStatusSubCopy("sold_out")).toBe("New bids are closed. Come back when the auction ends.");
-    expect(auctionStatusCopy("ended_not_finalized")).toBe("Auction ended · final price not set yet");
+    expect(auctionStatusCopy("ended_not_finalized")).toBe("Auction ended");
     expect(auctionStatusCopy("graduated")).toBe("Auction ended · ready to open the market");
     expect(auctionStatusCopy("failed")).toBe("Auction ended · goal not reached");
     expect(auctionStatusSubCopy("failed")).toBe(

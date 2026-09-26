@@ -102,13 +102,13 @@ export function launchCcaWrite(
   };
 }
 
-/** Anyone `collect(token)` on the locker. Prophet 24 : protocol 76. */
-export function collectCcaWrite(locker: Address, token: Address): CcaWriteRequest {
+/** Anyone `collect(token, tokenId)` on the locker. Prophet 24 : protocol 76. */
+export function collectCcaWrite(locker: Address, token: Address, tokenId: bigint): CcaWriteRequest {
   return {
     address: locker,
     abi: lockerCcaAbi,
     functionName: "collect",
-    args: [token],
+    args: [token, tokenId],
   };
 }
 
@@ -151,6 +151,5 @@ export function backendLaunchErrorNames(): readonly string[] {
 }
 
 export const INTERFACE_CCA_PENDING = [
-  "floor / tick Q96 pending #42 recalculation",
   "Universal Router 2.1.2 calldata not live-verified on Sepolia",
 ] as const;

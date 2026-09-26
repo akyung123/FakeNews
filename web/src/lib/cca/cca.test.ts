@@ -185,6 +185,26 @@ describe("verified external ABIs", () => {
     );
   });
 
+  it("Locker ABI matches #42 9c6b163 collect(token, tokenId) and indexed Collected.tokenId", () => {
+    expect(names(lockerCcaAbi, "function")).toEqual(
+      expect.arrayContaining(["collect", "register", "tokenIdsOf", "isRegistered", "prophetOf", "withdrawAccrued"]),
+    );
+    expect(names(lockerCcaAbi, "function")).not.toContain("tokenIdOf");
+    const collect = lockerCcaAbi.find((item) => item.type === "function" && item.name === "collect");
+    if (!collect || collect.type !== "function") throw new Error("missing collect");
+    expect(collect.inputs.map((input) => `${input.name}:${input.type}`)).toEqual(["token:address", "tokenId:uint256"]);
+    const collected = lockerCcaAbi.find((item) => item.type === "event" && item.name === "Collected");
+    if (!collected || collected.type !== "event") throw new Error("missing Collected");
+    expect(collected.inputs.map((input) => `${input.name}:${input.type}:${input.indexed}`)).toEqual([
+      "token:address:true",
+      "tokenId:uint256:true",
+      "prophetAmount0:uint256:false",
+      "protocolAmount0:uint256:false",
+      "prophetAmount1:uint256:false",
+      "protocolAmount1:uint256:false",
+    ]);
+  });
+
   it("Universal Router ABI is execute with V4_SWAP 0x10", () => {
     expect(names(universalRouterAbi, "function")).toEqual(["execute"]);
     expect(V4_SWAP_COMMAND).toBe(0x10);
@@ -232,10 +252,10 @@ describe("confirmed CCA config (PR #41 head d84aed4)", () => {
   it("keeps the fork-test values in one overrideable object", () => {
     expect(CCA_CONFIG.currency).toBe(zeroAddress);
     expect(NATIVE_ETH).toBe(zeroAddress);
-    expect(CCA_CONFIG.floorPriceQ96).toBe(1000n << 96n);
-    expect(CCA_CONFIG.tickSpacingQ96).toBe(100n << 96n);
-    expect(FLOOR_PRICE_Q96).toBe(1000n * Q96);
-    expect(TICK_SPACING_Q96).toBe(100n * Q96);
+    expect(CCA_CONFIG.floorPriceQ96).toBe(3_169_126_500_570_573_600n);
+    expect(CCA_CONFIG.tickSpacingQ96).toBe(31_691_265_005_705_736n);
+    expect(FLOOR_PRICE_Q96).toBe(3_169_126_500_570_573_600n);
+    expect(TICK_SPACING_Q96).toBe(31_691_265_005_705_736n);
     expect(CCA_CONFIG.graduationWei).toBe(parseEther("0.02"));
     expect(GRADUATION_ETH_WEI).toBe(parseEther("0.02"));
     expect(CCA_CONFIG.poolFee).toBe(10_000);
@@ -285,15 +305,11 @@ describe("Q96 price encoding", () => {
 
   it("snaps max price DOWN onto floor + k*tick and rejects below the floor", () => {
     expect(snapMaxPriceToTick(FLOOR_PRICE_Q96)).toBe(FLOOR_PRICE_Q96);
-    expect(snapMaxPriceToTick(ethPerTokenToQ96("1100"))).toBe(1100n * Q96);
-    expect(snapMaxPriceToTick(ethPerTokenToQ96("1150"))).toBe(1100n * Q96);
-    expect(snapMaxPriceToTick(ethPerTokenToQ96("1199"))).toBe(1100n * Q96);
-    expect(snapMaxPriceToTick(ethPerTokenToQ96("1200"))).toBe(1200n * Q96);
-    expect(prevTickHintQ96(ethPerTokenToQ96("1100"))).toBe(FLOOR_PRICE_Q96);
-    expect(prevTickHintQ96(ethPerTokenToQ96("1200"))).toBe(1100n * Q96);
+    const mid = FLOOR_PRICE_Q96 + TICK_SPACING_Q96 * 5n + TICK_SPACING_Q96 / 2n;
+    expect(snapMaxPriceToTick(mid)).toBe(FLOOR_PRICE_Q96 + TICK_SPACING_Q96 * 5n);
+    expect(prevTickHintQ96(FLOOR_PRICE_Q96 + TICK_SPACING_Q96)).toBe(FLOOR_PRICE_Q96);
     expect(prevTickHintQ96(FLOOR_PRICE_Q96)).toBe(FLOOR_PRICE_Q96);
-    expect(() => snapMaxPriceToTick(ethPerTokenToQ96("999"))).toThrow(MaxPriceBelowFloorError);
-    expect(() => snapMaxPriceToTick(ethPerTokenToQ96("0.001"))).toThrow(/below the auction floor/);
+    expect(() => snapMaxPriceToTick(FLOOR_PRICE_Q96 - 1n)).toThrow(MaxPriceBelowFloorError);
   });
 });
 
@@ -456,12 +472,12 @@ describe("bid encoding", () => {
     };
     const args = placeBidArgs(input);
     expect(args.amount).toBe(parseEther("0.01"));
-    expect(args.maxPriceQ96).toBe(1100n * Q96);
+    expect(args.maxPriceQ96).toBe(snapMaxPriceToTick(ethPerTokenToQ96("1150")));
     const request = placeBidWrite(input);
     expect(request.address).toBe(AUCTION);
     expect(request.abi).toBe(ccaAbi);
     expect(request.functionName).toBe("submitBid");
-    expect(args.prevTickPriceQ96).toBe(FLOOR_PRICE_Q96);
+    expect(args.prevTickPriceQ96).toBe(prevTickHintQ96(args.maxPriceQ96));
     expect(request.args).toEqual([
       args.maxPriceQ96,
       args.amount,
@@ -479,7 +495,7 @@ describe("bid encoding", () => {
       owner: OWNER,
       budgetEth: "0.01",
       maxPricePerTokenEth: "1000",
-    }).maxPriceQ96).toBe(FLOOR_PRICE_Q96);
+    }).maxPriceQ96).toBe(snapMaxPriceToTick(ethPerTokenToQ96("1000")));
   });
 
   it("rejects a max price below the floor", () => {
@@ -488,7 +504,7 @@ describe("bid encoding", () => {
         auction: AUCTION,
         owner: OWNER,
         budgetEth: "0.01",
-        maxPricePerTokenEth: "0.001",
+        maxPricePerTokenEth: "0.000000000000000001",
       }),
     ).toThrow(MaxPriceBelowFloorError);
   });
@@ -713,10 +729,10 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
     const launched = launchCcaWrite(launchpad, "lingo-2028", "hello", 1_800_000_000n);
     expect(launched.functionName).toBe("launch");
     expect(launched.args).toEqual(["lingo-2028", "hello", 1_800_000_000n]);
-    expect(collectCcaWrite(locker, TOKEN)).toMatchObject({
+    expect(collectCcaWrite(locker, TOKEN, 7n)).toMatchObject({
       abi: lockerCcaAbi,
       functionName: "collect",
-      args: [TOKEN],
+      args: [TOKEN, 7n],
     });
     expect(withdrawAccruedWrite(locker).functionName).toBe("withdrawAccrued");
   });
@@ -729,10 +745,7 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
       expect.arrayContaining(["CcaNotSet", "AuctionExists", "AuctionNotCreated"]),
     );
     expect(INTERFACE_CCA_PENDING).toEqual(
-      expect.arrayContaining([
-        "floor / tick Q96 pending #42 recalculation",
-        "Universal Router 2.1.2 calldata not live-verified on Sepolia",
-      ]),
+      expect.arrayContaining(["Universal Router 2.1.2 calldata not live-verified on Sepolia"]),
     );
     expect(INTERFACE_CCA_TBD).toBe("TBD(INTERFACE_CCA)");
   });

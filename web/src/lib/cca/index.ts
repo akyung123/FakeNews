@@ -175,18 +175,22 @@ export {
   withdrawAccruedWrite,
 } from "./launchpadCca";
 export {
+  fetchLockerRegisteredTokenIds,
   fetchPositionManagerMintLogs,
   findLockerTokenId,
   findLockerTokenIdReads,
+  isRegisteredRead,
   lockerProphetOfRead,
+  lockerRegisteredLogsQuery,
   matchLockerTokenId,
   matchMintedTokenId,
   positionManagerMintLogsQuery,
   positionManagerTransferAbi,
   registerLocker,
   registerLockerWrite,
+  registeredTokenIdFromLog,
   tokenIdFromMigrateReceipt,
-  tokenIdOfRead,
+  tokenIdFromRegisteredLogs,
   tokenIdsMintedToLocker,
 } from "./register";
 export {

@@ -110,7 +110,7 @@ describe("CcaTrade CCA states", () => {
     expect(screen.getByRole("button", { name: CCA_COPY.placeBid })).toBeDisabled();
   });
 
-  it("shows checkpoint then unused-ETH and claim after the goal is met", async () => {
+  it("shows unused-ETH and claim after the goal is met, without Set final price", async () => {
     renderTrade(
       snap({
         copyStatus: "ended_not_finalized",
@@ -137,7 +137,8 @@ describe("CcaTrade CCA states", () => {
         refundWei: parseEther("0.003"),
       }),
     );
-    await waitFor(() => expect(screen.getByText(CCA_COPY.setFinalPrice)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(CCA_COPY.auctionEnded)).toBeInTheDocument());
+    expect(screen.queryByText(CCA_COPY.setFinalPrice)).toBeNull();
     expect(screen.getByText("Get back unused ETH (0.003 ETH)")).toBeInTheDocument();
     expect(screen.getByText(CCA_COPY.claimTokens)).toBeInTheDocument();
   });

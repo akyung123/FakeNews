@@ -8,7 +8,7 @@ import { contracts } from "../contracts";
 import { v4PoolId } from "../graduation";
 import { wagmiConfig } from "../wagmi";
 import { lbpStrategyAbi } from "./abi/lbpStrategy";
-import { lockerCcaAbi, poolManagerAbi } from "./abi/launchpadCca";
+import { poolManagerAbi } from "./abi/launchpadCca";
 import { CCA_SEPOLIA, resolveCcaProductAddresses } from "./addresses";
 import {
   auctionScheduleRequest,
@@ -24,7 +24,7 @@ import type { AuctionCopyStatus } from "./copy";
 import { auctionOfRead, hookRead, lockerRead, lbpStrategyRead, positionManagerRead } from "./launchpadCca";
 import { ccaLogsFromBlock } from "./logs";
 import { bidAmountQ96ToWei } from "./price";
-import { findLockerTokenId } from "./register";
+import { findLockerTokenId, isRegisteredRead } from "./register";
 
 export type LoadedBid = {
   id: bigint;
@@ -206,35 +206,33 @@ export async function loadCcaAuction(token: Address): Promise<CcaAuctionSnapshot
 
   let tokenId: bigint | undefined;
   let needsRegister = false;
-  if (locker && poolOpen) {
-    try {
-      tokenId = (await readContract(wagmiConfig, {
-        address: locker,
-        abi: lockerCcaAbi,
-        functionName: "tokenIdOf",
-        args: [token],
-      })) as bigint;
-    } catch (err) {
-      const text = err instanceof Error ? err.message : String(err);
-      if (/UnknownLock/i.test(text) && positionManager && hook) {
-        needsRegister = true;
-        tokenId = await findLockerTokenId(
-          {
-            readContract: (req) => readContract(wagmiConfig, req as never),
-            getBlockNumber: async () => currentBlock,
-            getContractEvents: (query) => getContractEvents(wagmiConfig, query as never),
-          },
-          {
-            positionManager,
-            locker,
-            token,
-            hooks: hook,
-            fromBlock,
-            auctionStartBlock: startBlock,
-            latestBlock: currentBlock,
-          },
-        );
+  if (locker && poolOpen && positionManager && hook) {
+    tokenId = await findLockerTokenId(
+      {
+        readContract: (req) => readContract(wagmiConfig, req as never),
+        getBlockNumber: async () => currentBlock,
+        getContractEvents: (query) => getContractEvents(wagmiConfig, query as never),
+      },
+      {
+        positionManager,
+        locker,
+        token,
+        hooks: hook,
+        fromBlock,
+        auctionStartBlock: startBlock,
+        latestBlock: currentBlock,
+      },
+    );
+    if (tokenId != null) {
+      try {
+        const registered = (await readContract(wagmiConfig, isRegisteredRead(locker, token, tokenId))) as boolean;
+        needsRegister = !registered;
+      } catch (err) {
+        const text = err instanceof Error ? err.message : String(err);
+        needsRegister = /UnknownLock/i.test(text) || !/isRegistered/i.test(text);
       }
+    } else {
+      needsRegister = true;
     }
   }
 

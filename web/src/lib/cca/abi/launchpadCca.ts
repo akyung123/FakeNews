@@ -92,7 +92,10 @@ export const lockerCcaAbi = [
     type: "function",
     name: "collect",
     stateMutability: "nonpayable",
-    inputs: [{ name: "token", type: "address" }],
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
     outputs: [],
   },
   {
@@ -114,10 +117,20 @@ export const lockerCcaAbi = [
   },
   {
     type: "function",
-    name: "tokenIdOf",
+    name: "tokenIdsOf",
     stateMutability: "view",
     inputs: [{ name: "token", type: "address" }],
-    outputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "isRegistered",
+    stateMutability: "view",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
   },
   {
     type: "function",
@@ -146,6 +159,7 @@ export const lockerCcaAbi = [
     name: "Collected",
     inputs: [
       { name: "token", type: "address", indexed: true },
+      { name: "tokenId", type: "uint256", indexed: true },
       { name: "prophetAmount0", type: "uint256", indexed: false },
       { name: "protocolAmount0", type: "uint256", indexed: false },
       { name: "prophetAmount1", type: "uint256", indexed: false },

@@ -145,13 +145,79 @@ export async function fetchPositionManagerMintLogs(
   return out;
 }
 
-export function tokenIdOfRead(locker: Address, token: Address) {
+export function isRegisteredRead(locker: Address, token: Address, tokenId: bigint) {
   return {
     address: locker,
     abi: lockerCcaAbi,
-    functionName: "tokenIdOf" as const,
-    args: [token] as const,
+    functionName: "isRegistered" as const,
+    args: [token, tokenId] as const,
   };
+}
+
+export function lockerRegisteredLogsQuery(
+  locker: Address,
+  token: Address,
+  toBlock: bigint,
+  fromBlock: bigint,
+) {
+  return {
+    address: locker,
+    abi: lockerCcaAbi,
+    eventName: "Registered" as const,
+    args: { token },
+    fromBlock,
+    toBlock,
+  };
+}
+
+/**
+ * Reload path when the migrate receipt is gone: Locker `Registered(token, tokenId)`
+ * logs filtered by token, chunked and bounded by the deploy/lookback block.
+ * Never uses `tokenIdsOf` — that array can fail once spam registrations pile up.
+ */
+export async function fetchLockerRegisteredTokenIds(
+  client: {
+    getBlockNumber: () => Promise<bigint>;
+    getContractEvents: (query: ReturnType<typeof lockerRegisteredLogsQuery>) => Promise<unknown>;
+  },
+  locker: Address,
+  token: Address,
+  fromBlock?: bigint,
+  auctionStartBlock?: bigint,
+  latestBlock?: bigint,
+): Promise<bigint[]> {
+  const toBlock = latestBlock ?? (await client.getBlockNumber());
+  const lookback = ccaLogsFromBlock(undefined, toBlock, auctionStartBlock);
+  const rangeStart = fromBlock === undefined ? lookback : fromBlock > lookback ? fromBlock : lookback;
+  const ids: bigint[] = [];
+  for (const chunk of ccaLogChunks(rangeStart, toBlock)) {
+    const part = await client.getContractEvents(
+      lockerRegisteredLogsQuery(locker, token, chunk.toBlock, chunk.fromBlock),
+    );
+    const rows = Array.isArray(part) ? part : [part];
+    for (const row of rows) {
+      const tokenId = registeredTokenIdFromLog(row);
+      if (tokenId != null) ids.push(tokenId);
+    }
+  }
+  return ids;
+}
+
+export function registeredTokenIdFromLog(row: unknown): bigint | undefined {
+  if (!row || typeof row !== "object") return undefined;
+  const args = "args" in row ? (row as { args?: { tokenId?: bigint | string | number } }).args : undefined;
+  const raw = args?.tokenId;
+  if (raw == null) return undefined;
+  try {
+    return BigInt(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+export function tokenIdFromRegisteredLogs(ids: readonly bigint[]): bigint | undefined {
+  if (ids.length === 0) return undefined;
+  return ids[ids.length - 1];
 }
 
 export function lockerProphetOfRead(locker: Address, token: Address) {
@@ -265,7 +331,12 @@ export async function findLockerTokenId(
       args?: readonly unknown[];
     }) => Promise<unknown>;
     getBlockNumber?: () => Promise<bigint>;
-    getContractEvents?: (query: ReturnType<typeof positionManagerMintLogsQuery>) => Promise<unknown>;
+    getContractEvents?: (query: {
+      address: Address;
+      eventName: string;
+      fromBlock: bigint;
+      toBlock: bigint;
+    }) => Promise<unknown>;
   },
   input: {
     positionManager: Address;
@@ -293,40 +364,19 @@ export async function findLockerTokenId(
     const matched = await matchMintedTokenId(client, ids, input);
     if (matched != null) return matched;
   }
-  const next = (await client.readContract({
-    address: input.positionManager,
-    abi: positionManagerAbi,
-    functionName: "nextTokenId",
-    args: [],
-  })) as bigint;
-  if (next <= 1n) return undefined;
-  const last = next - 1n;
-  for (const row of findLockerTokenIdReads(input.positionManager, last)) {
-    try {
-      const owner = (await client.readContract(row.ownerOf)) as Address;
-      if (owner.toLowerCase() !== input.locker.toLowerCase()) continue;
-      const [key] = (await client.readContract(row.poolInfo)) as [
-        { currency0: Address; currency1: Address; fee: number; tickSpacing: number; hooks: Address },
-        bigint,
-      ];
-      if (
-        matchLockerTokenId({
-          owner,
-          locker: input.locker,
-          token: input.token,
-          hooks: input.hooks,
-          keyHooks: key.hooks,
-          currency0: key.currency0,
-          currency1: key.currency1,
-          fee: Number(key.fee),
-          tickSpacing: Number(key.tickSpacing),
-        })
-      ) {
-        return row.tokenId;
-      }
-    } catch {
-      // skip unminted or foreign ids
-    }
+  if (client.getContractEvents && client.getBlockNumber) {
+    const registered = await fetchLockerRegisteredTokenIds(
+      {
+        getBlockNumber: client.getBlockNumber,
+        getContractEvents: client.getContractEvents,
+      },
+      input.locker,
+      input.token,
+      input.fromBlock,
+      input.auctionStartBlock,
+      input.latestBlock,
+    );
+    return tokenIdFromRegisteredLogs(registered);
   }
   return undefined;
 }

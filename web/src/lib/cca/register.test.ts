@@ -3,10 +3,15 @@ import { encodeEventTopics, zeroAddress } from "viem";
 import { CCA_SEPOLIA } from "./addresses";
 import { CCA_LOG_CHUNK_BLOCKS } from "./logs";
 import {
+  fetchLockerRegisteredTokenIds,
   fetchPositionManagerMintLogs,
+  findLockerTokenId,
+  isRegisteredRead,
+  lockerRegisteredLogsQuery,
   positionManagerMintLogsQuery,
   positionManagerTransferAbi,
   tokenIdFromMigrateReceipt,
+  tokenIdFromRegisteredLogs,
   tokenIdsMintedToLocker,
 } from "./register";
 
@@ -111,5 +116,71 @@ describe("PositionManager mint log query (reload path)", () => {
       10_000n,
     );
     expect(getContractEvents.mock.calls[0]![0].fromBlock).toBe(40_000n);
+  });
+});
+
+const TOKEN = "0xa555555555555555555555555555555555555555" as const;
+
+describe("Locker Registered log fallback (no tokenIdsOf)", () => {
+  it("filters Registered by token and never queries tokenIdsOf", async () => {
+    const seen: string[] = [];
+    const getContractEvents = vi.fn(async (query: { eventName: string; address: string }) => {
+      seen.push(query.eventName);
+      expect(query.eventName).not.toBe("tokenIdsOf");
+      if (query.eventName === "Transfer") return [];
+      return [{ args: { token: TOKEN, tokenId: 12n } }];
+    });
+    const readContract = vi.fn(async () => {
+      throw new Error("tokenIdsOf must not be used to find the LP tokenId");
+    });
+    const tokenId = await findLockerTokenId(
+      {
+        readContract,
+        getBlockNumber: async () => 90_000n,
+        getContractEvents,
+      },
+      {
+        positionManager: PM,
+        locker: LOCKER,
+        token: TOKEN,
+        hooks: "0x5555555555555555555555555555555555555555",
+      },
+    );
+    expect(tokenId).toBe(12n);
+    expect(seen).toContain("Registered");
+    expect(lockerRegisteredLogsQuery(LOCKER, TOKEN, 90_000n, 40_000n)).toMatchObject({
+      address: LOCKER,
+      eventName: "Registered",
+      args: { token: TOKEN },
+    });
+    expect(isRegisteredRead(LOCKER, TOKEN, 12n)).toMatchObject({
+      functionName: "isRegistered",
+      args: [TOKEN, 12n],
+    });
+  });
+
+  it("returns undefined when neither Transfer nor Registered logs exist", async () => {
+    const tokenId = await findLockerTokenId(
+      {
+        readContract: async () => {
+          throw new Error("no nextTokenId / tokenIdsOf fallback");
+        },
+        getBlockNumber: async () => 90_000n,
+        getContractEvents: async () => [],
+      },
+      {
+        positionManager: PM,
+        locker: LOCKER,
+        token: TOKEN,
+        hooks: "0x5555555555555555555555555555555555555555",
+      },
+    );
+    expect(tokenId).toBeUndefined();
+    expect(tokenIdFromRegisteredLogs([])).toBeUndefined();
+    expect(await fetchLockerRegisteredTokenIds(
+      { getBlockNumber: async () => 50_000n, getContractEvents: async () => [] },
+      LOCKER,
+      TOKEN,
+    )).toEqual([]);
   });
 });
