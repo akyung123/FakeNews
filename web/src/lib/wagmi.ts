@@ -2,7 +2,7 @@ import { createConfig, injected } from "wagmi";
 import { sepolia } from "wagmi/chains";
 import { walletConnect } from "wagmi/connectors";
 import { SEPOLIA_CHAIN_ID, webEnv } from "./env";
-import { sepoliaTransport } from "./rpc";
+import { SEPOLIA_POLLING_MS, sepoliaTransport } from "./rpc";
 
 const connectors = [
   injected(),
@@ -18,6 +18,11 @@ export const wagmiConfig = createConfig({
   transports: {
     [sepolia.id]: sepoliaTransport(),
   },
+  // Same read budget as getPublicClient(): reads in one tick share a multicall,
+  // and watchers poll once per block.
+  batch: { multicall: true },
+  pollingInterval: SEPOLIA_POLLING_MS,
+  cacheTime: SEPOLIA_POLLING_MS,
 });
 
 if (sepolia.id !== SEPOLIA_CHAIN_ID) {

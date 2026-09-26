@@ -78,6 +78,13 @@ export function ensTextQuery(name: string, key: string) {
   };
 }
 
+/**
+ * Found text per client, for this page session only. A written prophecy can never
+ * change (DECISIONS #5), so re-reading it on every list load only spends RPC budget.
+ * Misses are not kept: a record set a moment ago still shows up on the next read.
+ */
+const ensTextSeen = new WeakMap<object, Map<string, string>>();
+
 export async function getEnsText(
   name: string,
   key: string,
@@ -86,11 +93,20 @@ export async function getEnsText(
   const resolver = options.universalResolver ?? webEnv.universalResolver;
   if (!resolver) return mockEnsText(name, key);
   const client = options.client ?? createEnsClient();
+  const normalized = normalize(name);
+  const seenKey = `${resolver.toLowerCase()}|${normalized}|${key}`;
+  let seen = ensTextSeen.get(client);
+  const hit = seen?.get(seenKey);
+  if (hit !== undefined) return hit;
   const text = await client.getEnsText({
-    name: normalize(name),
+    name: normalized,
     key,
     universalResolverAddress: resolver,
   });
+  if (text) {
+    if (!seen) ensTextSeen.set(client, (seen = new Map()));
+    seen.set(seenKey, text);
+  }
   return text ?? null;
 }
 

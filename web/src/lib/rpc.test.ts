@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sepoliaRpcUrls, withRpcRetry } from "./rpc";
+import { sepoliaRpcUrls, shareFor, withRpcRetry } from "./rpc";
 
 describe("sepoliaRpcUrls", () => {
   it("puts the configured RPC first, then the public fallbacks, de-duplicated", () => {
@@ -71,5 +71,32 @@ describe("withRpcRetry", () => {
     });
     await expect(withRpcRetry(run, { sleep: async () => {} })).rejects.toThrow("execution reverted");
     expect(run).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("shareFor", () => {
+  it("shares one call within the window and reads again after it", async () => {
+    let clock = 0;
+    const run = vi.fn(async () => clock);
+    const load = shareFor(12_000, run, () => clock);
+    const [a, b] = await Promise.all([load(), load()]);
+    expect([a, b]).toEqual([0, 0]);
+    clock = 11_999;
+    await expect(load()).resolves.toBe(0);
+    expect(run).toHaveBeenCalledTimes(1);
+    clock = 12_000;
+    await expect(load()).resolves.toBe(12_000);
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not keep a failed call", async () => {
+    const run = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error("429 Too Many Requests"))
+      .mockResolvedValueOnce("ok");
+    const load = shareFor(12_000, run, () => 0);
+    await expect(load()).rejects.toThrow("429");
+    await expect(load()).resolves.toBe("ok");
+    expect(run).toHaveBeenCalledTimes(2);
   });
 });
