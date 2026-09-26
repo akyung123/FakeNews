@@ -70,8 +70,10 @@ import {
 } from "./price";
 import { encodeV4ExactInSingle, ethTokenPoolKey } from "./swap";
 import {
+  CCA_LOG_CHUNK_BLOCKS,
   bidExitedLogsQuery,
   bidSubmittedLogsQuery,
+  ccaLogChunks,
   ccaLogsFromBlock,
   fetchCcaEventLogs,
   tokensClaimedLogsQuery,
@@ -141,11 +143,26 @@ describe("verified external ABIs", () => {
       expect.arrayContaining([
         "BidMustBeAboveClearingPrice",
         "TickPriceNotAtBoundary",
+        "TickPriceNotIncreasing",
+        "TickHintMustBeGreaterThanNextActiveTickPrice",
+        "BatchClaimDifferentOwner",
         "NotGraduated",
         "BidNotExited",
         "AuctionIsOver",
       ]),
     );
+    const errorByName = Object.fromEntries(
+      ccaAbi.filter((item) => item.type === "error").map((item) => [item.name, item]),
+    );
+    expect(errorByName.TickPriceNotIncreasing?.inputs).toEqual([]);
+    expect(errorByName.TickHintMustBeGreaterThanNextActiveTickPrice?.inputs).toEqual([
+      { name: "tickPriceQ96", type: "uint256" },
+      { name: "nextActiveTickPriceQ96", type: "uint256" },
+    ]);
+    expect(errorByName.BatchClaimDifferentOwner?.inputs).toEqual([
+      { name: "expectedOwner", type: "address" },
+      { name: "receivedOwner", type: "address" },
+    ]);
   });
 
   it("CCALens.state matches AuctionStateLens", () => {
@@ -590,6 +607,10 @@ describe("error mapper", () => {
     expect(mapCcaError(new Error("MigrationNotYetAllowed"))).toBe("market_not_ready");
     expect(mapCcaError(new Error("TickPreviousPriceInvalid"))).toBe("bid_rejected");
     expect(mapCcaError(new Error("CannotPartiallyExitBidBeforeEndBlock"))).toBe("cannot_exit");
+    expect(mapCcaError(new Error("TickPriceNotIncreasing"))).toBe("bid_rejected");
+    expect(mapCcaError(new Error("TickHintMustBeGreaterThanNextActiveTickPrice"))).toBe(
+      "bid_rejected",
+    );
     expect(mapCcaError(new Error("BatchClaimDifferentOwner"))).toBe("cannot_claim");
     expect(mapCcaError(new Error("InvalidFundsRecipient"))).toBe("launch_rejected");
     expect(mapCcaError(new Error("User rejected the request"))).toBe("user_rejected");
@@ -602,6 +623,15 @@ describe("error mapper", () => {
       CCA_BID_ERROR_COPY.BidMustBeAboveClearingPrice,
     );
     expect(ccaErrorCopyFor(new Error("InvalidFundsRecipient"))).toBe(CCA_LAUNCH_ERROR_MESSAGE);
+    expect(ccaErrorCopyFor(new Error("TickPriceNotIncreasing"))).toBe(
+      "Prices moved. Refresh and try again.",
+    );
+    expect(ccaErrorCopyFor(new Error("TickHintMustBeGreaterThanNextActiveTickPrice"))).toBe(
+      "Prices moved. Refresh and try again.",
+    );
+    expect(ccaErrorCopyFor(new Error("BatchClaimDifferentOwner"))).toBe(
+      "These bids belong to different wallets. Claim them one by one.",
+    );
   });
 });
 
@@ -668,14 +698,21 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
 });
 
 describe("CCA log fromBlock", () => {
-  it("reads VITE_LAUNCHPAD_DEPLOY_BLOCK as bigint and falls back to 0n if unset", () => {
-    expect(ccaLogsFromBlock("12345678")).toBe(12_345_678n);
-    expect(ccaLogsFromBlock("0")).toBe(0n);
-    expect(ccaLogsFromBlock(undefined)).toBe(0n);
-    expect(ccaLogsFromBlock("")).toBe(0n);
-    expect(ccaLogsFromBlock("  ")).toBe(0n);
-    expect(ccaLogsFromBlock("nope")).toBe(0n);
-    expect(ccaLogsFromBlock()).toBe(0n);
+  it("reads VITE_LAUNCHPAD_DEPLOY_BLOCK as bigint and falls back to latest minus 50k if unset", () => {
+    expect(ccaLogsFromBlock("12345678", 200_000n)).toBe(12_345_678n);
+    expect(ccaLogsFromBlock("0", 90_000n)).toBe(0n);
+    expect(ccaLogsFromBlock(undefined, 90_000n)).toBe(40_000n);
+    expect(ccaLogsFromBlock("", 90_000n)).toBe(40_000n);
+    expect(ccaLogsFromBlock("  ", 90_000n)).toBe(40_000n);
+    expect(ccaLogsFromBlock("nope", 90_000n)).toBe(40_000n);
+    expect(ccaLogsFromBlock(undefined, 10_000n)).toBe(0n);
+  });
+
+  it("prefers the later of lookback/deploy and auction startBlock", () => {
+    expect(ccaLogsFromBlock(undefined, 90_000n, 50_000n)).toBe(50_000n);
+    expect(ccaLogsFromBlock(undefined, 90_000n, 10_000n)).toBe(40_000n);
+    expect(ccaLogsFromBlock("1000", 90_000n, 5_000n)).toBe(5_000n);
+    expect(ccaLogsFromBlock("80000", 90_000n, 5_000n)).toBe(80_000n);
   });
 
   it("always sends fromBlock on bid / exit / claim log queries", () => {
@@ -688,15 +725,35 @@ describe("CCA log fromBlock", () => {
     expect(fromDeploy.abi).toBe(ccaAbi);
     expect(Object.keys(fromDeploy)).toContain("fromBlock");
 
-    const unset = bidSubmittedLogsQuery(AUCTION, latest, ccaLogsFromBlock(undefined));
-    expect(unset.fromBlock).toBe(0n);
+    const unset = bidSubmittedLogsQuery(AUCTION, latest, ccaLogsFromBlock(undefined, latest));
+    expect(unset.fromBlock).toBe(30_000n);
     expect(bidExitedLogsQuery(AUCTION, latest, 9n).eventName).toBe("BidExited");
     expect(tokensClaimedLogsQuery(AUCTION, latest, 9n).eventName).toBe("TokensClaimed");
   });
 
-  it("fetchCcaEventLogs forwards the deploy-block fromBlock", async () => {
+  it("splits 120_000 blocks into 3 inclusive chunks with no overlap or gap", () => {
+    expect(CCA_LOG_CHUNK_BLOCKS).toBe(50_000n);
+    const chunks = ccaLogChunks(0n, 119_999n);
+    expect(chunks).toEqual([
+      { fromBlock: 0n, toBlock: 49_999n },
+      { fromBlock: 50_000n, toBlock: 99_999n },
+      { fromBlock: 100_000n, toBlock: 119_999n },
+    ]);
+    expect(chunks).toHaveLength(3);
+    for (const chunk of chunks) {
+      expect(chunk.toBlock - chunk.fromBlock + 1n).toBeLessThanOrEqual(CCA_LOG_CHUNK_BLOCKS);
+    }
+    for (let i = 1; i < chunks.length; i++) {
+      expect(chunks[i].fromBlock).toBe(chunks[i - 1].toBlock + 1n);
+    }
+    expect(chunks[0].fromBlock).toBe(0n);
+    expect(chunks[chunks.length - 1].toBlock).toBe(119_999n);
+  });
+
+  it("fetchCcaEventLogs forwards fromBlock in 50k chunks", async () => {
     const seen: unknown[] = [];
-    const logs = [{ eventName: "BidSubmitted" }];
+    const logsA = [{ eventName: "BidSubmitted", id: 1 }];
+    const logsB = [{ eventName: "BidSubmitted", id: 2 }];
     const got = await fetchCcaEventLogs(
       {
         async getBlockNumber() {
@@ -704,15 +761,80 @@ describe("CCA log fromBlock", () => {
         },
         async getContractEvents(query) {
           seen.push(query);
-          return logs;
+          return seen.length === 1 ? logsA : logsB;
         },
       },
       AUCTION,
       "BidSubmitted",
       12_000n,
     );
-    expect(got).toBe(logs);
-    expect(seen).toEqual([bidSubmittedLogsQuery(AUCTION, 90_000n, 12_000n)]);
-    expect((seen[0] as { fromBlock: bigint }).fromBlock).toBe(12_000n);
+    expect(got).toEqual([...logsA, ...logsB]);
+    expect(seen).toEqual([
+      bidSubmittedLogsQuery(AUCTION, 61_999n, 12_000n),
+      bidSubmittedLogsQuery(AUCTION, 90_000n, 62_000n),
+    ]);
+  });
+
+  it("fetchCcaEventLogs queries 120k blocks in 3 calls with no overlap or gap", async () => {
+    const seen: { fromBlock: bigint; toBlock: bigint }[] = [];
+    const got = await fetchCcaEventLogs(
+      {
+        async getBlockNumber() {
+          return 119_999n;
+        },
+        async getContractEvents(query) {
+          seen.push({ fromBlock: query.fromBlock, toBlock: query.toBlock });
+          return [{ n: seen.length }];
+        },
+      },
+      AUCTION,
+      "BidSubmitted",
+      0n,
+    );
+    expect(got).toEqual([{ n: 1 }, { n: 2 }, { n: 3 }]);
+    expect(seen).toEqual([
+      { fromBlock: 0n, toBlock: 49_999n },
+      { fromBlock: 50_000n, toBlock: 99_999n },
+      { fromBlock: 100_000n, toBlock: 119_999n },
+    ]);
+    for (let i = 1; i < seen.length; i++) {
+      expect(seen[i].fromBlock).toBe(seen[i - 1].toBlock + 1n);
+    }
+  });
+
+  it("fetchCcaEventLogs uses lookback when fromBlock is omitted, then the later startBlock", async () => {
+    const seen: { fromBlock: bigint; toBlock: bigint }[] = [];
+    await fetchCcaEventLogs(
+      {
+        async getBlockNumber() {
+          return 90_000n;
+        },
+        async getContractEvents(query) {
+          seen.push({ fromBlock: query.fromBlock, toBlock: query.toBlock });
+          return [];
+        },
+      },
+      AUCTION,
+      "BidSubmitted",
+    );
+    expect(seen[0]?.fromBlock).toBe(40_000n);
+
+    seen.length = 0;
+    await fetchCcaEventLogs(
+      {
+        async getBlockNumber() {
+          return 90_000n;
+        },
+        async getContractEvents(query) {
+          seen.push({ fromBlock: query.fromBlock, toBlock: query.toBlock });
+          return [];
+        },
+      },
+      AUCTION,
+      "BidSubmitted",
+      undefined,
+      55_000n,
+    );
+    expect(seen).toEqual([{ fromBlock: 55_000n, toBlock: 90_000n }]);
   });
 });

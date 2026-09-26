@@ -301,11 +301,28 @@ export const ccaAbi = [
   { type: "error", name: "InvalidBidUnableToClear", inputs: [] },
   { type: "error", name: "TickPriceNotAtBoundary", inputs: [] },
   { type: "error", name: "TickPreviousPriceInvalid", inputs: [] },
+  { type: "error", name: "TickPriceNotIncreasing", inputs: [] },
   { type: "error", name: "TickNotInitialized", inputs: [] },
   { type: "error", name: "InvalidTickPrice", inputs: [] },
   {
     type: "error",
+    name: "TickHintMustBeGreaterThanNextActiveTickPrice",
+    inputs: [
+      { name: "tickPriceQ96", type: "uint256" },
+      { name: "nextActiveTickPriceQ96", type: "uint256" },
+    ],
+  },
+  {
+    type: "error",
     name: "BidIdDoesNotExist",
     inputs: [{ name: "bidId", type: "uint256" }],
+  },
+  {
+    type: "error",
+    name: "BatchClaimDifferentOwner",
+    inputs: [
+      { name: "expectedOwner", type: "address" },
+      { name: "receivedOwner", type: "address" },
+    ],
   },
 ] as const;

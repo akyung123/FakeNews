@@ -200,6 +200,15 @@ describe("designer FINAL CCA copy", () => {
       CCA_BID_ERROR_COPY.BidMustBeAboveClearingPrice,
     );
     expect(ccaErrorCopyFor(new Error("InvalidFundsRecipient"))).toBe(CCA_LAUNCH_ERROR_MESSAGE);
+    expect(ccaErrorCopyFor(new Error("TickPriceNotIncreasing"))).toBe(
+      "Prices moved. Refresh and try again.",
+    );
+    expect(ccaErrorCopyFor(new Error("TickHintMustBeGreaterThanNextActiveTickPrice"))).toBe(
+      "Prices moved. Refresh and try again.",
+    );
+    expect(ccaErrorCopyFor(new Error("BatchClaimDifferentOwner"))).toBe(
+      "These bids belong to different wallets. Claim them one by one.",
+    );
   });
 
   test("hides claim and open-market when the goal was missed", () => {
