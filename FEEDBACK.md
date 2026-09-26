@@ -14,27 +14,32 @@ On `main`, people buy and sell on a bonding curve; when that supply sells out, l
 
 ## What we built on CCA + LBPStrategy + v4 hook
 
-**Status (2026-09-26):** docs accepted on the `cca` branch (INTERFACE + DECISIONS #18–#22). Contracts, fork test, web, and deploy script are **not** on this PR.
+**Status (2026-09-26):** built on `cca` (`c0a8cc4`) and deployed on Sepolia. Record: [`deployments/sepolia.json`](deployments/sepolia.json) — Launchpad `0x0b4BF5C6f73A1204CCe07f2522db9142d2BcB4Aa`, block 11785558, source commit `58514dd`. Read back on 2026-09-26 (head block 11785745): `hook()`, `locker()`, `lbpStrategy()`, `positionManager()`, `poolManager()`, and `ens()` match that file. `auctionBlocks()` is **10** (`AuctionBlocksSet` in tx `0x3182ad0d…7880c`, block 11785569, 28,040 gas). No `ProphetRegistered` or `Launched` log from this Launchpad in that range, so no live bid, claim, migrate, or swap yet.
 
 | Piece | Decision / official path | Built? |
 |---|---|---|
-| Launchpad → LBPStrategy | `initializeDistribution(token, totalSupply, configData, salt)` on Sepolia `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000`. Strategy pulls tokens, factory-creates the CCA, calls `onTokensReceived` | Docs only. `TODO(team)` skeleton / fork |
-| CCA factory v2.1.0 | Official `0x000000001F26a0044BaA66024e7b6599c61963F8` (`7d7602d`). We do not deploy a factory | Address pinned. No `create` from Launchpad — strategy calls it |
-| Auction | ETH currency, 25 blocks, `requiredCurrencyRaised = 0.02 ETH`. Bid = budget + max price. State via CCALens `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53` | Docs only. `TODO(team)` bid / claim on a fork |
-| `migrate` | Anyone calls `LBPStrategy.migrate(initializer)` after `migrationBlock`. Opens ETH/token pool, fee `10000`, tickSpacing `200` | Docs only. `TODO(team)` fork step 3 |
-| `ProphecyHook` | Must **inherit** `InitializerHook`. `authorized()` = LBPStrategy. Reference hook on Sepolia: `0x1600059B95A80d500fC42400ea9a88A9C29D2000` | Curve-era hook on `main` authorizes Launchpad only and has no ERC165. Rewrite is `TODO(team)` |
-| `LiquidityLocker` | Holds the PositionManager NFT (`positionRecipient`). `collect` still 24 : 76. No principal out | Curve-era locker on `main` is PoolManager-native, not an ERC-721 receiver. Rewrite is `TODO(team)` |
-| Recipients | `fundsRecipient` = LBPStrategy (else `InvalidFundsRecipient`). `recipient` and `tokensRecipient` = protocol or Launchpad — never the prophet, and `tokensRecipient` never the strategy | Written into INTERFACE. `TODO(team)` to encode |
+| Launchpad → LBPStrategy | `initializeDistribution(token, totalSupply, configData, salt)` on Sepolia `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000`. Strategy pulls tokens, factory-creates the CCA, calls `onTokensReceived` | Built and deployed. Live `lbpStrategy()` is that address. Fork `test_launchpadHookLockerMigrateRegisterCollect` launches through it |
+| CCA factory v2.1.0 | Official `0x000000001F26a0044BaA66024e7b6599c61963F8` (`7d7602d`). We do not deploy a factory | Address pinned in `SepoliaConfig` and `deployments/sepolia.json`. Launchpad does not call factory `create`. Fork setup asserts `initializerFactory()` is this address |
+| Auction | ETH currency. Default `auctionBlocks` is 25; `setAuctionBlocks` is deployer-only. Floor line is 0.02 ETH for the 500M auction half (`CcaLib.AUCTION_SUPPLY`). Bid = budget + max price | Fork demos (10 and 25 blocks) graduate and `claimTokens`. Live Launchpad is set to 10 blocks. No live auction yet |
+| `migrate` | Anyone calls `LBPStrategy.migrate(initializer)` after `migrationBlock`. Opens ETH/token pool, fee `10000`, tickSpacing `200` | Fork: `migrate` opens a pool (`sqrtPriceX96 > 0`) and the PositionManager NFT is owned by our locker. Not called on the live Launchpad |
+| `ProphecyHook` | ERC165 `IInitializerHook`, `authorized()` = LBPStrategy, `beforeInitialize` only. Constructor `(poolManager, authorized)`. Reference hook on Sepolia: `0x1600059B95A80d500fC42400ea9a88A9C29D2000` | Deployed `0x5f7Ba2Fa7e57873D9E57575e2Fc30F71897ea000`. Live `authorized()` is LBPStrategy. We implement the interface; we do not inherit the official hook contract |
+| `LiquidityLocker` | Holds the PositionManager NFT. Official `_mint` does not call `onERC721Received`, so the locker also has `register(token, tokenId)`. `collect` is 24 : 76. No principal out | Deployed `0x3c2642CDDB4CEE7fC65568240fD5c1C98Be70ff6`. Fork registers the mint `Transfer` id and `collect` matches `Graduation.splitFees` (24 : 76) |
+| Recipients | `fundsRecipient` = LBPStrategy (else `InvalidFundsRecipient`). `recipient` and `tokensRecipient` = protocol — never the prophet, and `tokensRecipient` never the strategy | Encoded in `CcaLib`. `test_recipientsAreNeverProphet` passed |
 
-`TODO(team):` Sepolia-fork outcome for the four steps (launch+create auction, bid, migrate opens v4 pool, swap). `TODO(team):` gas for `initializeDistribution`, `submitBid`, `checkpoint`, `exitBid`, `claimTokens`, `migrate`, swap.
+Sepolia-fork outcome (CI run [36235288329](https://github.com/prism-toggle-ai/FakeNews/actions/runs/36235288329) on the deploy-record PR, merged as `c0a8cc4`): **95 tests passed, 0 failed, 0 skipped**. That includes `CcaSepoliaForkTest` (11) and `CcaLaunchpadForkTest.test_launchpadHookLockerMigrateRegisterCollect` (launch, bid, `exitBid`, `claimTokens`, `migrate`, `register`, Universal Router buy, `collect`). Same run: web 49 tests, world 23 tests.
 
-## What worked (verified in source / on `main`, not yet on the CCA fork)
+Live deploy gas, receipts in block 11785558 (deployer `0x9Fb765ba848ec78616ECC277A5a61Fdc380eCA6F`): ProphecyEns CREATE 1,357,055; Launchpad CREATE 2,702,158; Hook CREATE2 279,022; Locker CREATE 1,135,409; `setUniswap` 91,115; `setCca` 85,506. `setAuctionBlocks(10)` used 28,040. `TODO(team):` per-call gas for `initializeDistribution`, `submitBid`, `checkpoint`, `exitBid`, `claimTokens`, `migrate`, and the v4 swap — the fork suite does not record those costs, and no live auction has run them.
+
+## What worked (verified in source, on the CCA fork, and on the Sepolia deployment)
 
 - Official Sepolia LBPStrategy `initializerFactory()` is the v2.1.0 CCA factory; `poolManager()` / `positionManager()` match the v4 Sepolia table. Read on-chain in PR #38 (public RPC, 2026-09-26).
 - Official `initializeDistribution` / `migrate` / `AuctionParameters` / `MigratorParameters` decode is documented and present at commit `1c5904912aefceaceb89c24528cd5e25d0b61597`. We did not have to invent a factory function name: v2 renamed `initializeDistribution` → factory `create`; the strategy still exposes `initializeDistribution`.
 - CCALens `state(auction)` is the intended off-chain read (`eth_call`; it checkpoints via a revert payload). `getInitializedTickData` is `view`.
 - On `main`, a local `new PoolManager(owner)` plus `StateLibrary` was enough to exercise initialize, full-range liquidity, donate and collect without a fork (curve graduation). `Hooks.validateHookPermissions` in the constructor catches a wrong hook address immediately.
 - `TickMath.minUsableTick` / `maxUsableTick` for spacing 200 give `-887200` / `887200`.
+- On a Sepolia fork, one demo bid of 0.021 ETH at 2× floor fills the 500M auction half without a separate `checkpoint` (`exitBid` finalizes). `maxPrice == clearingPrice` reverts `CannotExitBid`. Floor graduation leaves 171 wei for the protocol.
+- After `migrate`, Universal Router 2.1.2 (`0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`) buys and sells on the new pool (`test_urSwapBuyAndSellAfterMigrate`). CI run 36235288329 logged `ur used six-field params: 1` (buy 23582658408766078402769254 token wei for 0.001 ETH; sell returned 502007047322968 wei).
+- Live hook `authorized()` is the official LBPStrategy, which is the caller `migrate` uses for `beforeInitialize`.
 
 ## Friction — official path cannot attach our hook / locker as-is
 
@@ -45,6 +50,7 @@ Recorded from official LBPStrategy v3.3.0 source and from our curve-era contract
 | 09-26 (research, PR #38) | LBP hook | `validateHook` requires ERC165 `IInitializerHook`, `authorized() == address(this)` (the strategy), a valid hook address for the fee, and `BEFORE_INITIALIZE`. Our `ProphecyHook` authorized Launchpad and had no ERC165 | Inherit `InitializerHook`; set `authorized` to LBPStrategy `0x9543…2000` | Put “custom hook must inherit InitializerHook and set authorized to *this* LBPStrategy” next to the deployments table, not only in TechnicalReference |
 | 09-26 (research) | LBP hook | Official Sepolia `InitializerHook` `0x1600…2000` has `authorized() == LBPStrategy`. Using that address as `poolParameters.hook` initializes **that** hook, not ours | Deploy our own CREATE2 hook that inherits the same base | Show a “bring your own InitializerHook” snippet with the constructor `(PoolManager, authorized)` |
 | 09-26 (research) | Locker | `migrate` mints via `PositionManager.modifyLiquidities` and transfers each NFT to `positionRecipient`. Our locker `lock` / `collect` talk to PoolManager `modifyLiquidity` and have no `onERC721Received` | Rewrite locker as the NFT holder; collect through PositionManager | Document that `positionRecipient` is the only supported lock. Setting it to a PoolManager-native contract silently fails to lock |
+| 09-26 (fork, PR #42 / #47) | Locker | Official PositionManager `_mint` does not call `onERC721Received`, so a receiver-only locker never learns the LP `tokenId` | `register(token, tokenId)` after the mint `Transfer(0 → locker)`. Fork test collects 24 : 76 on that id | Say in the migrate guide that the NFT transfer is not an ERC-721 callback. Callers must read the mint `tokenId` themselves |
 | 09-26 (research) | Recipients | `fundsRecipient` **must** be the strategy (`InvalidFundsRecipient`). `tokensRecipient` **must not** be the strategy (`InvalidTokensRecipient`). `recipient` takes unused currency and recover-on-fail | Set funds to the strategy; set the other two to protocol / Launchpad; never the prophet | The two “recipient” names (`recipient` vs `tokensRecipient` vs `fundsRecipient`) are easy to swap. A one-line matrix in the LBP deploy guide would have saved a revert |
 | 09-26 (research) | Factory name | DeploymentGuide still shows `initializeDistribution` on the CCA factory. Source v2+ is `create`. Strategy kept `initializeDistribution` | Call the strategy, not the factory, from Launchpad | Fix the stale DeploymentGuide snippet or mark it factory-v1 only |
 | 09-26 (research) | Docs vs source | [Launchpad deployments](https://developers.uniswap.org/docs/liquidity/liquidity-launchpad/deployments) says the factory “has no constructor parameters”. Factory v2.0.0+ takes `_protocolFeeController` | Ignore that sentence; official Sepolia factory was deployed with `address(0)` (fees off) | Align the deployments page with `ContinuousClearingAuctionFactory.sol` L20–L22 |
@@ -94,7 +100,7 @@ cd contracts && forge build && forge test
 - Round trip never gains: pass (`testFuzz_roundTripNeverGains`)
 - Graduation vs pool start price: pass (`testFuzz_priceGapUnderLimit`, gap < 68 ppm)
 
-CCA fork result: `TODO(team)`.
+CCA fork result: 95 passed, 0 failed, 0 skipped on CI run 36235288329 (`cca` deploy-record PR). See the status section for the four steps and the live deploy gas. Per-step auction gas is still `TODO(team)`.
 
 ## Suggestions (concrete)
 
@@ -106,4 +112,4 @@ CCA fork result: `TODO(team)`.
 
 ## 09-26 note — switching from curve graduation to official migrate
 
-The hard part of the curve-era hook was the address and the caller, not the hook body. Official LBP makes that stricter: the caller **must** be the strategy, the hook **must** speak ERC165, and the lock **must** be an NFT. That is a product fit (we still want a locked pool and a 24 : 76 fee split) but it is not a drop-in. [`INTERFACE_CCA.md`](docs/INTERFACE_CCA.md) records the rewrite so frontend, backend and infra can move in parallel. `INTERFACE.md` on `main` stays the curve contract. Implementation results belong in the rows marked `TODO(team)`.
+The hard part of the curve-era hook was the address and the caller, not the hook body. Official LBP makes that stricter: the caller **must** be the strategy, the hook **must** speak ERC165, and the lock **must** be an NFT. That is a product fit (we still want a locked pool and a 24 : 76 fee split) but it is not a drop-in. The rewrite is on `cca` and the Sepolia addresses above are live. `INTERFACE.md` on `main` stays the curve contract. The only open measurement is per-step auction gas (`TODO(team)`).
