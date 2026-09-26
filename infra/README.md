@@ -22,6 +22,16 @@ After the service is up, set `VITE_WORLD_SERVER_URL` to the `https://….onrende
 
 `context_mismatch` is a world/ error code (backend follow-up). No extra env names.
 
+### Demo
+
+Render's free plan sleeps when idle. A cold start takes tens of seconds.
+
+1. Right before recording, call `GET <world-url>/health` once to wake the server:
+
+```bash
+curl -sS https://<world-url>/health
+```
+
 ### Fallback (no Render account in time)
 
 For the demo recording, run the world server locally and expose it with a Cloudflare quick tunnel:
