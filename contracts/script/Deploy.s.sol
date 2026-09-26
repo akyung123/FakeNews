@@ -31,6 +31,9 @@ contract Deploy is Script {
         console.log("poolManager", poolManager);
         console.log("hookSalt");
         console.logBytes32(hookSalt);
+        if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
+            require(feeRecipient != address(0), "set PROTOCOL_FEE_RECIPIENT");
+        }
 
         // Simulation unless the person passes the send flag. Key stays in env, not on argv.
         if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {

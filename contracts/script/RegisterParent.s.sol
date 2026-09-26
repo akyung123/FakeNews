@@ -77,7 +77,7 @@ contract RegisterParent is Script {
         require(block.timestamp >= uint256(committedAt) + 60, "wait 60s after commit");
 
         _start();
-        // Person mints MockUSDC first (docs/INFRA.md). Approve is part of register.
+        // Person mints MockUSDC first (infra/README.md). Approve is part of register.
         usdc.approve(address(registrar), type(uint256).max);
         registrar.register(label, owner, secret, address(0), address(0), duration, address(usdc), bytes32(0));
         vm.stopBroadcast();
