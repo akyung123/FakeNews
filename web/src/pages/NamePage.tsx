@@ -29,7 +29,7 @@ export function NamePage() {
 
 export function ClaimNameScreen({
   session,
-  world = createWorldClient(),
+  world: worldProp,
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
   registerProphet = createRegisterProphet(),
 }: {
@@ -39,6 +39,9 @@ export function ClaimNameScreen({
   registerProphet?: (input: RegisterProphetInput) => Promise<void>;
 }) {
   const navigate = useNavigate();
+  // One client per screen. A new one each render makes WorldGate recheck the
+  // server and drop the open World ID widget.
+  const [world] = useState(() => worldProp ?? createWorldClient());
   const returningProphet = Boolean(session.prophetLabel);
   const [prophetLabel, setProphetLabel] = useState(session.prophetLabel ?? "");
   const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
