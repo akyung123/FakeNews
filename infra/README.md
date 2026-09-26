@@ -10,6 +10,8 @@ GitHub Pages workflow is a **separate PR**. Expected URL: `https://akyung123.git
 
 A person must enable Settings → Pages → source **GitHub Actions**. Until that is on, the deploy job fails. Zero extra secrets. Public `VITE_*` go in Actions variables.
 
+Preview/demo builds hard-code `VITE_WORLD_MOCK=0` (OFF). Mock is ON unless the value is exactly `0` or `false` (PR #20). The Pages workflow fails if mock resolves to ON. Recording with mock ON is not valid World ID evidence.
+
 ## World server hosting (Render)
 
 `world/` is a Bun service. It cannot go on GitHub Pages. **One candidate: [Render](https://render.com) free Web Service.**
@@ -32,7 +34,9 @@ Render's free plan sleeps when idle. A cold start takes tens of seconds.
 ./infra/check-world-signer.sh
 ```
 
-2. Right before recording, call `GET <world-url>/health` once to wake the server:
+2. Confirm the Pages preview has mock OFF (no "Simulate failure" / "Mock World ID" notice). Then re-run Pages if the Actions variables just changed.
+
+3. Right before recording, call `GET <world-url>/health` once to wake the server:
 
 ```bash
 curl -sS https://<world-url>/health
@@ -97,6 +101,16 @@ WORLD_SIGNER_KEY=<paste from the local infra/new-world-signer.sh output only>
 ```
 
 Never commit `WORLD_SIGNER_KEY`. Never print it in CI logs. A person pastes it from the local generation output onto Render as a secret.
+
+**Then set GitHub Actions variables** (Settings → Secrets and variables → Actions → Variables — public, not secrets) and re-run the Pages deploy:
+
+| Variable | Value |
+|----------|--------|
+| `VITE_WORLD_SERVER_URL` | Render `https://….onrender.com` origin |
+| `VITE_LAUNCHPAD_ADDRESS` | Deployed Launchpad |
+| `VITE_CHAIN_ID` | `11155111` |
+
+Before recording, open https://akyung123.github.io/Prophecy/ and confirm mock is OFF: no "Simulate failure" button and no "Mock World ID" notice. Recording with mock ON is not valid World ID evidence.
 
 ## Human-input checklist (names only)
 
