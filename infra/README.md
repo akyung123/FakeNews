@@ -59,4 +59,4 @@ This repo has one `.env.example` (this lane). Do not add `world/.env.example`. O
 
 ## CI
 
-`ci.yml`: `forge build` + `forge test`; web `bun install` / `tsc` / `build`; world job skipped until `world/package.json` exists (not a fake pass).
+`ci.yml`: `forge build` + `forge test`; web `bun install` / `tsc` / `build`; world `tsc` + `bun test` (no lint/build scripts in `world/package.json`).
