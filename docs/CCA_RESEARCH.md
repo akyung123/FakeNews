@@ -381,11 +381,63 @@ Exact person-hours are **UNVERIFIED**. Compared with the current curve+graduatio
 
 ### Fallback if CCA is not demo-ready by 22:00 KST
 
-Keep the **shipping bonding curve** (already on `main`, DECISIONS #7 / #11). Graduation into our v4 pool + locker is implemented and tested. Record CCA blockers in `FEEDBACK.md` (already listed in [PLAN.md](PLAN.md) section 5). Do not delete curve code until a person accepts the INTERFACE proposal.
-
-Do not use official LBPStrategy as the 22:00 fallback: it cannot attach `ProphecyHook` / `LiquidityLocker` without a rewrite.
+Keep the **shipping bonding curve** (already on `main`, DECISIONS #7 / #11). See section 6. Do not use official LBPStrategy as the 22:00 fallback: it cannot attach `ProphecyHook` / `LiquidityLocker` without a rewrite.
 
 ---
+
+## 6. PM: fallback on `main`, fork-test gate, clock
+
+Folder contract: [`INTERFACE.md`](INTERFACE.md) section 10.
+
+### Bonding curve on `main` stays
+
+Until a person marks the 22:00 KST checkpoint as passed, **do not replace the bonding-curve Launchpad on `main`**. `buy` / `sell` / `curve` / last-buy `_graduate` stay as they are on `main` (DECISIONS #7 / #11; [`Launchpad.sol` L257, L399-L425](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/contracts/src/Launchpad.sol#L257)). This research PR does not edit `contracts/`.
+
+CCA Path A (Launchpad `create` + `graduate(token)` + web auction panel) is a **later, separate branch** after a person accepts this INTERFACE (DECISIONS row). It is not today’s merge.
+
+Record CCA blockers in `FEEDBACK.md` ([PLAN.md](PLAN.md) section 5).
+
+### Can a Sepolia fork test verify the four steps?
+
+**Yes, as a spike on a later contracts branch** — same pattern as existing ForkE2E, **without** rewriting Launchpad on `main`.
+
+Harness we already have ([`ForkE2EHelpers.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/contracts/test/ForkE2EHelpers.sol#L62-L83), [`ForkE2E.t.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/contracts/test/ForkE2E.t.sol#L41-L44)):
+
+- `rpc = vm.envOr("SEPOLIA_RPC_URL", "")`; empty → do not fork
+- else `vm.createSelectFork(rpc)` (optional pin; archive-less RPC falls back to latest)
+- `onFork`: `if (!forked) vm.skip(true)` so default CI stays green
+- CI already injects the secret ([`.github/workflows/ci.yml`](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/.github/workflows/ci.yml#L37-L40)). **Fork PRs do not receive Actions secrets** ([infra/README.md](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/infra/README.md#L266)), so a person must run `SEPOLIA_RPC_URL=… forge test` locally for the spike to actually hit Sepolia.
+
+Official CCA tests that the spike can copy (in-process factory, not a Sepolia fork — the **calls** are the same): [`AuctionFactory.t.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/test/AuctionFactory.t.sol) (`create` + mint + `onTokensReceived`), [`Auction.submitBid.t.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/test/Auction.submitBid.t.sol), [`Auction.graduation.t.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/test/Auction.graduation.t.sol) (22,218 bytes). Helpers: [`AuctionParamsBuilder`](https://github.com/Uniswap/continuous-clearing-auction/tree/7d7602d257733315434570f2a0c2f94f1c7b207a/test/utils), [`AuctionStepsBuilder`](https://github.com/Uniswap/continuous-clearing-auction/tree/7d7602d257733315434570f2a0c2f94f1c7b207a/test/utils). Step packing: [TechnicalDocumentation — Auction steps](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/docs/TechnicalDocumentation.md#auction-steps) (`uint64(mps) | (uint64(blockDelta) << 24)`). Official factory tests assert `startBlock() == block.number` ([AuctionFactory.t.sol](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/test/AuctionFactory.t.sol)); on Sepolia (L1) `vm.roll` is the schedule control.
+
+Do **not** add the CCA repo as a Foundry lib on `main`. The spike talks to the **already-deployed** factory (bytecode present, section 1) through a local interface.
+
+| Step | Fork-verifiable? | On the fork (must have code) | What the test does |
+|---|---|---|---|
+| **(1) Create auction** | **Yes** | Factory `0x000000001F26a0044BaA66024e7b6599c61963F8`. Token: deploy `ProphecyToken` or a mintable ERC-20 in the test (no live token required). | `factory.create(token, amount, abi.encode(AuctionParameters), salt)` → transfer `amount` → `onTokensReceived`. Assert `AuctionCreated` / `TokensReceived`. Optional: CCALens `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53`. Set `requiredCurrencyRaised = 0` so graduation is not blocked (section 2). |
+| **(2) Bid** | **Yes** (needs 1) | Same factory + the auction from (1). Bidder EOA with `vm.deal`. | `vm.roll` to `startBlock`. `submitBid{value: amount}(maxPriceQ96, amount, owner, prevTick, "")` with `currency = address(0)`. Prefer a price on a tick boundary and `prevTick = floorPrice`. Assert `BidSubmitted`. |
+| **(3) Clear / settle + claim** | **Yes** (needs 1–2) | Same auction. Optional lens for `state()`. | `vm.roll` to `endBlock`, `checkpoint()`, `isGraduated()`. `exitBid` on a bid **strictly above** final clearing (avoid `exitPartiallyFilledBid` hints in the spike). `vm.roll` to `claimBlock`, `claimTokens`. Assert `BidExited` / `TokensClaimed`. |
+| **(4) Open v4 pool + our hook** | **Yes, with a prank** (needs 1–3) | Official PoolManager `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543` (ForkE2E already requires code). **Local-on-fork** Launchpad + CREATE2 `ProphecyHook` + `LiquidityLocker` + `setUniswap` ([`_deployLocalOnFork`](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/contracts/test/ForkE2EHelpers.sol#L237-L264)). Not LBPStrategy / InitializerHook / PositionManager. | `sweepCurrency` / `sweepUnsoldTokens` (test is `fundsRecipient` / `tokensRecipient`). Read `lbpInitializationParams()`. `vm.prank(launchpad)` for `poolManager.initialize` (`ProphecyHook.beforeInitialize` requires `sender == launchpad` — [ProphecyHook.sol L45-L48](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/contracts/src/uniswap/ProphecyHook.sol#L45-L48)) and `locker.lock` (`msg.sender == launchpad` — [LiquidityLocker.sol L105](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/contracts/src/uniswap/LiquidityLocker.sol#L105)). Assert `slot0` and hook address. This is **not** `Launchpad.graduate` (that function does not exist yet). |
+
+### Hours (ESTIMATE — not measured)
+
+No timer in this repo or in official CCA CI gives person-hours. Numbers below are **ESTIMATE / UNVERIFIED**. Basis: our ForkE2E surface is already written (`ForkE2E.t.sol` + `ForkE2EHelpers.sol`); official create+fund is a short test once params pack; official graduation file is 22 KB; the spike does **not** rewrite Launchpad.
+
+| Step | ESTIMATE hours | Why this size |
+|---|---|---|
+| (1) Create | **3** | New fork file + CCA interfaces + valid `auctionStepsData` (wrong MPS reverts `InvalidStepDataMps`). Includes the shared harness. |
+| (2) Bid | **2** | Q96 tick + hint. Official `submitBid` tests exist. |
+| (3) Settle + claim | **3** | Block rolls + checkpoint + simple `exitBid`. Partial-exit hints are out of the spike. |
+| (4) v4 + hook | **3** | Reuse `_deployLocalOnFork`. Price from `lbpInitializationParams` instead of `vEth/vToken`. Prank approve/lock. |
+| **Total (spike only)** | **11** | Sum of the four rows |
+
+**Clock at write:** 2026-09-26 ~16:40 KST. 22:00 KST is about **5 hours 20 minutes** later.
+
+**Does the four-step spike fit before 22:00 KST today?** **No.** 11h ESTIMATE > 5h 20m remaining. Even (1)+(2) alone (5h ESTIMATE) has no buffer for a bad step pack or a flaky RPC — treat as **does not reliably fit**.
+
+**Does Path A implementation fit before 22:00 KST today?** **No.** That is a Launchpad + web rewrite on a **later branch** (section 5). Exact hours **UNVERIFIED**; same order of work as the existing curve + graduation stack.
+
+The 22:00 checkpoint is therefore: keep the curve on `main`. A green local fork spike, if someone still writes it, is evidence — not a reason to merge Path A today.
 
 ## 7. Infra (deploy order, addresses, gas)
 

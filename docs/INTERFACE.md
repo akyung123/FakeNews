@@ -5,7 +5,7 @@
 > **Path A (recommended):** official CCA factory on Sepolia + our Launchpad still initializes the v4 pool and locks LP in `LiquidityLocker`. Frontend talks to the CCA for bid / exit / claim.
 > **Path B (not recommended for the hackathon):** official `LBPStrategy.migrate`. Cannot attach today's `ProphecyHook` / `LiquidityLocker` without rewriting both. See CCA_RESEARCH section 3.
 >
-> Team addenda (same no-guess rule): Frontend §4, Designer §8, Infra §9. Sources: [`CCA_RESEARCH.md`](CCA_RESEARCH.md) §§7–9.
+> Team addenda (same no-guess rule): Frontend §4, Designer §8, Infra §9, PM §10. Sources: [`CCA_RESEARCH.md`](CCA_RESEARCH.md) §§6–9.
 
 What `contracts/`, `web/` and `world/` rely on from each other. Only the contract between folders, not how to implement it.
 
@@ -370,7 +370,7 @@ Full research: [`CCA_RESEARCH.md`](CCA_RESEARCH.md) section 5.
 1. Person accepts this INTERFACE (DECISIONS row). Contracts PR implements Path A only.
 2. Launchpad rewrite + web auction panel. World / ENS unchanged.
 3. Effort: same order as the existing curve + graduation stack (one contracts rewrite, one web trade-panel rewrite). Exact hours **UNVERIFIED**.
-4. **Fallback if CCA is not working by 22:00 KST:** keep the bonding-curve Launchpad already on `main`. Do not merge Path A contracts. Record blockers in `FEEDBACK.md`.
+4. **Fallback if CCA is not working by 22:00 KST:** keep the bonding-curve Launchpad already on `main` (section 10). Do not merge Path A contracts. Record blockers in `FEEDBACK.md`.
 
 ## 8. Designer: auction states and revert names `(PROPOSAL)`
 
@@ -465,3 +465,21 @@ Current record ([infra/README.md “Deployment record”](../infra/README.md#dep
 | `factory.create` / `submitBid` / `checkpoint` / `exitBid` / `claimTokens` / Path A `graduate` / Path B `migrate` | **UNVERIFIED** | no official `.forge-snapshots` at v2.1.0. Docs warn the no-hint `submitBid` is gas-intensive; `forceIterateOverTicks` can OOG |
 
 ETH cost for the current 6.82M deploy is in infra/README (0.0068 / 0.034 / 0.136 ETH at 1 / 5 / 20 gwei). One `setCcaFactory` does not change that order of magnitude.
+
+## 10. PM: `main` fallback and fork-test gate `(PROPOSAL)`
+
+Sources: [`CCA_RESEARCH.md`](CCA_RESEARCH.md) section 6.
+
+**Until the 22:00 KST checkpoint passes, the bonding-curve code on `main` stays.** Do not merge Path A into `main`. CCA implementation (Launchpad rewrite + web auction panel) is a **later, separate branch** after a person adds a DECISIONS row.
+
+A Sepolia **fork spike** can verify official CCA + our hook **without** editing Launchpad on `main`. Pattern: `ForkE2EHelpers._maybeFork` (`SEPOLIA_RPC_URL` + `vm.createSelectFork` + `vm.skip` when unset). Fork PRs do not get the Actions secret; a person runs the spike locally.
+
+| Step | Fork-verifiable? | Addresses / contracts on the fork | ESTIMATE hours (UNVERIFIED) |
+|---|---|---|---|
+| (1) Create auction | Yes | Official factory `0x000000001F26a0044BaA66024e7b6599c61963F8`; test-deployed ERC-20 / `ProphecyToken`. Optional CCALens `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53` | **3** |
+| (2) Bid | Yes (needs 1) | Auction from (1); bidder with ETH | **2** |
+| (3) Clear / settle + claim | Yes (needs 1–2) | Same auction. `checkpoint` → `exitBid` → `claimTokens` (`vm.roll`) | **3** |
+| (4) Open v4 pool + our hook | Yes, with `vm.prank(launchpad)` (needs 1–3) | Official PoolManager `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543`; **local-on-fork** Launchpad + `ProphecyHook` + `LiquidityLocker` (`ForkE2EHelpers._deployLocalOnFork`). Not LBPStrategy. Hook / locker still require the Launchpad as caller | **3** |
+| **Total spike** | | | **11** |
+
+Clock at write: 2026-09-26 ~16:40 KST → 22:00 KST is about **5 hours 20 minutes**. **11h does not fit.** (1)+(2) alone is 5h ESTIMATE with no buffer — treat as not reliable. Path A implementation is later and also does not fit today.

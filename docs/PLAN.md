@@ -89,6 +89,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 ## 6. CCA research (`docs/` only)
 
 - [x] Official Uniswap CCA / Liquidity Launchpad research + INTERFACE Path A proposal ([CCA_RESEARCH.md](CCA_RESEARCH.md)) @cursor
+- [x] PM: bonding curve on `main` is the 22:00 KST fallback; CCA on a later branch; fork-test gate for create / bid / settle+claim / v4+hook ([CCA_RESEARCH.md](CCA_RESEARCH.md) section 6, [INTERFACE.md](INTERFACE.md) section 10) @cursor
 
 ## If there is time
 
