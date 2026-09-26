@@ -119,7 +119,7 @@ contract CcaSepoliaForkTest is CcaSepoliaForkBase {
         (uint256 refunded, uint256 filled) = _exitClaim(auction, token, id, false);
         emit log_named_uint("rollover refunded", refunded);
         emit log_named_uint("rollover filled", filled);
-        assertGt(filled, 0);
+        _assertDemoBidFillsAuctionSupply(filled);
     }
 
     /// Demo path with no separate checkpoint: 0.021 ETH at 2× floor.
@@ -138,7 +138,12 @@ contract CcaSepoliaForkTest is CcaSepoliaForkBase {
         assertEq(bidder.balance - ethBefore, 0, "whole budget used");
         _rollTo(auction.claimBlock());
         auction.claimTokens(id);
-        assertGt(token.balanceOf(bidder), tokBefore, "tokens received");
+        uint256 filled = token.balanceOf(bidder) - tokBefore;
+        // 0.021 ETH is 5% above the 0.02 ETH floor line. Tick is 1% of floor, so
+        // clearing is floor+5 ticks and the bid buys the 500M auction half
+        // (50/50). Inverse Q96 is 15_186_872_782 token-wei short of
+        // AUCTION_SUPPLY; 100 tokens covers that plus one MPS/X7 unit (50 tokens).
+        assertApproxEqAbs(filled, CcaLib.AUCTION_SUPPLY, 100e18, "0.021 ETH demo fills ~500M");
         assertTrue(auction.isGraduated());
     }
 
@@ -211,6 +216,21 @@ contract CcaSepoliaForkTest is CcaSepoliaForkBase {
         assertLt(demo.token.balanceOf(trader), tokBefore + bought);
     }
 
+    /// Demo bids graduate by selling the 500M auction half (50/50). Floor is set
+    /// so 0.02 ETH buys `AUCTION_SUPPLY` exactly. Tick is 1% of floor:
+    /// a 0.02 ETH bid that clears at floor+1 tick fills `500M * 100/101`
+    /// (~495.05M, 0.990% short). 1% relative is that tick gap.
+    uint256 internal constant DEMO_AUCTION_FILL_REL_TOLERANCE = 0.01e18;
+
+    function _assertDemoBidFillsAuctionSupply(uint256 filled) internal pure {
+        assertApproxEqRel(
+            filled,
+            CcaLib.AUCTION_SUPPLY,
+            DEMO_AUCTION_FILL_REL_TOLERANCE,
+            "demo bid fills ~500M auction supply"
+        );
+    }
+
     struct DemoOut {
         ICcaFork auction;
         ProphecyToken token;
@@ -240,6 +260,7 @@ contract CcaSepoliaForkTest is CcaSepoliaForkBase {
         emit log_named_uint("filled", out.filled);
         emit log_named_uint("refunded", out.refunded);
         emit log_named_uint("budgetUsed", uint256(budget) - out.refunded);
+        _assertDemoBidFillsAuctionSupply(out.filled);
 
         if (!migrateAfter) return out;
 

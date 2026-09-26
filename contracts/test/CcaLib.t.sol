@@ -75,6 +75,18 @@ contract CcaLibTest is Test {
         assertGe(raisedAtFloor, CcaLib.REQUIRED_CURRENCY_RAISED);
         assertEq(raisedAtFloor, 0.02 ether);
 
+        // 0.021 ETH demo bid: +5% demand, tick = 1% of floor ⇒ clears at +5 ticks
+        // and raises exactly the 0.021 ETH budget for the full 500M auction half.
+        uint256 fiveTick = CcaLib.FLOOR_PRICE_Q96 + 5 * CcaLib.AUCTION_TICK_SPACING_Q96;
+        assertEq(CcaLib.AUCTION_SUPPLY * fiveTick / CcaLib.Q96, 0.021 ether);
+        uint256 tokensAtFive = uint256(0.021 ether) * CcaLib.Q96 / fiveTick;
+        assertEq(CcaLib.AUCTION_SUPPLY - tokensAtFive, 15_186_872_782);
+
+        // 0.02 ETH at floor+1 tick: fill is 500M * 100/101 (~0.990% short).
+        uint256 oneTick = CcaLib.FLOOR_PRICE_Q96 + CcaLib.AUCTION_TICK_SPACING_Q96;
+        uint256 tokensAtOne = uint256(0.02 ether) * CcaLib.Q96 / oneTick;
+        assertApproxEqRel(tokensAtOne, CcaLib.AUCTION_SUPPLY, 0.01e18);
+
         // CCA v2.1.0 constructor: floor + tickSpacing <= MAX_BID_PRICE
         // (ContinuousClearingAuction.sol; MaxBidPriceLib.maxBidPrice(auctionSupply)).
         // Auction supply is TOTAL_SUPPLY - LP_SUPPLY (LBP initializeDistribution).
