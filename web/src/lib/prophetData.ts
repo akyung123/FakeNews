@@ -1,15 +1,17 @@
 /**
  * Read interface for the prophet page (Screen 4).
  *
- * Today this is a mock. Later, swap the body of `getProphetPage` for:
- *   - prophet wallet: Universal Resolver getEnsAddress(name)
+ * Today this is a mock. Live reads (when `VITE_UNIVERSAL_RESOLVER` is set):
+ *   - prophet wallet: getEnsAddress(name)
  *   - sentence / deadline: getEnsText(name, "prophecy" | "deadline")
  *   - token: getEnsAddress(slug.name.prophecy.eth)
  *   - curve + fees: Launchpad.curve(token) and creatorFeeOf(wallet) via viem
  *
- * Sentences must come through this module. Screen components never hardcode them.
+ * Sentences and deadlines come through the ENS text helpers. Screens never
+ * hardcode them. `Launched` has no deadline (PR #25).
  */
 import { CURVE_SUPPLY as PROTOTYPE_CURVE_SUPPLY } from "./curve";
+import { mockEnsAddress, mockEnsText, parseDeadlineText, ENS_TEXT_DEADLINE, ENS_TEXT_PROPHECY } from "./ens";
 import { GRADUATION_ETH, MOCK_PARENT_NAME, MOCK_PROPHETS, MOCK_PROPHECIES } from "./mock";
 import { marketCap, type Coin } from "./store";
 
@@ -96,7 +98,7 @@ export function prototypeCoinFromName(name: string, nowSec?: number): Coin | nul
   const coin: Coin = {
     id: p.slug,
     name: p.ensName,
-    ticker: p.slug.replace(/-/g, "").slice(0, 10).toUpperCase(),
+    ticker: p.slug.toUpperCase().slice(0, 11),
     prophecy: p.sentence,
     creator: p.ensName.split(".").slice(1).join("."),
     createdAt,
@@ -171,13 +173,17 @@ function toProphetProphecy(
   row: (typeof MOCK_PROPHECIES)[number],
   nowSec: number,
 ): ProphetProphecy {
+  const ensName = prophecyEnsName(row.slug, row.prophetLabel);
+  const sentence = mockEnsText(ensName, ENS_TEXT_PROPHECY) ?? row.sentence;
+  const deadline = parseDeadlineText(mockEnsText(ensName, ENS_TEXT_DEADLINE)) ?? row.deadline;
+  const token = mockEnsAddress(ensName) ?? row.token;
   return {
     slug: row.slug,
-    ensName: prophecyEnsName(row.slug, row.prophetLabel),
-    sentence: row.sentence,
-    deadline: row.deadline,
-    departed: isDeparted(row.deadline, nowSec),
-    token: row.token,
+    ensName,
+    sentence,
+    deadline,
+    departed: isDeparted(deadline, nowSec),
+    token,
     sold: row.sold,
     complete: row.complete,
     curveProgress: curveProgress(row.sold, row.complete),

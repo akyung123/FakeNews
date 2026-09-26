@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
 import { graduated, progress, quoteBuy, quoteSell, TOTAL_SUPPLY } from "../lib/curve";
+import { isEnsName, slugOf } from "../lib/ensName";
 import { ago, eth, tokens } from "../lib/format";
 import { GRADUATION_ETH } from "../lib/mock";
 import { prototypeCoinFromName } from "../lib/prophetData";
@@ -40,9 +41,15 @@ export function CoinPage() {
           <div className="coin-id">
             <div>
               <p className="coin-name">
-                {coin.name} <span className="faint">${coin.ticker}</span>
+                {slugOf(coin.name)} <span className="faint">${coin.ticker}</span>
               </p>
               <p className="faint small">
+                {isEnsName(coin.name) ? (
+                  <>
+                    {coin.name} <CopyFullName value={coin.name} />
+                    {" · "}
+                  </>
+                ) : null}
                 by {coin.creator} · {ago(coin.createdAt)} · {holderCount(s, coin.id)} holders
               </p>
             </div>
@@ -164,6 +171,25 @@ function PostBox({ coinId, holds }: { coinId: string; holds: boolean }) {
         Post
       </button>
     </form>
+  );
+}
+
+function CopyFullName({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="link"
+      onClick={() => {
+        if (!navigator.clipboard) return;
+        void navigator.clipboard.writeText(value).then(() => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
   );
 }
 

@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "../lib/issue";
-import { MOCK_ISSUE_SESSION, MOCK_RETURNING_SESSION, MOCK_WORLD_HEALTH, MOCK_RP_CONTEXT_RESPONSE } from "../lib/mock";
+import type { RegisterProphetInput } from "../lib/launchpad";
+import { MOCK_ISSUE_SESSION, MOCK_RETURNING_SESSION, MOCK_WORLD_HEALTH, MOCK_RP_CONTEXT_RESPONSE, MOCK_WORLD_VERIFY } from "../lib/mock";
 import { WorldClientError, createWorldClient, type WorldClient } from "../lib/world";
 import { IssueScreen } from "./CreatePage";
 
@@ -26,7 +27,7 @@ function renderIssue(
 }
 
 type IssueScreenProps = {
-  registerProphet?: (input: { label: string; nullifier: `0x${string}`; serverSig: `0x${string}` }) => Promise<void>;
+  registerProphet?: (input: RegisterProphetInput) => Promise<void>;
 };
 
 async function fillFirstTimeForm(user: ReturnType<typeof userEvent.setup>) {
@@ -200,6 +201,28 @@ describe("Screen 2 button gating", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(ISSUE_COPY.nullifierReuse));
     expect(launchButton()).toBeDisabled();
     assertNoRawCodes();
+  });
+
+  it("calls registerProphet with { label, nullifier, serverSig } and keeps label off the signed payload", async () => {
+    const user = userEvent.setup();
+    const seen: RegisterProphetInput[] = [];
+    renderIssue(MOCK_ISSUE_SESSION, {
+      registerProphet: async (input) => {
+        seen.push(input);
+      },
+    });
+    await fillFirstTimeForm(user);
+    await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
+    await waitFor(() => expect(launchButton()).toBeEnabled());
+    await user.click(launchButton());
+    await waitFor(() => expect(seen).toEqual([
+      {
+        label: "mina",
+        nullifier: MOCK_WORLD_VERIFY.nullifier,
+        serverSig: MOCK_WORLD_VERIFY.serverSig,
+      },
+    ]));
+    expect(MOCK_WORLD_VERIFY).not.toHaveProperty("label");
   });
 
   it("skips World ID for a returning prophet and enables Issue once the form is valid", async () => {

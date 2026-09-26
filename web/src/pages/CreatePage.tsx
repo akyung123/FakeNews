@@ -16,11 +16,11 @@ import {
   type IssueSession,
   type WorldStatus,
 } from "../lib/issue";
+import { createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_ISSUE_SESSION, MOCK_PARENT_NAME, MOCK_RETURNING_SESSION } from "../lib/mock";
 import { actions } from "../lib/store";
 import {
   createWorldClient,
-  type Hex,
   type WorldClient,
   type WorldErrorKind,
   type WorldServerSignature,
@@ -34,7 +34,7 @@ export type IssueScreenProps = {
   now?: number;
   parentName?: string;
   onIssued?: (id: string) => void;
-  registerProphet?: (input: { label: string; nullifier: Hex; serverSig: Hex }) => Promise<void>;
+  registerProphet?: (input: RegisterProphetInput) => Promise<void>;
 };
 
 export function resolveIssueSession(search: URLSearchParams, storedLabel = readStoredProphetLabel()): IssueSession {
@@ -56,7 +56,7 @@ export function IssueScreen({
   now = Date.now(),
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
   onIssued,
-  registerProphet,
+  registerProphet = createRegisterProphet(),
 }: IssueScreenProps) {
   const navigate = useNavigate();
   const returningProphet = Boolean(session.prophetLabel);
@@ -121,7 +121,7 @@ export function IssueScreen({
             }
             const id = actions.create({
               prophecy: prophecy.trim(),
-              name: slug,
+              name: fullName || slug,
               ticker: slug.toUpperCase().slice(0, 11),
               firstBuy: Number(firstBuy) || 0,
             });
