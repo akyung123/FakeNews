@@ -1,4 +1,4 @@
-/** Bonding-curve progress. `labelled` adds the percentage and graduation note under the bar. */
+/** Auction progress. `labelled` adds the percentage and market-open note under the bar. */
 export function Bar({ value, labelled }: { value: number; labelled?: boolean }) {
   const pctText = `${(value * 100).toFixed(0)}%`;
   return (
@@ -6,7 +6,7 @@ export function Bar({ value, labelled }: { value: number; labelled?: boolean }) 
       <div
         className="bar"
         role="meter"
-        aria-label="Bonding curve"
+        aria-label="Auction progress"
         aria-valuenow={Math.round(value * 100)}
         aria-valuemin={0}
         aria-valuemax={100}
@@ -15,8 +15,8 @@ export function Bar({ value, labelled }: { value: number; labelled?: boolean }) 
       </div>
       {labelled ? (
         <p className="bar-label">
-          <span>Bonding curve {pctText}</span>
-          <span className="faint">Graduates at 100%</span>
+          <span>Auction {pctText}</span>
+          <span className="faint">Market opens at 100%</span>
         </p>
       ) : null}
     </div>

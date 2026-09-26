@@ -51,6 +51,20 @@ describe("Screen 3 name route", () => {
       Date.now = realNow;
     }
   });
+
+  test("progress bar uses auction copy, not the bonding curve", () => {
+    Date.now = () => NOW * 1000;
+    try {
+      const html = renderName("badges-2028.ringo.prophecy.eth");
+      expect(html).toContain('aria-label="Auction progress"');
+      expect(html).toContain("<span>Auction 40%</span>");
+      expect(html).toContain("Market opens at 100%");
+      expect(html).not.toContain("Bonding");
+      expect(html).not.toContain("Graduates at");
+    } finally {
+      Date.now = realNow;
+    }
+  });
 });
 
 describe("CCA trade panel", () => {

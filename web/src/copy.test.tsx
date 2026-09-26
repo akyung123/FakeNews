@@ -33,6 +33,8 @@ const REMOVED = [
   "How's your bag feeling?",
   "market cap since launch",
   "Graduated. The curve sold out.",
+  "Bonding curve",
+  "Graduates at 100%",
   "No talk yet. Buy in and say something.",
   "bought at",
   "Since launch",
@@ -56,7 +58,7 @@ const REMOVED = [
   ...FLAGGED_MEMOS,
 ];
 
-/** Signed gain/loss figures such as +861% or -12.3%. Curve fill (70%) has no sign. */
+/** Signed gain/loss figures such as +861% or -12.3%. Auction fill (70%) has no sign. */
 const SIGNED_PCT = /[+-]\d+(?:\.\d+)?%/;
 
 function renderApp(path: string): string {
