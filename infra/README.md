@@ -10,13 +10,35 @@ GitHub Pages workflow is a **separate PR**. Expected URL: `https://akyung123.git
 
 A person must enable Settings → Pages → source **GitHub Actions**. Until that is on, the deploy job fails. Zero extra secrets. Public `VITE_*` go in Actions variables.
 
-## World server hosting (needs a human account)
+## World server hosting (Render)
 
-`world/` is a Bun service on **port 8787**. It cannot go on GitHub Pages.
+`world/` is a Bun service. It cannot go on GitHub Pages. **One candidate: [Render](https://render.com) free Web Service.**
 
-**Proposal (simplest free option): [Render](https://render.com) free Web Service.** Start command `cd world && bun src/index.ts` (or `bun start`), instance port `8787`. Set the world env names from the checklist below as Render env vars — never in git. Fly.io and Railway also work.
+Blueprint: [`infra/render.yaml`](render.yaml) (not the repo root — a root `render.yaml` would collide with other lanes). In the dashboard: New Blueprint → connect this GitHub repo → set the Blueprint path to `infra/render.yaml`. Render builds from `world/` (`bun start`, health check `/health`). It installs Bun in the build step. Listen on the `PORT` Render injects (local default is `8787`).
 
-This needs a **human Render / Fly / Railway account**. Infra does not create it. Not a blocker for contract dry-run or the static web preview. After it is up, set `VITE_WORLD_SERVER_URL` to that HTTPS origin.
+A **human needs a Render account connected to GitHub**. Infra does not create the account. The account is provided with the **17:00 KST user-value bundle** (the four Portal values below). Env names in the blueprint are `sync: false` with **no values** — a person pastes them in the dashboard. Never commit secrets.
+
+After the service is up, set `VITE_WORLD_SERVER_URL` to the `https://….onrender.com` origin. Not a blocker for contract dry-run or the static web preview.
+
+`context_mismatch` is a world/ error code (backend follow-up). No extra env names.
+
+### Fallback (no Render account in time)
+
+For the demo recording, run the world server locally and expose it with a Cloudflare quick tunnel:
+
+```bash
+cd world && bun start
+# other terminal
+cloudflared tunnel --url http://localhost:8787
+```
+
+Point `VITE_WORLD_SERVER_URL` at the `https://….trycloudflare.com` origin.
+
+### Submission README
+
+If the fallback is used, the ETHGlobal submission README must state:
+
+> The World verification server ran locally and was exposed with a Cloudflare quick tunnel (`cloudflared tunnel --url http://localhost:8787`) for the demo recording.
 
 ## Sepolia (dry-run default)
 
