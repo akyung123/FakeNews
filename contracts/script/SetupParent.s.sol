@@ -25,10 +25,13 @@ interface IETHRegistry {
     function setSubregistry(uint256 anyId, address registry) external;
 }
 
-/// After prophecy.eth is registered: deploy the parent UserRegistry, point .eth at it,
-/// setParent, then grant the Launchpad ROLE_REGISTRAR only.
+/// After prophecy.eth is registered, order is:
+///   deploy UserRegistry → deploy Launchpad (#8) → deploy adapter (#17)
+///   → setSubregistry/setParent → grant ROLE_REGISTRAR.
 ///
 ///   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployUserRegistry()"
+///   ./script/run-sepolia.sh script/Deploy.s.sol
+///   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployAdapter()"
 ///   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "linkParent()"
 ///   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "grantLaunchpadRegistrar()"
 ///
@@ -42,6 +45,14 @@ contract SetupParent is ScriptVm {
     event ParentRegistry(address registry);
     event Linked(string label, address registry);
     event RegistrarGranted(address launchpad);
+    event AdapterPlan(
+        address launchpad,
+        address parentRegistry,
+        string parentDnsName,
+        address factory,
+        address userRegistryImpl,
+        address resolverImpl
+    );
 
     function deployUserRegistry() external {
         require(_sepolia(), "sepolia or anvil only");
@@ -60,6 +71,31 @@ contract SetupParent is ScriptVm {
         vm.stopBroadcast();
 
         emit ParentRegistry(registry);
+    }
+
+    /// TODO(#17): `new ProphecyEns(launchpad, parentRegistry, parentDnsName, factory, userRegistryImpl, resolverImpl)`.
+    /// Exact wiring waits for #17 and #8 to merge. Dry-run emits the planned args.
+    function deployAdapter() external {
+        require(_sepolia(), "sepolia or anvil only");
+        address launchpad = vm.envOr("LAUNCHPAD_ADDRESS", address(0));
+        address parentRegistry = vm.envOr("PARENT_USER_REGISTRY", address(0));
+        string memory label = vm.envOr("PARENT_LABEL", string("prophecy"));
+        string memory parentDnsName = string.concat(label, ".eth");
+
+        emit AdapterPlan(
+            launchpad,
+            parentRegistry,
+            parentDnsName,
+            SepoliaConfig.VERIFIABLE_FACTORY,
+            SepoliaConfig.USER_REGISTRY_IMPL,
+            SepoliaConfig.PERMISSIONED_RESOLVER_IMPL
+        );
+
+        if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
+            require(launchpad != address(0), "set LAUNCHPAD_ADDRESS after Launchpad deploy");
+            require(parentRegistry != address(0), "set PARENT_USER_REGISTRY");
+            revert("TODO(#17): wire ProphecyEns constructor after merge");
+        }
     }
 
     function linkParent() external {

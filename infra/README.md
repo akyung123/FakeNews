@@ -58,20 +58,25 @@ From `contracts/`, with `contracts/.env` filled:
 # once, locally — generates WORLD_SIGNER_KEY + WORLD_SIGNER_ADDRESS (do not commit)
 ../infra/new-world-signer.sh
 
-./script/run-sepolia.sh script/Deploy.s.sol
 ./script/run-sepolia.sh script/RegisterParent.s.sol --sig "commit()"
 # wait 60 seconds
 ./script/run-sepolia.sh script/RegisterParent.s.sol --sig "registerName()"
 ./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployUserRegistry()"
+./script/run-sepolia.sh script/Deploy.s.sol
+# TODO(#17): deploy adapter — launchpad, parentRegistry, parent DNS name,
+# factory, UserRegistryImpl, PermissionedResolverImpl
+./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployAdapter()"
 ./script/run-sepolia.sh script/SetupParent.s.sol --sig "linkParent()"
 ./script/run-sepolia.sh script/SetupParent.s.sol --sig "grantLaunchpadRegistrar()"
 ```
 
 Sending is opt-in and needs `DEPLOYER_PRIVATE_KEY` in the environment, never on argv.
 
-`Deploy.s.sol` deploys the current `ProphecyFactory` stub. When Launchpad lands, pass `worldSigner` into its constructor (`TODO(backend M1)` for the exact param name). There is no setter.
+`Deploy.s.sol` deploys the current `ProphecyFactory` stub. When PR #8 merges, call `new Launchpad(protocolFeeRecipient, worldSigner)`. Both args are immutable; zero address reverts. There is no setter. `worldSigner` is derived from `WORLD_SIGNER_KEY` (generated at deploy, never committed). `protocolFeeRecipient` is `PROTOCOL_FEE_RECIPIENT`.
 
-The script logs `WORLD_CHAIN_ID=11155111` and `WORLD_LAUNCHPAD_ADDRESS` for the world server env.
+Adapter wiring (`ProphecyEns` constructor) is TODO until #17 and #8 merge.
+
+The script prints two paste-ready lines: `WORLD_CHAIN_ID=11155111` and `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`.
 
 ## Human-input checklist (names only)
 
@@ -121,9 +126,11 @@ This repo has one `.env.example`. Do not add `world/.env.example`.
 2. `mint` MockUSDC on the team wallet (5+ chars ≈ $8 / year).
 3. `commit()` → wait **60 seconds** → `registerName()`.
 4. `deployUserRegistry()` — VerifiableFactory proxy of `UserRegistryImpl`.
-5. `linkParent()` — `setSubregistry` on ETHRegistry, `setParent` on the new registry.
-6. `grantLaunchpadRegistrar()` — `ROLE_REGISTRAR` to `LAUNCHPAD_ADDRESS` only.
-7. Final lock is irreversible. A person confirms before anyone prepares it.
+5. Deploy Launchpad (`Deploy.s.sol`). Constructor: `protocolFeeRecipient`, `worldSigner` (PR #8).
+6. Deploy the ENS adapter with `launchpad`, `parentRegistry`, parent DNS name, `factory`, `UserRegistryImpl`, `PermissionedResolverImpl` (TODO(#17) until merge).
+7. `linkParent()` — `setSubregistry` on ETHRegistry, `setParent` on the new registry.
+8. `grantLaunchpadRegistrar()` — `ROLE_REGISTRAR` to `LAUNCHPAD_ADDRESS` only.
+9. Final lock is irreversible. A person confirms before anyone prepares it.
 
 ## CI
 

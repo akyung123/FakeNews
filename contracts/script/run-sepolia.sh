@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Dry-run a Sepolia Foundry script. Sending a transaction is opt-in and person-only.
 #
+# Order after prophecy.eth is registered:
+#   deployUserRegistry → Deploy.s.sol (Launchpad) → deployAdapter → linkParent → grantLaunchpadRegistrar
+#
 #   ./script/run-sepolia.sh script/Deploy.s.sol
 #   ./script/run-sepolia.sh script/RegisterParent.s.sol --sig "commit()"
+#   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployAdapter()"
 #   ./script/run-sepolia.sh script/Deploy.s.sol --broadcast
 set -euo pipefail
 
