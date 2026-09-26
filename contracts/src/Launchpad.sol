@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-
 import {ProphecyToken} from "./ProphecyToken.sol";
 
 /// Constant-product quotes and fee rounding. Multiply first, divide once.
@@ -50,8 +46,11 @@ library CurveMath {
 
 /// Bonding-curve launchpad. Price is the ratio of two reserves; fees sit in a
 /// separate ledger so they never move that price.
-contract Launchpad is ReentrancyGuard {
-    using SafeERC20 for IERC20;
+contract Launchpad {
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED = 2;
+    uint256 private _status = _NOT_ENTERED;
+
     uint256 public constant TOTAL_SUPPLY = 1_000_000_000e18;
     uint256 public constant CURVE_SUPPLY = 793_100_000e18;
     uint256 public constant LP_SUPPLY = 206_900_000e18;
@@ -111,6 +110,15 @@ contract Launchpad is ReentrancyGuard {
     error EthTransferFailed();
     error NotImplemented();
     error ZeroAddress();
+    error Reentrant();
+    error TokenTransferFailed();
+
+    modifier nonReentrant() {
+        if (_status == _ENTERED) revert Reentrant();
+        _status = _ENTERED;
+        _;
+        _status = _NOT_ENTERED;
+    }
 
     constructor(address protocolFeeRecipient_) {
         if (protocolFeeRecipient_ == address(0)) revert ZeroAddress();
@@ -178,7 +186,7 @@ contract Launchpad is ReentrancyGuard {
         protocolFees += protocolShare;
 
         _emitTrade(token, msg.sender, false, payout, tokensIn, fee, c.vEth, c.vToken, memo);
-        IERC20(token).safeTransferFrom(msg.sender, address(this), tokensIn);
+        _transferTokenFrom(token, msg.sender, address(this), tokensIn);
         _sendEth(msg.sender, payout);
     }
 
@@ -288,7 +296,7 @@ contract Launchpad is ReentrancyGuard {
         protocolFees += protocolShare;
 
         _emitTrade(token, buyer, true, preview.ethUsed, preview.tokensOut, preview.fee, c.vEth, c.vToken, memo);
-        IERC20(token).safeTransfer(buyer, preview.tokensOut);
+        _transferToken(token, buyer, preview.tokensOut);
         if (preview.refund > 0) _sendEth(buyer, preview.refund);
     }
 
@@ -337,5 +345,13 @@ contract Launchpad is ReentrancyGuard {
     function _sendEth(address to, uint256 amount) internal {
         (bool ok,) = to.call{value: amount}("");
         if (!ok) revert EthTransferFailed();
+    }
+
+    function _transferToken(address token, address to, uint256 value) internal {
+        if (!ProphecyToken(token).transfer(to, value)) revert TokenTransferFailed();
+    }
+
+    function _transferTokenFrom(address token, address from, address to, uint256 value) internal {
+        if (!ProphecyToken(token).transferFrom(from, to, value)) revert TokenTransferFailed();
     }
 }
