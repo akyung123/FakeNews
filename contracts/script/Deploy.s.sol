@@ -11,7 +11,9 @@ import {ScriptVm} from "./ScriptVm.sol";
 /// Constructor (contracts/src/Launchpad.sol):
 ///   constructor(address protocolFeeRecipient_, address worldSigner_, IProphecyEns ens_)
 /// All three public immutable. Zero address reverts. No setter.
-/// `ens` comes from ENS_ADAPTER (infra-owned script; this PR only adds that arg).
+/// `ens` comes from ENS_ADAPTER_ADDRESS. Off anvil: required; reject 0 and
+/// placeholder 0xe05 (same pattern as PROTOCOL_FEE_RECIPIENT / 0xfee).
+/// Anvil dry-run fills 0xe05 when unset. Infra adds the name to .env.example.
 ///
 /// Dry-run:  ./script/run-sepolia.sh script/Deploy.s.sol
 /// Send:     ./script/run-sepolia.sh script/Deploy.s.sol --broadcast
@@ -22,6 +24,7 @@ contract Deploy is ScriptVm {
     /// Anvil dry-run only. Never accepted on Sepolia (or any non-31337 chain).
     address internal constant PLACEHOLDER_FEE = address(uint160(0xfee));
     address internal constant PLACEHOLDER_SIGNER = address(uint160(0x51e));
+    address internal constant PLACEHOLDER_ENS = address(uint160(0xe05));
 
     event Deployed(string name, address addr);
     event CopyIntoWorldEnv(string name, address value);
@@ -34,7 +37,7 @@ contract Deploy is ScriptVm {
 
         address protocolFeeRecipient = vm.envOr("PROTOCOL_FEE_RECIPIENT", address(0));
         address worldSigner = _worldSigner();
-        address ens = vm.envOr("ENS_ADAPTER", address(0));
+        address ens = vm.envOr("ENS_ADAPTER_ADDRESS", address(0));
         if (chainId != 31337) {
             require(vm.envExists("DEPLOYER_PRIVATE_KEY"), "set DEPLOYER_PRIVATE_KEY");
             require(vm.envExists("PROTOCOL_FEE_RECIPIENT"), "set PROTOCOL_FEE_RECIPIENT");
@@ -42,6 +45,7 @@ contract Deploy is ScriptVm {
                 vm.envExists("WORLD_SIGNER_KEY") || vm.envExists("WORLD_SIGNER_ADDRESS"),
                 "set WORLD_SIGNER_KEY"
             );
+            require(vm.envExists("ENS_ADAPTER_ADDRESS"), "set ENS_ADAPTER_ADDRESS");
             require(
                 protocolFeeRecipient != address(0) && protocolFeeRecipient != PLACEHOLDER_FEE,
                 "PROTOCOL_FEE_RECIPIENT cannot be zero or placeholder 0xfee"
@@ -50,18 +54,19 @@ contract Deploy is ScriptVm {
                 worldSigner != address(0) && worldSigner != PLACEHOLDER_SIGNER,
                 "worldSigner cannot be zero or placeholder 0x51e"
             );
+            require(
+                ens != address(0) && ens != PLACEHOLDER_ENS,
+                "ENS_ADAPTER_ADDRESS cannot be zero or placeholder 0xe05"
+            );
         } else if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
             require(protocolFeeRecipient != address(0), "set PROTOCOL_FEE_RECIPIENT");
             require(worldSigner != address(0), "set WORLD_SIGNER_KEY");
+            require(ens != address(0), "set ENS_ADAPTER_ADDRESS");
         } else {
             // Launchpad reverts on address(0). Placeholders keep anvil dry-run working.
             if (protocolFeeRecipient == address(0)) protocolFeeRecipient = PLACEHOLDER_FEE;
             if (worldSigner == address(0)) worldSigner = PLACEHOLDER_SIGNER;
-        }
-        // Third constructor arg only. #24's fee/signer guards above are unchanged.
-        if (ens == address(0)) {
-            require(chainId == 31337, "set ENS_ADAPTER");
-            ens = address(uint160(0xe05));
+            if (ens == address(0)) ens = PLACEHOLDER_ENS;
         }
 
         _start();

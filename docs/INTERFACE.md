@@ -160,10 +160,12 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 | `VITE_WORLD_SERVER_URL` | web (world/ base URL; unused while mock) |
 | `VITE_WALLETCONNECT_PROJECT_ID` | web (optional; injected wallets work without it) |
 | `SEPOLIA_RPC_URL`, `DEPLOYER_PRIVATE_KEY` | contract deployment (people only) |
-| `ENS_ADAPTER` | deploy script (Launchpad `ens` constructor arg) |
+| `ENS_ADAPTER_ADDRESS` | deploy script (Launchpad `ens` constructor arg) |
 | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |
 
 Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0.
+
+`ENS_ADAPTER_ADDRESS` is the already-deployed ENS adapter. Off anvil (`chainid != 31337`) it must be set and cannot be `address(0)` or placeholder `0xe05` — the same guard as `PROTOCOL_FEE_RECIPIENT` / `0xfee` and `worldSigner` / `0x51e`. Anvil dry-run fills `0xe05` when unset. Infra adds this name to `.env.example`.
 
 ## 6. Curve quote vectors
 
