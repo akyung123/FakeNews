@@ -1,8 +1,10 @@
 /**
- * Map CCA / LBP / Universal Router reverts to kinds.
- * Same idea as `worldErrorKindFromRegisterProphet` in `web/src/lib/issue.ts`:
- * match verified error names, never put a raw revert code in designer copy.
+ * Map CCA / LBP / Universal Router reverts to kinds, then to designer copy.
+ * Official error names look up `CCA_ERROR_COPY` first. Kind messages are
+ * fallbacks and must never leak a revert name.
  */
+import { CCA_CLAIM_ERROR_COPY, ccaErrorCopy, officialCcaErrorName, type CcaErrorCopyVars } from "./copy";
+
 export type CcaErrorKind =
   | "auction_not_live"
   | "bid_rejected"
@@ -78,11 +80,11 @@ export function ccaUserMessage(kind: CcaErrorKind): string {
     case "cannot_claim":
       return "Tokens cannot be claimed yet.";
     case "goal_not_reached":
-      return "The goal wasn't reached, so there are no tokens to claim.";
+      return CCA_CLAIM_ERROR_COPY.NotGraduated;
     case "market_not_ready":
       return "The market cannot be opened yet.";
     case "launch_rejected":
-      return "This prophecy could not be issued.";
+      return "Couldn't start the auction. Try again.";
     case "swap_failed":
       return "The pool swap did not go through.";
     case "user_rejected":
@@ -92,4 +94,14 @@ export function ccaUserMessage(kind: CcaErrorKind): string {
     case "network":
       return "Something went wrong. Please try again.";
   }
+}
+
+/** Prefer the official-name map; fall back to the kind sentence. */
+export function ccaErrorCopyFor(error: unknown, vars: CcaErrorCopyVars = {}): string {
+  const named = officialCcaErrorName(errorText(error));
+  if (named) {
+    const line = ccaErrorCopy(named, vars);
+    if (line) return line;
+  }
+  return ccaUserMessage(mapCcaError(error));
 }

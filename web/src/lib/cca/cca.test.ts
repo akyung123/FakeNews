@@ -40,7 +40,8 @@ import {
   packUniformAuctionSteps,
   resolveCcaConfig,
 } from "./config";
-import { ccaUserMessage, mapCcaError } from "./errors";
+import { CCA_BID_ERROR_COPY, CCA_CLAIM_ERROR_COPY, CCA_LAUNCH_ERROR_MESSAGE } from "./copy";
+import { ccaErrorCopyFor, ccaUserMessage, mapCcaError } from "./errors";
 import { exitBid, exitBidWrite, exitPartiallyFilledBid } from "./exit";
 import { CCA_FORK_PIN_BLOCK, CCA_FORK_STEPS, forkHappyPathSchedule } from "./flow";
 import {
@@ -594,10 +595,13 @@ describe("error mapper", () => {
     expect(mapCcaError(new Error("User rejected the request"))).toBe("user_rejected");
     expect(mapCcaError(new MaxPriceBelowFloorError())).toBe("bid_rejected");
     expect(ccaUserMessage("bid_rejected")).not.toMatch(/BidMustBeAboveClearingPrice/);
-    expect(ccaUserMessage("goal_not_reached")).toBe(
-      "The goal wasn't reached, so there are no tokens to claim.",
-    );
+    expect(ccaUserMessage("goal_not_reached")).toBe(CCA_CLAIM_ERROR_COPY.NotGraduated);
     expect(ccaUserMessage("goal_not_reached")).not.toMatch(/NotGraduated/);
+    expect(ccaErrorCopyFor(new Error("NotGraduated"))).toBe(CCA_CLAIM_ERROR_COPY.NotGraduated);
+    expect(ccaErrorCopyFor(new Error("BidMustBeAboveClearingPrice"))).toBe(
+      CCA_BID_ERROR_COPY.BidMustBeAboveClearingPrice,
+    );
+    expect(ccaErrorCopyFor(new Error("InvalidFundsRecipient"))).toBe(CCA_LAUNCH_ERROR_MESSAGE);
   });
 });
 
@@ -636,6 +640,9 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
         "Universal Router 2.1.2 V4_SWAP command + inputs encoding",
         "LiquidityLocker tokenId → token / prophet binding",
         "Launchpad custom-error names (LbpNotSet and the like)",
+        "clearing-price helper (per-block price)",
+        "swap section copy",
+        "fee collect copy",
       ]),
     );
     expect(INTERFACE_CCA_TBD).toBe("TBD(INTERFACE_CCA)");
