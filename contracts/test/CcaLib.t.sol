@@ -98,7 +98,8 @@ contract CcaLibTest is Test {
         assertGe(tick, minUsable);
         assertLe(tick, maxUsable);
         assertEq(CcaLib.POOL_TICK_SPACING, 200);
-        assertEq(tick / CcaLib.POOL_TICK_SPACING * CcaLib.POOL_TICK_SPACING, 122000);
+        // TickMath tick ≈ 244047; nearest spacing-200 bucket below is 244000.
+        assertEq((tick / CcaLib.POOL_TICK_SPACING) * CcaLib.POOL_TICK_SPACING, 244000);
     }
 
     function test_buildNeverSetsProphetAsRecipient() public pure {
