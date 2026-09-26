@@ -12,6 +12,7 @@ import {
 } from "../lib/issue";
 import { createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_PARENT_NAME } from "../lib/mock";
+import { runRegisterProphet } from "../lib/writes";
 import { resolveIssueSession } from "./CreatePage";
 import {
   createWorldClient,
@@ -44,6 +45,7 @@ export function ClaimNameScreen({
   const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
   const [registerStatus, setRegisterStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
+  const [writeError, setWriteError] = useState<string | null>(null);
 
   const labelOk = isValidProphetLabel(prophetLabel);
   const registerBusy = registerStatus === "pending";
@@ -55,11 +57,8 @@ export function ClaimNameScreen({
         ? ISSUE_COPY.pending
         : null;
   const error =
-    registerStatus === "failed"
-      ? ISSUE_COPY.registerFailed
-      : returningProphet || worldStatus === "pending" || registerBusy
-        ? null
-        : worldUserMessage(worldError);
+    writeError ??
+    (returningProphet || worldStatus === "pending" || registerBusy ? null : worldUserMessage(worldError));
   const fullName = prophetLabel ? `${prophetLabel}.${parentName}` : "";
 
   return (
@@ -95,19 +94,17 @@ export function ClaimNameScreen({
           if (!canContinue || registerBusy) return;
           if (!returningProphet && !verified) return;
           void (async () => {
-            if (!returningProphet && verified && registerProphet) {
+            setWriteError(null);
+            if (!returningProphet && verified) {
               setRegisterStatus("pending");
-              try {
-                await registerProphet({
-                  label: prophetLabel,
-                  nullifier: verified.nullifier,
-                  serverSig: verified.serverSig,
-                });
-                setRegisterStatus("success");
-              } catch {
-                setRegisterStatus("failed");
-                return;
-              }
+              const result = await runRegisterProphet(registerProphet, {
+                label: prophetLabel,
+                nullifier: verified.nullifier,
+                serverSig: verified.serverSig,
+              });
+              setRegisterStatus(result.status);
+              setWriteError(result.message);
+              if (result.status !== "success") return;
             }
             if (!returningProphet) storeProphetLabel(prophetLabel);
             navigate("/create");
