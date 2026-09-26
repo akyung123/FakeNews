@@ -92,6 +92,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 Gates (KST): 22:00 INTERFACE + contract skeleton; 02:00 Sepolia-fork 4 steps; 03:30 web + deploy script. Miss any gate → curve on `main`.
 
 - [x] `INTERFACE_CCA.md` + DECISIONS #18–#22 for B2 (LBPStrategy `initializeDistribution`, hook inherits `InitializerHook`, locker holds the NFT). `INTERFACE.md` on `main` stays the curve contract @cursor
+- [x] `INTERFACE_CCA.md` TBD answers + designer copy v2 (PR #42 head `b71c64e`: `submitBid` 5-arg, UR 2.1.2 swap, locker `register`, salt, errors). `INTERFACE.md` on `main` stays the curve contract @cursor
 - [x] `FEEDBACK.md` Uniswap prize write-up (CCA + LBPStrategy + v4 hook) @cursor
 - [ ] Contracts skeleton on a `cca/*` branch (Launchpad calls `initializeDistribution`; no curve) — 22:00 gate
 - [ ] Sepolia-fork 4 steps green: launch+create auction, bid, migrate opens v4 pool, swap — 02:00 gate
