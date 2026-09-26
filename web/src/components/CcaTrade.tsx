@@ -35,6 +35,7 @@ import {
 import { ccaFeatureFlags, type CcaFeatureFlags } from "../lib/cca/config";
 import { loadCcaAuction, type CcaAuctionSnapshot } from "../lib/cca/loadAuction";
 import { SEPOLIA_CHAIN_ID } from "../lib/env";
+import { isTxHash } from "../lib/explorer";
 import { graduated } from "../lib/curve";
 import { eth, ethToWei, formatPrice, tokens } from "../lib/format";
 import { GRADUATION_ETH } from "../lib/mock";
@@ -42,6 +43,7 @@ import { isCcaDemoMode } from "../lib/mode";
 import { actions, type Coin } from "../lib/store";
 import { isChainWriteTarget, liveTokenAddress } from "../lib/writes";
 import { wagmiConfig } from "../lib/wagmi";
+import { TxLink } from "./TokenAddress";
 
 export type CcaTradeProps = {
   coin: Coin;
@@ -78,6 +80,10 @@ export function CcaTrade({
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  /** Hash of the write behind `success`. Shown labelled, never as a bare green value. */
+  const [lastTx, setLastTx] = useState<string | null>(null);
+  /** migrate tx sent from this panel; the chain read may lag a block behind it. */
+  const [openedTx, setOpenedTx] = useState<string | null>(null);
 
   async function reload() {
     if (!chain || !writeTarget || !token) return;
@@ -139,10 +145,15 @@ export function CcaTrade({
     setPending(label);
     setError(null);
     setSuccess(null);
+    setLastTx(null);
     try {
       const result = await work();
       if (result && typeof result === "object" && result !== null && "bannerError" in result) {
         setError(String((result as { bannerError: unknown }).bannerError));
+      } else if (typeof result === "string" && result.startsWith("0x")) {
+        // A write returns its tx hash: show the done line, with the hash labelled next to it.
+        setSuccess(done);
+        if (isTxHash(result)) setLastTx(result);
       } else {
         setSuccess(typeof result === "string" ? result : done);
       }
@@ -181,7 +192,22 @@ export function CcaTrade({
       {snap?.auction && snap.missing.length ? <p className="faint small">{MISSING_ADDRESS_COPY}</p> : null}
 
       {pending ? <p className="banner-lock">{pending}</p> : null}
-      {success ? <p className="up">{success}</p> : null}
+      {success ? (
+        <p className="up">
+          {success}
+          {lastTx ? (
+            <>
+              {" · "}
+              <TxLink hash={lastTx} label="in tx" />
+            </>
+          ) : null}
+        </p>
+      ) : null}
+      {(snap?.migrateTx ?? openedTx) && (copyStatus === "pool_open" || snap?.poolOpen) ? (
+        <p className="faint small" data-testid="migrate-tx">
+          <TxLink hash={(snap?.migrateTx ?? openedTx)!} label="Market opened in tx" />
+        </p>
+      ) : null}
       {error ? (
         <p className="banner-error" role="alert">
           {error}
@@ -294,8 +320,9 @@ export function CcaTrade({
             disabled={writesBlocked || (view ? !view.canOpenMarket : false)}
             onClick={() => {
               void run(CCA_COPY.openingMarket, async () => {
-                const { outcome, receipt } = await openMarketResult(snap.auction!, writes, snap.lbpStrategy);
+                const { hash, outcome, receipt } = await openMarketResult(snap.auction!, writes, snap.lbpStrategy);
                 if (outcome === "failed") return { bannerError: CCA_COPY.marketFailedToast };
+                setOpenedTx(hash);
                 if (snap.locker) {
                   const tokenId = tokenIdFromMigrateReceipt(receipt, snap.locker, snap.positionManager);
                   if (tokenId != null) {
@@ -446,14 +473,10 @@ export function CcaTrade({
                   // Not linked yet: one-time register only. Once linked, collect sends the fees.
                   void run(
                     registering ? FEE_COLLECT_COPY.settingUp : FEE_COLLECT_COPY.collectingFees,
-                    async () => {
-                      if (registering) {
-                        await registerLocker(locker, token, tokenId, writes);
-                        return done;
-                      }
-                      await sendCcaWrite(collectCcaWrite(locker, token, tokenId), "collect", writes);
-                      return done;
-                    },
+                    () =>
+                      registering
+                        ? registerLocker(locker, token, tokenId, writes)
+                        : sendCcaWrite(collectCcaWrite(locker, token, tokenId), "collect", writes),
                     done,
                   );
                 }}

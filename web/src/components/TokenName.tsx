@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { isEnsName, slugOf } from "../lib/ensName";
+import { CopyButton } from "./CopyButton";
 
 /** Presentational token name: slug large, full ENS small. No chain reads. */
 export function tokenDisplayName(input: {
@@ -32,29 +32,9 @@ export function TokenName({
       {ensName ? (
         <span className="token-ens">
           <span>{ensName}</span>
-          {copy ? <CopyFullName value={ensName} /> : null}
+          {copy ? <CopyButton value={ensName} label="Copy full name" /> : null}
         </span>
       ) : null}
     </span>
-  );
-}
-
-function CopyFullName({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      className="link token-copy"
-      aria-label="Copy full name"
-      onClick={() => {
-        if (!navigator.clipboard) return;
-        void navigator.clipboard.writeText(value).then(() => {
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1500);
-        });
-      }}
-    >
-      {copied ? "Copied" : "Copy"}
-    </button>
   );
 }

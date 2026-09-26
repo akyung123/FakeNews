@@ -6,6 +6,7 @@ import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
 import { PriceChart } from "../components/PriceChart";
 import { SampleBadge } from "../components/SampleBadge";
+import { TokenAddress, type WatchAssetInput } from "../components/TokenAddress";
 import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { CCA_COPY, raisedProgressCopy } from "../lib/cca";
 import { usePoolPrice } from "../lib/cca/usePoolPrice";
@@ -40,10 +41,12 @@ export type CoinPageProps = {
   sendBuy?: (input: BuyInput) => Promise<boolean>;
   sendSell?: (input: SellInput) => Promise<boolean>;
   loadLaunched?: () => Promise<Coin[]>;
+  watchAsset?: (input: WatchAssetInput) => Promise<boolean>;
 };
 
 export function CoinPage({
   loadLaunched,
+  watchAsset,
 }: CoinPageProps = {}) {
   const { id = "", name = "" } = useParams();
   const s = useStore();
@@ -128,6 +131,9 @@ export function CoinPage({
               </p>
             </div>
           </div>
+          {chain && coin.token && isChainWriteTarget(coin) ? (
+            <TokenAddress address={coin.token} symbol={coin.ticker} watchAsset={watchAsset} />
+          ) : null}
           <h1 className="prophecy-title">{coin.prophecy}</h1>
           <p className="price-now">{formatPrice(poolPrice.open ? poolPrice.priceWei : coinPriceWei(coin))}</p>
           <p className="big-num">{auctionProgressHeader(coin)}</p>

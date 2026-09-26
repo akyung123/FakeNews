@@ -58,6 +58,8 @@ export type CcaAuctionSnapshot = {
   auctionBlocks?: bigint;
   refundWei: bigint;
   owner?: Address;
+  /** Transaction that opened the pool (LBPStrategy `Migrated`). */
+  migrateTx?: `0x${string}`;
 };
 
 function asAddress(value: unknown): Address | undefined {
@@ -157,6 +159,7 @@ export async function loadCcaAuction(token: Address): Promise<CcaAuctionSnapshot
 
   let poolOpen = false;
   let marketFailed = false;
+  let migrateTx: `0x${string}` | undefined;
   try {
     const [migratedLogs, failedLogs] = await Promise.all([
       getContractEvents(wagmiConfig, {
@@ -177,6 +180,7 @@ export async function loadCcaAuction(token: Address): Promise<CcaAuctionSnapshot
       }),
     ]);
     poolOpen = migratedLogs.length > 0;
+    migrateTx = (migratedLogs[0] as { transactionHash?: `0x${string}` | null } | undefined)?.transactionHash ?? undefined;
     marketFailed = !poolOpen && failedLogs.length > 0;
   } catch {
     // event scan optional
@@ -268,6 +272,7 @@ export async function loadCcaAuction(token: Address): Promise<CcaAuctionSnapshot
     auctionBlocks,
     refundWei,
     owner,
+    migrateTx,
   };
 }
 
