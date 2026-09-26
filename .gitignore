@@ -4,3 +4,7 @@
 **/.env.local
 !.env.example
 !**/.env.example
+
+# Local / fork deploy records (throwaway anvil addresses). Keep sepolia.json.
+deployments/anvil.json
+deployments/anvil-*.json
