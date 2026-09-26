@@ -24,6 +24,12 @@ export const ISSUE_COPY = {
   portalRejected: "World ID couldn't confirm this check. Try again in World App.",
   checkFailed: "Something went wrong with the check. Please try again.",
   nullifierReuse: "This human already has a prophet name. One human, one name.",
+  step1: "Step 1 of 2",
+  step2: "Step 2 of 2",
+  oneTransaction: "One transaction",
+  claimTitle: "Claim your name",
+  claimLead: "One name per person. World ID is asked only here.",
+  continueIssue: "Continue to issue",
 } as const;
 
 const PROPHET_LABEL = /^[a-z0-9]{3,16}$/;
