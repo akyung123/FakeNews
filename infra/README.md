@@ -86,9 +86,9 @@ From `contracts/`, with `contracts/.env` filled:
 
 Sending is opt-in and needs `DEPLOYER_PRIVATE_KEY` in the environment, never on argv.
 
-`Deploy.s.sol` deploys the current `ProphecyFactory` stub. When PR #8 merges, call `new Launchpad(protocolFeeRecipient, worldSigner)` in that constructor order. Both args are `public immutable`; zero address reverts. There is no setter. Right after deploy, require `launchpad.worldSigner() == worldSigner` and `launchpad.protocolFeeRecipient() == protocolFeeRecipient` (both mandatory — a swapped order compiles silently). `worldSigner` is derived from `WORLD_SIGNER_KEY` (generated at deploy, never committed). `protocolFeeRecipient` is `PROTOCOL_FEE_RECIPIENT`.
+`Deploy.s.sol` deploys `Launchpad` as `new Launchpad(protocolFeeRecipient, worldSigner)` — the order in `contracts/src/Launchpad.sol`. Both args are `public immutable`; zero address reverts. There is no setter. Right after deploy the script requires `launchpad.worldSigner() == worldSigner` and `launchpad.protocolFeeRecipient() == protocolFeeRecipient` so a swapped constructor order fails in dry-run. `worldSigner` is derived from `WORLD_SIGNER_KEY` (generated at deploy, never committed). `protocolFeeRecipient` is `PROTOCOL_FEE_RECIPIENT`.
 
-Adapter wiring (`ProphecyEns` constructor) is TODO until #17 and #8 merge.
+Adapter wiring (`new ProphecyEns(...)`) is still TODO in `deployAdapter()`.
 
 The script prints paste-ready lines for a visual check: `WORLD_CHAIN_ID=11155111`, `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`, and `worldSigner address: 0x…` (address only, never the private key).
 

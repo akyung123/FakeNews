@@ -3,7 +3,6 @@
   "chainId": 11155111,
   "note": "Copy to sepolia.json after a person broadcasts. Addresses below are placeholders except official externals.",
   "contracts": {
-    "ProphecyFactory": "0x0000000000000000000000000000000000000000",
     "Launchpad": "0x0000000000000000000000000000000000000000",
     "ProphecyToken": "0x0000000000000000000000000000000000000000",
     "ProphecyHook": "0x0000000000000000000000000000000000000000",
