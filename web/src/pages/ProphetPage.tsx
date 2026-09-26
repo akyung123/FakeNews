@@ -9,6 +9,7 @@ import {
   type ProphetPageData,
   type ProphetProphecy,
 } from "../lib/prophetData";
+import { hasLaunchpad } from "../lib/contracts";
 import { createClaim, writeErrorMessage, writePhaseCopy, WRITE_COPY, type WritePhase } from "../lib/writes";
 
 export function ProphetPage({ claimFee }: { claimFee?: () => Promise<unknown> } = {}) {
@@ -44,6 +45,7 @@ function ProphetView({
   const [phase, setPhase] = useState<WritePhase | null>(null);
   const [error, setError] = useState<string | null>(null);
   const feeWei = claimed ? 0n : data.claimableFeeWei;
+  const showClaim = Boolean(claimFee) || !hasLaunchpad();
 
   return (
     <main className="prophet-page stack">
@@ -65,29 +67,31 @@ function ProphetView({
           <p className="faint small">Claimable fees</p>
           <p className="big-num">{formatFee(feeWei)}</p>
         </div>
-        <button
-          type="button"
-          className="btn primary"
-          disabled={claimed || feeWei === 0n || pending}
-          onClick={() => {
-            void (async () => {
-              setPending(true);
-              setPhase("wallet");
-              setError(null);
-              try {
-                await (claimFee ?? createClaim({ onPhase: setPhase }))();
-                setClaimed(true);
-              } catch (err) {
-                setError(writeErrorMessage(err));
-              } finally {
-                setPending(false);
-                setPhase(null);
-              }
-            })();
-          }}
-        >
-          {claimed ? WRITE_COPY.claimSuccess : "Claim fees"}
-        </button>
+        {showClaim ? (
+          <button
+            type="button"
+            className="btn primary"
+            disabled={claimed || feeWei === 0n || pending}
+            onClick={() => {
+              void (async () => {
+                setPending(true);
+                setPhase("wallet");
+                setError(null);
+                try {
+                  await (claimFee ?? createClaim({ onPhase: setPhase }))();
+                  setClaimed(true);
+                } catch (err) {
+                  setError(writeErrorMessage(err));
+                } finally {
+                  setPending(false);
+                  setPhase(null);
+                }
+              })();
+            }}
+          >
+            {claimed ? WRITE_COPY.claimSuccess : "Claim fees"}
+          </button>
+        ) : null}
         {pending && writePhaseCopy(phase) ? (
           <p className="banner-lock">{writePhaseCopy(phase)}</p>
         ) : null}

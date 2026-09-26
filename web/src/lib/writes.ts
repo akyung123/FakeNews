@@ -12,6 +12,7 @@ import { contracts } from "./contracts";
 import { erc20Abi } from "./erc20Abi";
 import { ISSUE_COPY } from "./issue";
 import { launchpadAbi } from "./launchpadAbi";
+import { MOCK_PROPHECIES, SEED_COINS } from "./mock";
 import { actions } from "./store";
 import { wagmiConfig } from "./wagmi";
 import { classifyWriteError } from "./writeErrors";
@@ -169,6 +170,36 @@ export function liveTokenAddress(id: string, token?: string): Address | undefine
   if (token && isAddress(token)) return token;
   if (isAddress(id)) return id;
   return undefined;
+}
+
+const MOCK_TOKEN_ADDRESSES = new Set(MOCK_PROPHECIES.map((row) => row.token.toLowerCase()));
+const MOCK_COIN_IDS = new Set([
+  ...SEED_COINS.map((row) => row.id.toLowerCase()),
+  ...MOCK_PROPHECIES.map((row) => row.slug.toLowerCase()),
+]);
+
+export type WriteTargetCoin = {
+  id: string;
+  token?: string;
+  fromChain?: boolean;
+};
+
+/** Mock seed / prototype rows — never a simulate/write target when the launchpad is set. */
+export function isMockCoinRecord(coin: WriteTargetCoin): boolean {
+  if (coin.fromChain) return false;
+  if (MOCK_COIN_IDS.has(coin.id.toLowerCase())) return true;
+  const addr = coin.token ?? (isAddress(coin.id) ? coin.id : undefined);
+  return Boolean(addr && MOCK_TOKEN_ADDRESSES.has(addr.toLowerCase()));
+}
+
+export function isMockTokenAddress(token: string): boolean {
+  return MOCK_TOKEN_ADDRESSES.has(token.toLowerCase());
+}
+
+/** Chain-mode writes only for Launched / live-launch tokens, never mock addresses. */
+export function isChainWriteTarget(coin: WriteTargetCoin): boolean {
+  if (isMockCoinRecord(coin)) return false;
+  return Boolean(liveTokenAddress(coin.id, coin.token));
 }
 
 export function launchWrite(input: LaunchInput, address: Address) {
@@ -336,6 +367,7 @@ export function createBuy(options: WriteOptions = {}): (input: BuyInput) => Prom
   const address = resolveAddress(options);
   return async (input) => {
     if (!address) return false;
+    if (isMockTokenAddress(input.token)) return false;
     const quoted = await readQuoteBuy(input.token, input.ethIn, options, input.curve);
     const minTokensOut = minOutAfterSlippage(quoted);
     await sendWrite(
@@ -352,6 +384,7 @@ export function createSell(options: WriteOptions = {}): (input: SellInput) => Pr
   const address = resolveAddress(options);
   return async (input) => {
     if (!address) return false;
+    if (isMockTokenAddress(input.token)) return false;
     const { read, accountOf } = clients(options);
     const owner = input.account ?? accountOf().address;
     if (!owner) throw new Error("Connect a wallet");

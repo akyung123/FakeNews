@@ -19,6 +19,7 @@ describe("Launched logs → card shape", () => {
     expect(coins).toHaveLength(1);
     expect(coins[0]?.id).toBe(TOKEN);
     expect(coins[0]?.token).toBe(TOKEN);
+    expect(coins[0]?.fromChain).toBe(true);
     expect(coins[0]?.ticker).toBe("LINGO-2028");
     expect(coins[0]?.creator).toBe("ringo");
     expect(coins[0]?.name).toContain("lingo-2028.ringo");

@@ -26,6 +26,7 @@ import {
   createBuy,
   createSell,
   ethInputToWei,
+  isChainWriteTarget,
   liveTokenAddress,
   refreshCoinFromChain,
   writeErrorMessage,
@@ -144,6 +145,7 @@ export function CoinPage({
           coin={coin}
           balance={s.balance}
           held={pos?.tokens ?? 0}
+          chain={chain}
           sendBuy={sendBuy}
           sendSell={sendSell}
         />
@@ -164,12 +166,14 @@ function TradeBox({
   coin,
   balance,
   held,
+  chain,
   sendBuy,
   sendSell,
 }: {
   coin: Coin;
   balance: number;
   held: number;
+  chain: boolean;
   sendBuy: (input: BuyInput) => Promise<boolean>;
   sendSell: (input: SellInput) => Promise<boolean>;
 }) {
@@ -187,12 +191,14 @@ function TradeBox({
   const buyQuote = quoteBuy(coin, Math.min(value, balance));
   const sellTokens = Math.min(held, (held * Math.min(value, 100)) / 100);
   const sellQuote = quoteSell(coin, sellTokens).eth;
+  const writeTarget = isChainWriteTarget(coin);
+  const showWrites = !chain || writeTarget;
 
   function submit() {
     if (pending || memoTooLong) return;
+    if (chain && !writeTarget) return;
     const token = liveTokenAddress(coin.id, coin.token);
-    const onChain = hasLaunchpad() && Boolean(token);
-    if (!onChain || !token) {
+    if (!writeTarget || !token) {
       if (side === "buy") actions.buy(coin.id, value);
       else actions.sell(coin.id, sellTokens);
       return;
@@ -290,20 +296,22 @@ function TradeBox({
           {MEMO_COPY.tooLong}
         </p>
       ) : null}
-      <button
-        type="button"
-        className={`btn ${side === "buy" ? "primary" : "sell"} full`}
-        disabled={pending || closed || memoTooLong || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
-        onClick={submit}
-      >
-        {pending && phase === "approve"
-          ? WRITE_COPY.approve
-          : closed
-            ? "Curve sold out"
-            : side === "buy"
-              ? `Buy $${coin.ticker}`
-              : `Sell $${coin.ticker}`}
-      </button>
+      {showWrites ? (
+        <button
+          type="button"
+          className={`btn ${side === "buy" ? "primary" : "sell"} full`}
+          disabled={pending || closed || memoTooLong || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
+          onClick={submit}
+        >
+          {pending && phase === "approve"
+            ? WRITE_COPY.approve
+            : closed
+              ? "Curve sold out"
+              : side === "buy"
+                ? `Buy $${coin.ticker}`
+                : `Sell $${coin.ticker}`}
+        </button>
+      ) : null}
       <p className="faint small">Cash {eth(balance)}</p>
     </section>
   );

@@ -190,6 +190,7 @@ export function IssueScreen({
                 actions.create({
                   id: token,
                   token,
+                  fromChain: true,
                   prophecy: prophecy.trim(),
                   name: fullName || slug,
                   ticker: slug.toUpperCase().slice(0, 11),

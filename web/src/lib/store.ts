@@ -23,6 +23,8 @@ export type Coin = CurveState & {
   token?: `0x${string}`;
   /** From Launchpad.curve. Used in chain mode so graduation is not inferred from the prototype sold count. */
   complete?: boolean;
+  /** Set when the row came from a Launched log or a live launch receipt. */
+  fromChain?: boolean;
 };
 
 /** A one-line memo attached to a trade. */
@@ -182,6 +184,7 @@ export const actions = {
     firstBuy: number;
     id?: string;
     token?: `0x${string}`;
+    fromChain?: boolean;
   }): string {
     const id = input.id ?? newId();
     const now = Date.now();
@@ -193,6 +196,7 @@ export const actions = {
       creator: YOU,
       createdAt: now,
       token: input.token,
+      fromChain: input.fromChain,
     });
     if (input.firstBuy > 0) next = applyBuy(next, YOU, id, Math.min(input.firstBuy, next.balance), now);
     set(next);

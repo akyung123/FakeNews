@@ -45,6 +45,7 @@ export function coinFromLaunchedLog(log: LaunchedLogLike, parentName = webEnv.pa
     sold: 0,
     ethRaised: 0,
     history: [],
+    fromChain: true,
   };
 }
 

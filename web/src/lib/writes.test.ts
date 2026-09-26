@@ -1,7 +1,7 @@
 import { encodeAbiParameters, encodeEventTopics, parseEther, parseUnits } from "viem";
 import { describe, expect, it, vi } from "vitest";
 import { launchpadAbi } from "./launchpadAbi";
-import { MOCK_WORLD_LAUNCHPAD } from "./mock";
+import { MOCK_PROPHECIES, MOCK_WORLD_LAUNCHPAD } from "./mock";
 import { quoteBuyWei, toCurveWei } from "./curve";
 import { actions } from "./store";
 import { wagmiConfig } from "./wagmi";
@@ -14,6 +14,9 @@ import {
   createLaunch,
   createSell,
   ethInputToWei,
+  isChainWriteTarget,
+  isMockCoinRecord,
+  isMockTokenAddress,
   launchWrite,
   LaunchedParseError,
   liveTokenAddress,
@@ -116,6 +119,16 @@ describe("slippage and deadline helpers", () => {
     expect(ethInputToWei("0.001")).toBe(parseEther("0.001"));
     expect(liveTokenAddress("wifi")).toBeUndefined();
     expect(liveTokenAddress(TOKEN)).toBe(TOKEN);
+    expect(isMockCoinRecord({ id: "wifi" })).toBe(true);
+    expect(isMockTokenAddress(MOCK_PROPHECIES[0]!.token)).toBe(true);
+    expect(isChainWriteTarget({ id: "wifi" })).toBe(false);
+    expect(isChainWriteTarget({ id: "wifi", token: MOCK_PROPHECIES[0]!.token })).toBe(false);
+    expect(isChainWriteTarget({ id: TOKEN, token: TOKEN })).toBe(true);
+    expect(isChainWriteTarget({ id: TOKEN, token: TOKEN, fromChain: true })).toBe(true);
+    expect(isChainWriteTarget({ id: MOCK_PROPHECIES[0]!.token, token: MOCK_PROPHECIES[0]!.token })).toBe(false);
+    expect(
+      isChainWriteTarget({ id: MOCK_PROPHECIES[0]!.token, token: MOCK_PROPHECIES[0]!.token, fromChain: true }),
+    ).toBe(true);
   });
 
   it("keeps designer write copy free of flagged wording", () => {
@@ -245,6 +258,14 @@ describe("buy write", () => {
     expect(fns.simulateContract).not.toHaveBeenCalled();
     expect(fns.writeContract).not.toHaveBeenCalled();
   });
+
+  it("does not simulate or write a mock token address", async () => {
+    const fns = mocks();
+    expect(await createBuy(fns)({ ...input, token: MOCK_PROPHECIES[0]!.token })).toBe(false);
+    expect(fns.simulateContract).not.toHaveBeenCalled();
+    expect(fns.writeContract).not.toHaveBeenCalled();
+    expect(fns.readContract).not.toHaveBeenCalled();
+  });
 });
 
 describe("sell write", () => {
@@ -328,6 +349,14 @@ describe("sell write", () => {
   it("is a no-op when the launchpad address is unset", async () => {
     const fns = mocks({ address: undefined });
     expect(await createSell(fns)(input)).toBe(false);
+    expect(fns.simulateContract).not.toHaveBeenCalled();
+    expect(fns.writeContract).not.toHaveBeenCalled();
+    expect(fns.readContract).not.toHaveBeenCalled();
+  });
+
+  it("does not approve, simulate, or write a mock token address", async () => {
+    const fns = mocks();
+    expect(await createSell(fns)({ ...input, token: MOCK_PROPHECIES[0]!.token })).toBe(false);
     expect(fns.simulateContract).not.toHaveBeenCalled();
     expect(fns.writeContract).not.toHaveBeenCalled();
     expect(fns.readContract).not.toHaveBeenCalled();
