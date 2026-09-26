@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { ISSUE_COPY, type WorldStatus } from "../lib/issue";
 import { MOCK_IDKIT_RESULT } from "../lib/mock";
 import {
@@ -53,8 +53,12 @@ export function WorldGate({
   const [defaultWorld] = useState(() => worldProp ?? createWorldClient());
   const world = worldProp ?? defaultWorld;
   const [resolved, setResolved] = useState<WorldClient | null>(world.isMock ? world : null);
+  const [blocked, setBlocked] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const slow = useSlowPending(!resolved);
+  const slow = useSlowPending(!resolved && !blocked);
+  const report = useRef({ onStatus, onErrorKind });
+  report.current = { onStatus, onErrorKind };
+  const retryingBlocked = useRef(false);
 
   useEffect(() => {
     if (world.isMock) {
@@ -63,9 +67,24 @@ export function WorldGate({
     }
     let cancelled = false;
     setResolved(null);
-    void worldClientWithServerFallback(world).then((next) => {
-      if (!cancelled) setResolved(next);
-    });
+    worldClientWithServerFallback(world).then(
+      (next) => {
+        if (cancelled) return;
+        setResolved(next);
+        if (retryingBlocked.current) {
+          retryingBlocked.current = false;
+          report.current.onStatus("idle");
+        }
+      },
+      (error: unknown) => {
+        if (cancelled) return;
+        retryingBlocked.current = false;
+        const kind = error instanceof WorldClientError ? error.kind : "network";
+        setBlocked(true);
+        report.current.onErrorKind(kind);
+        report.current.onStatus(worldStatusFromKind(kind));
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -77,6 +96,27 @@ export function WorldGate({
         <p className="strong">Human check skipped</p>
         <p className="faint">{ISSUE_COPY.returning}</p>
         <p className="name-preview">{prophetName}</p>
+      </section>
+    );
+  }
+
+  if (blocked) {
+    return (
+      <section className="world-gate" data-testid="world-gate">
+        <p className="strong">Proof of Human</p>
+        <p className="faint">{ISSUE_COPY.worldHelp}</p>
+        <button
+          type="button"
+          className="btn ghost"
+          onClick={() => {
+            retryingBlocked.current = true;
+            setBlocked(false);
+            onStatus("pending");
+            setAttempt((a) => a + 1);
+          }}
+        >
+          {ISSUE_COPY.retry}
+        </button>
       </section>
     );
   }

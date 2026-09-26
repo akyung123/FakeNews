@@ -5,7 +5,7 @@ import { SampleBadge } from "../components/SampleBadge";
 import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { hasLaunchpad } from "../lib/contracts";
 import { graduated, progress } from "../lib/curve";
-import { ago, gwei } from "../lib/format";
+import { ago, eth, gwei } from "../lib/format";
 import { loadLaunchedCoins } from "../lib/launched";
 import { price, useStore, type Coin } from "../lib/store";
 
@@ -56,7 +56,7 @@ export function HomePage({ loadLaunched }: HomePageProps = {}) {
         {featured ? (
           <Link className="featured launch" to={`/coin/${featured.id}`}>
             <div>
-              <p className="featured-kicker">Closest to graduation</p>
+              <p className="featured-kicker">Auction live</p>
               <p className="featured-text">{featured.prophecy}</p>
               <div className="featured-meta">
                 <TokenName {...tokenDisplayName(featured)} />
@@ -69,9 +69,9 @@ export function HomePage({ loadLaunched }: HomePageProps = {}) {
               <span className="bar">
                 <span className="bar-fill" style={{ width: `${(progress(featured) * 100).toFixed(1)}%` }} />
               </span>
-              <span className="faint small">
-                Curve {(progress(featured) * 100).toFixed(0)}%
-              </span>
+              {featured.ethRaised > 0 ? (
+                <span className="faint small">Raised {eth(featured.ethRaised)}</span>
+              ) : null}
               <span className="faint small">
                 {talkCount(featured.id)} {talkCount(featured.id) === 1 ? "memo" : "memos"}
               </span>

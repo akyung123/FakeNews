@@ -60,6 +60,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [x] Screen 2: issue @cursor
   - the issue button turns on only after World verification
   - cancelling or failing disables it
+  - [x] two steps on one form (Claim your name, then Launch your prophecy); inputs survive the name claim and a reload; a blocked World server says so instead of switching to mock @claude
   - [x] Issue and name screens use the connected wallet for the World step, `prophetOf` and `registerProphet`; mock wallets only in mock mode @claude
 - [x] Screen 3: prophecy detail @cursor
   - find the token by name

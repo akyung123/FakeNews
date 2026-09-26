@@ -1,16 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import type { Address } from "viem";
 import { WalletGate } from "../components/WalletGate";
 import { WorldGate } from "../components/WorldGate";
 import {
+  clearLaunchDraft,
   isIssueFormValid,
   isLaunchEnabled,
+  isNamedProphet,
   isRegisterSubmitEnabled,
   ISSUE_COPY,
   ISSUE_PLACEHOLDER,
   launchButtonLabel,
   prophecyName,
+  readLaunchDraft,
+  storeLaunchDraft,
   storeProphetLabel,
   worldUserMessage,
   type IssueSession,
@@ -86,11 +90,14 @@ export function IssueScreen({
     onVerified: onWorldVerified,
     reset: resetWorld,
   } = useWalletBoundWorld(wallet);
-  const [typedLabel, setProphetLabel] = useState(presetLabel ?? "");
+  // The inputs outlive a reload (a refresh, or the tab coming back from a wallet
+  // app) so a claimed name goes straight on to launch without retyping.
+  const [draft] = useState(readLaunchDraft);
+  const [typedLabel, setProphetLabel] = useState(presetLabel ?? draft?.prophetLabel ?? "");
   // A wallet that already has a name keeps it; the field is read-only then.
   const prophetLabel = onChainLabel || typedLabel;
-  const [prophecy, setProphecy] = useState("");
-  const [slug, setSlug] = useState("");
+  const [prophecy, setProphecy] = useState(draft?.prophecy ?? "");
+  const [slug, setSlug] = useState(draft?.slug ?? "");
   const [registerStatus, setRegisterStatus] = useState<RegisterStatus>("idle");
   const [writeBusy, setWriteBusy] = useState(false);
   const [writePhase, setWritePhase] = useState<WritePhase | null>(null);
@@ -103,11 +110,16 @@ export function IssueScreen({
   if (stateWallet !== wallet) {
     setStateWallet(wallet);
     resetWorld();
-    setProphetLabel(presetLabel ?? "");
+    // A wallet reconnecting after a reload is the same person: keep the typed name.
+    if (stateWallet) setProphetLabel(presetLabel ?? "");
     setRegisterStatus("idle");
     setWriteError(null);
     setWriteSuccess(null);
   }
+
+  useEffect(() => {
+    storeLaunchDraft({ prophetLabel: typedLabel, prophecy, slug });
+  }, [typedLabel, prophecy, slug]);
 
   const formValid = isIssueFormValid({
     prophetLabel,
@@ -115,6 +127,8 @@ export function IssueScreen({
     slug,
   });
   const gate = { returningProphet, worldStatus, formValid, registerStatus };
+  const named = isNamedProphet(gate);
+  const registeredHere = registerStatus === "success";
   const canLaunch = walletReady && isLaunchEnabled(gate);
   const canRegister = walletReady && isRegisterSubmitEnabled(gate);
   const canSubmit = canLaunch || canRegister;
@@ -124,15 +138,15 @@ export function IssueScreen({
     ? writePhaseCopy(writePhase) ?? WRITE_COPY.pending
     : registerBusy
       ? ISSUE_COPY.registerPending
-      : walletReady && !returningProphet && worldStatus === "pending"
+      : walletReady && !named && worldStatus === "pending"
         ? ISSUE_COPY.pending
         : null;
   const error =
     writeError ??
-    (returningProphet || worldStatus === "pending" || busy ? null : worldUserMessage(worldError));
+    (named || worldStatus === "pending" || busy ? null : worldUserMessage(worldError));
   const submitLabel = !wallet
     ? ISSUE_COPY.connectWallet
-    : launchButtonLabel({ returningProphet, worldStatus, canLaunch, canRegister });
+    : launchButtonLabel(gate);
   const fullName = prophetLabel && slug ? prophecyName(slug, prophetLabel, parentName) : "";
   const pendingTestId = writeBusy ? "write-pending" : registerBusy ? "register-pending" : "world-pending";
 
@@ -141,14 +155,20 @@ export function IssueScreen({
       <h1>{ISSUE_COPY.title}</h1>
       <p className="faint">{ISSUE_COPY.lead}</p>
       <div className="steps" data-testid="issue-steps">
-        {returningProphet ? (
-          <span className="step on">{ISSUE_COPY.oneTransaction}</span>
-        ) : (
-          <>
-            <span className={`step${worldStatus !== "success" ? " on" : ""}`}>{ISSUE_COPY.step1}</span>
-            <span className={`step${worldStatus === "success" ? " on" : ""}`}>{ISSUE_COPY.step2}</span>
-          </>
-        )}
+        <span
+          className={`step${named ? " done" : " on"}`}
+          data-testid="step-claim"
+          aria-current={named ? undefined : "step"}
+        >
+          {ISSUE_COPY.launchStep1}
+        </span>
+        <span
+          className={`step${named ? " on" : ""}`}
+          data-testid="step-launch"
+          aria-current={named ? "step" : undefined}
+        >
+          {ISSUE_COPY.launchStep2}
+        </span>
       </div>
 
       {world.isMock && isMockMode() ? (
@@ -212,6 +232,7 @@ export function IssueScreen({
                   firstBuy: 0,
                 });
                 await refreshCoinFromChain(token, token).catch(() => undefined);
+                clearLaunchDraft();
                 setWriteSuccess(WRITE_COPY.launchSuccess);
                 if (onIssued) onIssued(token);
                 else navigate(`/coin/${token}`);
@@ -223,6 +244,7 @@ export function IssueScreen({
                 ticker: slug.toUpperCase().slice(0, 11),
                 firstBuy: 0,
               });
+              clearLaunchDraft();
               if (onIssued) onIssued(id);
               else navigate(`/coin/${id}`);
             } catch (err) {
@@ -243,7 +265,7 @@ export function IssueScreen({
             value={prophetLabel}
             maxLength={16}
             placeholder={issuePlaceholder().prophetLabel}
-            readOnly={returningProphet}
+            readOnly={named}
             autoComplete="off"
             spellCheck={false}
             onChange={(e) => setProphetLabel(e.target.value.toLowerCase())}
@@ -265,9 +287,9 @@ export function IssueScreen({
 
         <div className="row2">
           <label className="field">
-            <span>Slug</span>
+            <span>Short name</span>
             <input
-              aria-label="Slug"
+              aria-label="Short name"
               value={slug}
               maxLength={32}
               placeholder={issuePlaceholder().slug}
@@ -275,24 +297,28 @@ export function IssueScreen({
               spellCheck={false}
               onChange={(e) => setSlug(e.target.value.toLowerCase())}
             />
-            <span className="faint small">3–32 characters, a–z, 0–9 and hyphen</span>
+            <span className="faint small">
+              Becomes {slug || "short"}.{prophetLabel || "name"}.{parentName} · a–z, 0–9, hyphen · can't be changed
+            </span>
           </label>
         </div>
 
         {fullName ? <p className="name-preview">{fullName}</p> : null}
 
         {wallet && walletReady ? (
-          <WorldGate
-            key={wallet}
-            returningProphet={returningProphet}
-            prophetName={onChainLabel ? `${onChainLabel}.${parentName}` : ""}
-            wallet={wallet}
-            world={world}
-            status={worldStatus}
-            onStatus={onWorldStatus}
-            onErrorKind={onWorldError}
-            onVerified={onWorldVerified}
-          />
+          registeredHere ? null : (
+            <WorldGate
+              key={wallet}
+              returningProphet={returningProphet}
+              prophetName={onChainLabel ? `${onChainLabel}.${parentName}` : ""}
+              wallet={wallet}
+              world={world}
+              status={worldStatus}
+              onStatus={onWorldStatus}
+              onErrorKind={onWorldError}
+              onVerified={onWorldVerified}
+            />
+          )
         ) : (
           <WalletGate hasWallet={Boolean(wallet)} connecting={walletConnecting} lookup={lookup} onRetry={retryLookup} />
         )}
@@ -304,7 +330,7 @@ export function IssueScreen({
         ) : null}
         {registerStatus === "success" ? (
           <p className="up" data-testid="register-success">
-            {ISSUE_COPY.registerSuccess}
+            {ISSUE_COPY.registerSuccess} {ISSUE_COPY.launchNext}
           </p>
         ) : null}
         {writeSuccess ? (
@@ -326,8 +352,8 @@ export function IssueScreen({
         >
           {submitLabel}
         </button>
-        {walletReady && !returningProphet && worldStatus !== "success" ? (
-          <p className="faint small">The issue button stays off until World verification succeeds.</p>
+        {walletReady && !named && worldStatus !== "success" ? (
+          <p className="faint small">The button stays off until World verification succeeds.</p>
         ) : null}
       </form>
     </main>

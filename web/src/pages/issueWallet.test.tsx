@@ -88,14 +88,17 @@ function renderAt(path: string) {
 function issueButton() {
   return screen.getByRole("button", {
     name: (name) =>
-      name === ISSUE_COPY.launch || name === ISSUE_COPY.disabledLaunch || name === ISSUE_COPY.connectWallet,
+      name === ISSUE_COPY.launch ||
+      name === ISSUE_COPY.register ||
+      name === ISSUE_COPY.disabledLaunch ||
+      name === ISSUE_COPY.connectWallet,
   });
 }
 
 async function fillFirstTime(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/Prophet name/i), "mina");
   await user.type(screen.getByLabelText(/^Prophecy$/i), "Coffee lasts until the last pitch");
-  await user.type(screen.getByLabelText(/^Slug$/i), "coffee-last");
+  await user.type(screen.getByLabelText(/^Short name$/i), "coffee-last");
 }
 
 beforeEach(() => {
@@ -106,6 +109,7 @@ beforeEach(() => {
   chain.verifies.length = 0;
   chain.registers.length = 0;
   localStorage.clear();
+  sessionStorage.clear();
 });
 
 afterEach(() => {
@@ -147,10 +151,12 @@ describe("/create in chain mode uses the connected wallet", () => {
 
     // prophetOf is read again for the same wallet right after the claim.
     await waitFor(() => expect(chain.lookups).toEqual([WALLET_A, WALLET_A]));
-    await waitFor(() => expect(screen.getByTestId("issue-steps")).toHaveTextContent(ISSUE_COPY.oneTransaction));
-    expect(screen.getByTestId("world-gate")).toHaveTextContent(ISSUE_COPY.returning);
-    expect(screen.getByTestId("world-gate")).toHaveTextContent("mina.");
+    await waitFor(() => expect(screen.getByTestId("step-launch")).toHaveAttribute("aria-current", "step"));
+    expect(screen.queryByTestId("world-gate")).toBeNull();
+    expect(screen.getByLabelText(/Prophet name/i)).toHaveValue("mina");
+    expect(screen.getByLabelText(/Prophet name/i)).toHaveAttribute("readonly");
     expect(screen.getByTestId("launch-submit")).toBeEnabled();
+    expect(screen.getByTestId("launch-submit")).toHaveTextContent(ISSUE_COPY.launch);
     expect(readStoredProphetLabel(WALLET_A)).toBe("mina");
     expect(readStoredProphetLabel(WALLET_B)).toBeNull();
   });
@@ -170,6 +176,20 @@ describe("/create in chain mode uses the connected wallet", () => {
     expect(screen.getByTestId("world-gate")).toHaveTextContent("ringo.");
     expect(chain.lookups).toEqual([WALLET_A]);
     expect(chain.verifies).toEqual([]);
+  });
+
+  it("keeps the typed inputs when the wallet reconnects after a reload", async () => {
+    const user = userEvent.setup();
+    const { rerenderPage } = renderAt("/create");
+    await fillFirstTime(user);
+
+    connect(WALLET_A);
+    rerenderPage();
+
+    expect(await screen.findByRole("button", { name: ISSUE_COPY.prove })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Prophet name/i)).toHaveValue("mina");
+    expect(screen.getByLabelText(/^Prophecy$/i)).toHaveValue("Coffee lasts until the last pitch");
+    expect(screen.getByLabelText(/^Short name$/i)).toHaveValue("coffee-last");
   });
 
   it("drops the World result and re-reads prophetOf when the wallet changes", async () => {
