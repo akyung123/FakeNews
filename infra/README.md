@@ -156,7 +156,7 @@ Empty `WORLD_CHAIN_ID` / `WORLD_LAUNCHPAD_ADDRESS` turns the server-side context
 | Env name | Value |
 |----------|--------|
 | `WORLD_CHAIN_ID` | `11155111` |
-| `WORLD_LAUNCHPAD_ADDRESS` | Deployed Launchpad (today: factory stub address) |
+| `WORLD_LAUNCHPAD_ADDRESS` | Deployed Launchpad |
 | `WORLD_SIGNER_KEY` | Same private key used as Launchpad `worldSigner` (Render secret) |
 
 ### GitHub Actions secret (after the 17:00 bundle)
