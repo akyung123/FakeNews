@@ -5,8 +5,9 @@
 #
 # Env: LAUNCHPAD_ADDRESS, ENS_ADAPTER_ADDRESS, PARENT_USER_REGISTRY,
 #      HOOK_ADDRESS, LOCKER_ADDRESS, POOL_MANAGER / UNISWAP_V4_POOL_MANAGER,
-#      DEPLOYER (optional), LAUNCHPAD_BLOCK (optional), SEPOLIA_RPC_URL,
-#      DEPLOY_RECORD_LOCAL=1 for fork / anvil.
+#      POSITION_MANAGER, LBP_STRATEGY, CCA_FACTORY, INITIALIZER_HOOK,
+#      HOOK_SALT, DEPLOYER (optional), LAUNCHPAD_BLOCK (optional),
+#      SEPOLIA_RPC_URL, DEPLOY_RECORD_LOCAL=1 for fork / anvil.
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -47,6 +48,13 @@ block="${LAUNCHPAD_BLOCK:-}"
 hook="${HOOK_ADDRESS:-${VITE_HOOK_ADDRESS:-}}"
 locker="${LOCKER_ADDRESS:-${VITE_LOCKER_ADDRESS:-}}"
 pool_manager="${POOL_MANAGER:-${UNISWAP_V4_POOL_MANAGER:-}}"
+position_manager="${POSITION_MANAGER:-}"
+lbp_strategy="${LBP_STRATEGY:-}"
+cca_factory="${CCA_FACTORY:-}"
+initializer_hook="${INITIALIZER_HOOK:-}"
+hook_salt="${HOOK_SALT:-}"
+universal_router="${UNIVERSAL_ROUTER:-0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3}"
+permit2="${PERMIT2:-0x000000000022D473030F116dDEE9F6B43aC78BA3}"
 
 parsed="$(python3 - "$broadcast" "$launchpad" "$adapter" "$deployer" "$block" "$hook" "$locker" "$pool_manager" <<'PY'
 import json, sys
@@ -148,11 +156,20 @@ if [[ "${launchpad,,}" == "0x0000000000000000000000000000000000000e05" ]]; then
   exit 1
 fi
 
+: "${position_manager:=0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4}"
+: "${lbp_strategy:=0x95434E898Af471945Cab33D5064d2aC1A6Ba2000}"
+: "${cca_factory:=0x000000001F26a0044BaA66024e7b6599c61963F8}"
+: "${initializer_hook:=0x1600059B95A80d500fC42400ea9a88A9C29D2000}"
+
 mkdir -p "$(dirname "$out")"
-python3 - "$out" "$chain_id" "$launchpad" "$block" "$adapter" "$parent" "$deployer" "$commit" "$hook" "$locker" "$pool_manager" <<'PY'
+python3 - "$out" "$chain_id" "$launchpad" "$block" "$adapter" "$parent" "$deployer" "$commit" "$hook" "$locker" "$pool_manager" "$position_manager" "$lbp_strategy" "$cca_factory" "$initializer_hook" "$hook_salt" "$universal_router" "$permit2" <<'PY'
 import json, sys
 
-out, chain_id, launchpad, block, adapter, parent, deployer, commit, hook, locker, pool_manager = sys.argv[1:]
+(
+    out, chain_id, launchpad, block, adapter, parent, deployer, commit, hook, locker,
+    pool_manager, position_manager, lbp_strategy, cca_factory, initializer_hook,
+    hook_salt, universal_router, permit2,
+) = sys.argv[1:]
 
 def addr(v):
     v = (v or "").strip()
@@ -164,15 +181,25 @@ def num(v):
         return None
     return int(v, 16) if v.startswith("0x") else int(v)
 
+deploy_block = num(block)
 record = {
     "chainId": int(chain_id),
     "launchpad": addr(launchpad),
-    "launchpadBlock": num(block),
-    "adapter": addr(adapter),
-    "parentUserRegistry": addr(parent),
+    "ensAdapter": addr(adapter),
     "hook": addr(hook),
+    "hookSalt": addr(hook_salt) if hook_salt else None,
     "locker": addr(locker),
     "poolManager": addr(pool_manager),
+    "positionManager": addr(position_manager),
+    "lbpStrategy": addr(lbp_strategy),
+    "ccaFactory": addr(cca_factory),
+    "initializerHook": addr(initializer_hook),
+    "universalRouter": addr(universal_router),
+    "permit2": addr(permit2),
+    "deployBlock": deploy_block,
+    "launchpadBlock": deploy_block,
+    "adapter": addr(adapter),
+    "parentUserRegistry": addr(parent),
     "deployer": addr(deployer),
     "commit": commit or None,
 }
@@ -185,12 +212,21 @@ PY
 echo "--- deployment ---"
 echo "chainId=$chain_id"
 echo "launchpad=$launchpad"
+echo "ensAdapter=${adapter:-}"
+echo "deployBlock=${block:-}"
 echo "launchpadBlock=${block:-}"
 echo "adapter=${adapter:-}"
 echo "parentUserRegistry=${parent:-}"
 echo "hook=${hook:-}"
+echo "hookSalt=${hook_salt:-}"
 echo "locker=${locker:-}"
 echo "poolManager=${pool_manager:-}"
+echo "positionManager=${position_manager:-}"
+echo "lbpStrategy=${lbp_strategy:-}"
+echo "ccaFactory=${cca_factory:-}"
+echo "initializerHook=${initializer_hook:-}"
+echo "universalRouter=${universal_router:-}"
+echo "permit2=${permit2:-}"
 echo "deployer=${deployer:-}"
 echo "commit=${commit:-}"
 echo "VITE_LAUNCHPAD_ADDRESS=$launchpad"
