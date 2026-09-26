@@ -256,6 +256,10 @@ Environment variables: copy [`.env.example`](.env.example) and see [`infra/READM
 - **The parent name is not locked yet.** Every prophet and prophecy name is written once and locked, but one level up the team wallet still owns `prophecy.eth` on the `.eth` registry with `SET_SUBREGISTRY`, and holds `REGISTRAR` on the parent registry. With those it could point `prophecy.eth` at another registry, or register a prophet name without World ID. `prophecy.eth` also has a `.eth` expiry, and names under it stop resolving if it lapses. We plan to revoke those roles and renew the name for a long term; revoking is irreversible, so it is a separate, person-confirmed step.
 - **Demo data.** TBD (team): if a demo prophet was registered with a signature made directly with the World signer key instead of an in-app World ID check, name it here.
 
+## Roadmap
+
+- **Trade memos on-chain.** Today memos exist only in demo mode; on Sepolia the detail screen says they are not on-chain yet ([DECISIONS #19](docs/DECISIONS.md)). Next: a one-line memo on pool swaps after graduation, carried by a Uniswap V4 `afterSwap` hook. The hook's permissions live in its address, so this needs a new hook and a redeploy. Auction bids would need their own carrier.
+
 ## Layout
 
 | Path | Role |

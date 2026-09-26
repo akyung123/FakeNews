@@ -21,7 +21,7 @@ import {
   GRADUATED_TITLE,
 } from "../lib/graduation";
 import { findLaunchedCoin, loadLaunchedCoins } from "../lib/launched";
-import { memoRemainingLabel } from "../lib/limits";
+import { MEMO_COPY, memoRemainingLabel } from "../lib/limits";
 import { prototypeCoinFromName } from "../lib/prophetData";
 import {
   actions,
@@ -179,19 +179,27 @@ export function CoinPage({
           <Bar value={coinProgress(coin)} labelled />
         </section>
 
-        <section className="block">
-          <div className="block-head">
-            <h2>Trade memos</h2>
-            <span className="faint">{talk.length} memos</span>
-          </div>
-          <PostBox coinId={coin.id} holds={Boolean(pos)} />
-          <ul className="posts">
-            {talk.length === 0 ? <li className="empty">No trades yet. The first memo shows up here.</li> : null}
-            {talk.map((c) => (
-              <CommentItem key={c.id} comment={c} coin={coin} />
-            ))}
-          </ul>
-        </section>
+        {chain ? (
+          // Auction bids and pool swaps carry no memo yet (DECISIONS #19), so a
+          // memo box here would only save to this browser.
+          <p className="faint small" data-testid="memo-not-on-chain">
+            {MEMO_COPY.notOnChain}
+          </p>
+        ) : (
+          <section className="block">
+            <div className="block-head">
+              <h2>Trade memos</h2>
+              <span className="faint">{talk.length} memos</span>
+            </div>
+            <PostBox coinId={coin.id} holds={Boolean(pos)} />
+            <ul className="posts">
+              {talk.length === 0 ? <li className="empty">No trades yet. The first memo shows up here.</li> : null}
+              {talk.map((c) => (
+                <CommentItem key={c.id} comment={c} coin={coin} />
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
 
       <aside className="stack side">

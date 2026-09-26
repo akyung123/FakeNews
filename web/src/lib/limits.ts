@@ -9,6 +9,7 @@ export const MAX_PROPHECY_BYTES = MAX_MEMO_BYTES;
 
 export const MEMO_COPY = {
   tooLong: "Memo is too long. Shorten it to trade.",
+  notOnChain: "Trade memos aren't on-chain yet.",
 } as const;
 
 export function utf8ByteLength(value: string): number {
