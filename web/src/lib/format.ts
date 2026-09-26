@@ -37,12 +37,32 @@ export function formatEth(wei: bigint): string {
   return `${formatEthAmount(wei)} ETH`;
 }
 
+const WEI_PER_GWEI = 10n ** 9n;
+/** Prices under 1e-6 ETH read in gwei: past that the leading zeros are hard to count. */
+const GWEI_PRICE_BELOW = 10n ** 12n;
+/** Smallest gwei price written out in full. */
+const MIN_GWEI_PRICE = WEI_PER_GWEI / 10_000n;
+
+/**
+ * Price of one whole token, in wei, with its unit. From 1e-6 ETH up it reads
+ * like formatEth. Under that it reads in gwei (1 gwei = 1e-9 ETH), also to 4
+ * significant digits, and anything under 0.0001 gwei reads "<0.0001 gwei".
+ * 5e-4 ETH → "0.0005 ETH", 4e-8 ETH → "40 gwei", 4e-11 ETH → "0.04 gwei".
+ */
+export function formatPriceAmount(weiPerToken: bigint): string {
+  if (weiPerToken <= 0n) return formatEth(weiPerToken);
+  const rounded = roundTo(weiPerToken, sigUnit(weiPerToken, 4));
+  if (rounded >= GWEI_PRICE_BELOW) return formatEth(weiPerToken);
+  if (weiPerToken < MIN_GWEI_PRICE) return `<${formatUnits(MIN_GWEI_PRICE, 9)} gwei`;
+  return `${formatUnits(rounded, 9)} gwei`;
+}
+
 /**
  * Price of one whole token, in wei. Clearing price, final clearing price and
  * pool price all use this, so every price reads in the same unit and digits.
  */
 export function formatPrice(weiPerToken: bigint): string {
-  return `${formatEthAmount(weiPerToken)} ETH per token`;
+  return `${formatPriceAmount(weiPerToken)} per token`;
 }
 
 const TOKEN_SUFFIXES = ["", "K", "M", "B"] as const;

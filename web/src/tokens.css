@@ -50,6 +50,20 @@
   --sell-ink: var(--paper-50);
   --featured-ring: var(--gold-500);
 
+  /* Market stage cards (home list + featured). The badge text always names the stage too. */
+  --card-live: var(--paper-100);          /* Auction live: paper card */
+  --card-live-accent: var(--gold-500);    /* badge fill, progress, rule dot */
+  --card-live-accent-ink: var(--ink-950); /* badge text */
+  --card-market: var(--paper-100);        /* Market open: paper card … */
+  --card-market-ring: var(--gold-500);    /* … with a 2px gold border and a full gold bar */
+  --card-market-badge: var(--indigo-800); /* navy badge … */
+  --card-market-badge-ink: var(--gold-300); /* … with gold text */
+  --card-ended: #2A2A2A;                  /* Ended · refunded: dark grey card, dimmed */
+  --card-ended-ink: #9A9A9A;              /* text, badge outline, progress */
+  --card-ended-line: var(--ink-600);      /* card border, progress track */
+  --card-ended-opacity: 0.7;
+  --card-track: rgba(26, 26, 26, 0.12);   /* progress track on paper */
+
   /* Type */
   --font-display: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
   --font-body: 'Inter', system-ui, -apple-system, sans-serif;

@@ -8,7 +8,7 @@ import { loadMarketSnapshots, type MarketRow, type MarketSnapshot } from "../lib
 import { hasLaunchpad } from "../lib/contracts";
 import { avatarImageUrl } from "../lib/ens";
 import { follow, unfollow, useFollowing } from "../lib/following";
-import { ethToWei, formatEth, formatPrice } from "../lib/format";
+import { ethToWei, formatEth, formatPrice, formatPriceAmount } from "../lib/format";
 import { createReadCreatorFee } from "../lib/launchpad";
 import { loadChainProphet, loadProfileText, type ProfileText } from "../lib/profile";
 import {
@@ -363,9 +363,9 @@ function PriceRow({ row, market }: { row: ProphetProphecy; market: MarketSnapsho
       {points.length >= 2 ? (
         <PriceChart
           points={points}
-          label={`${market.priceLabel} (ETH)`}
+          label={`${market.priceLabel} per token`}
           live={market.status === "pool_open"}
-          format={(value) => formatEth(ethToWei(value))}
+          format={(value) => formatPriceAmount(ethToWei(value))}
         />
       ) : null}
     </li>

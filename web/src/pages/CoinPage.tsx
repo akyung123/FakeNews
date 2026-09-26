@@ -12,7 +12,7 @@ import { usePoolPrice } from "../lib/cca/usePoolPrice";
 import { contracts, hasLaunchpad } from "../lib/contracts";
 import { coinPriceWei, coinProgress, coinRaisedWei } from "../lib/coinFigures";
 import { graduated, TOTAL_SUPPLY } from "../lib/curve";
-import { ago, ethToWei, formatEth, formatPrice, tokens } from "../lib/format";
+import { ago, ethToWei, formatPrice, formatPriceAmount, tokens } from "../lib/format";
 import {
   GRADUATED_BODY,
   GRADUATED_LINK,
@@ -132,9 +132,9 @@ export function CoinPage({
           </p>
           <PriceChart
             points={chartPoints}
-            label={poolPrice.open ? "Pool price (ETH per token)" : "Price (ETH per token)"}
+            label={poolPrice.open ? "Pool price per token" : "Price per token"}
             live={poolPrice.open}
-            format={(value) => formatEth(ethToWei(value))}
+            format={(value) => formatPriceAmount(ethToWei(value))}
             emptyText="No trades yet. The chart starts with the first trade."
           />
           <Bar value={coinProgress(coin)} labelled />
