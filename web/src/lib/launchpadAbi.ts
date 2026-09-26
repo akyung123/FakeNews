@@ -1,11 +1,10 @@
 /**
- * Launchpad ABI from contracts/src/Launchpad.sol.
+ * Launchpad ABI from contracts/src/Launchpad.sol at 0ee30ce (current main).
  *
- * Custom errors match the source (and forge `out/Launchpad.sol/Launchpad.json`
- * when present): every `error` on Launchpad so viem can decode reverts.
  * Constructor ends at ens: (protocolFeeRecipient, worldSigner, ens).
- * Uniswap addresses are not constructor args; graduation adds one-time
+ * Uniswap addresses are not constructor args; deployer-only one-time
  * setUniswap(poolManager, hook, locker). Launched has no deadline.
+ * Graduation: curve().complete and Graduated(token, poolId, …).
  * The web never reads ENS_ADAPTER_ADDRESS — call launchpad.ens().
  */
 export const launchpadAbi = [
@@ -61,6 +60,17 @@ export const launchpadAbi = [
       { name: "tokensIn", type: "uint256" },
       { name: "minEthOut", type: "uint256" },
       { name: "memo", type: "string" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "setUniswap",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "poolManager", type: "address" },
+      { name: "hook", type: "address" },
+      { name: "locker", type: "address" },
     ],
     outputs: [],
   },
@@ -154,6 +164,34 @@ export const launchpadAbi = [
   },
   {
     type: "function",
+    name: "deployer",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "poolManager",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "hook",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "locker",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
     name: "protocolFees",
     stateMutability: "view",
     inputs: [],
@@ -191,6 +229,29 @@ export const launchpadAbi = [
       { name: "vEthAfter", type: "uint256", indexed: false },
       { name: "vTokenAfter", type: "uint256", indexed: false },
       { name: "memo", type: "string", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Graduated",
+    inputs: [
+      { name: "token", type: "address", indexed: true },
+      { name: "poolId", type: "bytes32", indexed: true },
+      { name: "ethToPool", type: "uint256", indexed: false },
+      { name: "tokensToPool", type: "uint256", indexed: false },
+      { name: "sqrtPriceX96", type: "uint160", indexed: false },
+      { name: "fee", type: "uint24", indexed: false },
+      { name: "tickSpacing", type: "int24", indexed: false },
+      { name: "hooks", type: "address", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "UniswapSet",
+    inputs: [
+      { name: "poolManager", type: "address", indexed: false },
+      { name: "hook", type: "address", indexed: false },
+      { name: "locker", type: "address", indexed: false },
     ],
   },
   {
