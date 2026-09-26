@@ -44,12 +44,14 @@ export function WorldGate({
   returningProphet,
   prophetName,
   wallet,
-  world = createWorldClient(),
+  world: worldProp,
   status,
   onStatus,
   onErrorKind,
   onVerified,
 }: Props) {
+  const [defaultWorld] = useState(() => worldProp ?? createWorldClient());
+  const world = worldProp ?? defaultWorld;
   const [resolved, setResolved] = useState<WorldClient | null>(world.isMock ? world : null);
   const [attempt, setAttempt] = useState(0);
   const slow = useSlowPending(!resolved);

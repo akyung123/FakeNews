@@ -61,7 +61,7 @@ export function CreatePage() {
 
 export function IssueScreen({
   session,
-  world = createWorldClient(),
+  world: worldProp,
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
   onIssued,
   registerProphet = createRegisterProphet(),
@@ -69,6 +69,9 @@ export function IssueScreen({
   lookupProphet,
 }: IssueScreenProps) {
   const navigate = useNavigate();
+  // One client per screen. A new one each render makes WorldGate recheck the
+  // server and drop the open World ID widget.
+  const [world] = useState(() => worldProp ?? createWorldClient());
   const readProphet = useMemo(() => lookupProphet ?? createReadProphetOf(), [lookupProphet]);
   const [onChainLabel, setOnChainLabel] = useState("");
   const returningProphet = Boolean(session.prophetLabel || onChainLabel);
