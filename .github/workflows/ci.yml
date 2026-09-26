@@ -67,11 +67,13 @@ jobs:
       # Fork PRs do not receive Actions secrets, so those runs stay skipped and still pass.
       # Export only when there is a URL: an empty SEPOLIA_RPC_URL would make the
       # CCA fork tests skip instead of falling back to the public RPC.
+      # The public RPC prunes old state, so without the key the fork tests run on
+      # the latest block instead of the pinned one.
       - name: Test
         env:
           RPC: ${{ steps.changed.outputs.contracts == 'true' && secrets.SEPOLIA_RPC_URL || '' }}
         run: |
-          if [[ -n "$RPC" ]]; then export SEPOLIA_RPC_URL="$RPC"; fi
+          if [[ -n "$RPC" ]]; then export SEPOLIA_RPC_URL="$RPC"; else unset SEPOLIA_FORK_BLOCK; fi
           forge test -vv
 
   detect-world:
