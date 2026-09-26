@@ -11,5 +11,10 @@ interface ImportMetaEnv {
   readonly VITE_WORLD_ACTION: string;
   readonly VITE_WORLD_MOCK: string;
   readonly VITE_WORLD_SERVER_URL: string;
+  readonly VITE_WALLETCONNECT_PROJECT_ID?: string;
   readonly VITE_ROUTER?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
 }

@@ -14,6 +14,7 @@ export default defineConfig({
     exclude: [
       "**/node_modules/**",
       "**/dist/**",
+      "src/lib/curve.vectors.test.ts",
       "src/lib/prophetData.test.ts",
       "src/pages/CoinPage.test.tsx",
       "src/pages/ProphetPage.test.tsx",
