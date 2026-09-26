@@ -1,10 +1,16 @@
 # Interface
 
+> **PROPOSAL** (2026-09-26). This file is the proposed Launchpad-facing contract if bonding-curve trading is replaced by Uniswap CCA. It is **not** accepted until a person adds a DECISIONS row (this would supersede #7 and #11). Research and sources: [`CCA_RESEARCH.md`](CCA_RESEARCH.md). No `contracts/`, `web/`, script, or workflow code ships in the PR that first lands this text.
+>
+> **Path A (recommended):** official CCA factory on Sepolia + our Launchpad still initializes the v4 pool and locks LP in `LiquidityLocker`. Frontend talks to the CCA for bid / exit / claim.
+> **Path B (not recommended for the hackathon):** official `LBPStrategy.migrate`. Cannot attach today's `ProphecyHook` / `LiquidityLocker` without rewriting both. See CCA_RESEARCH section 3.
+
 What `contracts/`, `web/` and `world/` rely on from each other. Only the contract between folders, not how to implement it.
 
 - **Changing it:** edit this file first, in **the same PR** as the code change, and write "INTERFACE change" in the PR description.
-- **Sources:** [`SPEC.md`](SPEC.md), [`DECISIONS.md`](DECISIONS.md)
+- **Sources:** [`SPEC.md`](SPEC.md), [`DECISIONS.md`](DECISIONS.md), [`CCA_RESEARCH.md`](CCA_RESEARCH.md)
 - `(draft)` means the shape may still change during implementation. Remove the mark once it settles.
+- `(removed)` is the bonding-curve surface that Path A deletes. Do not call it from web after the contracts PR.
 
 ## 1. Names (ENS)
 
@@ -26,9 +32,11 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 
 ## 2. Contracts
 
-### `Launchpad` `(draft)`
+### `Launchpad` `(draft)` `(PROPOSAL — Path A)`
 
-Final constructor. Graduation does not add constructor arguments.
+Constructor stays `(protocolFeeRecipient, worldSigner, ens)`. Uniswap addresses stay on `setUniswap`. A deployer-only `setCcaFactory` records the official Sepolia CCA factory. Graduation does not add constructor arguments.
+
+Official factory (Sepolia, verified bytecode): `0x000000001F26a0044BaA66024e7b6599c61963F8` (CCA v2.1.0). See [`CCA_RESEARCH.md`](CCA_RESEARCH.md) section 1.
 
 ```solidity
 constructor(address protocolFeeRecipient, address worldSigner, address ens);
@@ -36,25 +44,39 @@ constructor(address protocolFeeRecipient, address worldSigner, address ens);
 // Deployer-only, once. After Launchpad, Hook (CREATE2), and Locker exist.
 function setUniswap(address poolManager, address hook, address locker) external;
 
-// Create a prophet name. Needs a World ID server signature. Once per nullifier.
+// Deployer-only, once. Official ContinuousClearingAuctionFactory on Sepolia.
+function setCcaFactory(address factory) external;
+
+// Unchanged. Create a prophet name. Needs a World ID server signature. Once per nullifier.
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
 
-// Issue a prophecy. Caller must own a prophet name. If msg.value > 0, also makes the first buy.
-function launch(string slug, string prophecy, uint64 deadline, uint256 minTokensOut)
-    external payable returns (address token);
+// Issue a prophecy. Caller must own a prophet name.
+// Mints ProphecyToken to the Launchpad, writes ENS, deploys a CCA via factory.create,
+// transfers `auctionSupply` to the auction, calls onTokensReceived.
+// Does NOT take ETH for a first buy.
+function launch(string slug, string prophecy, uint64 deadline, AuctionLaunchParams params)
+    external
+    returns (address token, address auction);
 
-// memo: optional one-line note shown next to the trade. Empty string for none. At most 140 bytes.
-function buy(address token, uint256 minTokensOut, string memo) external payable;
-function sell(address token, uint256 tokensIn, uint256 minEthOut, string memo) external;
-function claimCreatorFee() external;
+struct AuctionLaunchParams {
+    uint64 startBlock;
+    uint64 endBlock;
+    uint64 claimBlock;
+    uint256 floorPriceQ96;
+    uint256 tickSpacingQ96;
+    uint128 requiredCurrencyRaised; // 0 = always graduate
+    uint128 auctionSupply;          // tokens sent to CCA; rest stays for LP
+    bytes auctionStepsData;         // packed MPS + block deltas
+}
+
+// After auction endBlock, auction.isGraduated(), and Uniswap is set:
+// sweepCurrency + sweepUnsoldTokens, initialize the v4 pool with ProphecyHook,
+// locker.lock the LP reserve + swept ETH. Anyone may call.
+function graduate(address token) external;
 
 // views
-function curve(address token) external view returns (
-    uint256 vEth, uint256 vToken, uint256 realEth, uint256 sold, bool complete);
-function quoteBuy(address token, uint256 ethIn) external view returns (uint256 tokensOut, uint256 fee);
-function quoteSell(address token, uint256 tokensIn) external view returns (uint256 ethOut, uint256 fee);
+function auctionOf(address token) external view returns (address auction, bool poolOpened);
 function prophetOf(address wallet) external view returns (string label);
-function creatorFeeOf(address wallet) external view returns (uint256);
 function protocolFeeRecipient() external view returns (address);
 function worldSigner() external view returns (address);
 function ens() external view returns (address);
@@ -62,15 +84,21 @@ function deployer() external view returns (address);
 function poolManager() external view returns (address);
 function hook() external view returns (address);
 function locker() external view returns (address);
+function ccaFactory() external view returns (address);
 ```
 
 ```solidity
 event ProphetRegistered(address indexed wallet, string label, uint256 nullifier);
-event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
-event Trade(address indexed token, address indexed trader, bool isBuy,
-            uint256 ethAmount, uint256 tokenAmount, uint256 fee, uint256 vEthAfter, uint256 vTokenAfter, string memo);
+event Launched(
+    address indexed token,
+    address indexed prophet,
+    address indexed auction,
+    string prophetLabel,
+    string slug
+);
 event Graduated(
     address indexed token,
+    address indexed auction,
     bytes32 indexed poolId,
     uint256 ethToPool,
     uint256 tokensToPool,
@@ -79,21 +107,71 @@ event Graduated(
     int24 tickSpacing,
     address hooks
 );
-event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 event UniswapSet(address poolManager, address hook, address locker);
+event CcaFactorySet(address factory);
 ```
 
-- `Graduated` is emitted in the buy that sells the last curve tokens. `poolId` is the V4 `PoolId` (`keccak256` of the `PoolKey`). `currency0` is native ETH (`address(0)`); `currency1` is `token`. The frontend reconstructs the key from `token`, `fee`, `tickSpacing`, and `hooks`.
-- The sentence and deadline are not in `Launched`. Both are read from ENS (DECISIONS #5).
+#### What the frontend calls (bid / claim / exit)
+
+The Launchpad is **not** the trading contract during the auction. Web calls the CCA at `auctionOf(token).auction` (official interface, CCA v2.1.0). Currency is native ETH (`address(0)`).
+
+| User action | Contract | Function |
+|---|---|---|
+| Bid ETH at a max price | CCA | `submitBid(maxPriceQ96, amount, owner, prevTickPriceQ96, hookData)` payable; `msg.value == amount`. Empty `hookData` if `validationHook == 0`. The 4-arg overload scans from the floor and is gas-heavy — do not use it in the demo unless the tick is already initialized |
+| Refresh clearing price | CCA | `checkpoint()` (also runs inside `submitBid`) |
+| Leave a fully-above-clearing bid after end | CCA | `exitBid(bidId)` — refunds leftover ETH immediately |
+| Leave a partial fill | CCA | `exitPartiallyFilledBid(bidId, lastFullyFilledCheckpointBlock, outbidBlock)` |
+| Take tokens after `claimBlock` | CCA | `claimTokens(bidId)` or `claimTokensBatch(owner, bidIds)` — anyone may call; tokens go to the bid owner |
+| Open the v4 pool | Launchpad | `graduate(token)` after `endBlock` and `isGraduated()` |
+
+CCA events to watch: `BidSubmitted`, `BidExited`, `TokensClaimed`, `CheckpointUpdated`, `ClearingPriceUpdated`, `TokensReceived`. Signatures are in [`CCA_RESEARCH.md`](CCA_RESEARCH.md) section 2.
+
+Read-only on the CCA (and/or CCALens `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53`): `clearingPrice()`, `isGraduated()`, `startBlock()`, `endBlock()`, `claimBlock()`, `currency()`, `token()`, `totalSupply()`.
+
+There is **no sell** during the auction. After `Graduated`, trading is the Uniswap v4 pool (same as today).
+
+#### What stays
+
+- `registerProphet`, World ID signature, one nullifier, prophet ENS name (section 3).
+- ENS adapter: prophecy sentence and deadline live only on the prophecy resolver (DECISIONS #5). `Launched` still does not contain them.
+- `setUniswap` + CREATE2 `ProphecyHook` + `LiquidityLocker`. Hook `beforeInitialize` still allows only the Launchpad. Locker still holds a PoolManager position (not a PositionManager NFT).
+- `LiquidityLocker.collect` / `withdrawAccrued` after the pool exists. Prophet 24 : protocol 76.
+- Constructor `(protocolFeeRecipient, worldSigner, ens)`.
+- Deploy order: Launchpad, Hook, Locker, `setUniswap`, `setCcaFactory`. Graduation reverts if either is unset.
+- `receive()` leftover seed ETH only from the locker and the PoolManager.
+- Label / slug / prophecy length rules. Names never expire.
+
+#### What is removed `(removed)`
+
+Bonding-curve trading. Do not keep these on Launchpad after the contracts PR:
+
+```solidity
+function launch(..., uint256 minTokensOut) external payable returns (address token); // old
+function buy(address token, uint256 minTokensOut, string memo) external payable;
+function sell(address token, uint256 tokensIn, uint256 minEthOut, string memo) external;
+function claimCreatorFee() external;
+function curve(address token) external view returns (uint256 vEth, uint256 vToken, uint256 realEth, uint256 sold, bool complete);
+function quoteBuy(address token, uint256 ethIn) external view returns (uint256 tokensOut, uint256 fee);
+function quoteSell(address token, uint256 tokensIn) external view returns (uint256 ethOut, uint256 fee);
+function creatorFeeOf(address wallet) external view returns (uint256);
+
+event Trade(address indexed token, address indexed trader, bool isBuy,
+            uint256 ethAmount, uint256 tokenAmount, uint256 fee, uint256 vEthAfter, uint256 vTokenAfter, string memo);
+event CreatorFeeClaimed(address indexed prophet, uint256 amount);
+```
+
+Reasons:
+
+- CCA has no instant buy/sell and no virtual reserves. Price is the auction clearing price, then the v4 pool.
+- Official Sepolia CCA factory `protocolFeeController()` is `address(0)`, so CCA itself takes no protocol fee ([CCA_RESEARCH.md](CCA_RESEARCH.md) section 1). The 1.25% curve split (DECISIONS #7) does not exist on this path. Prophet fees after the pool remain `LiquidityLocker.collect`.
+- DECISIONS #15 memos rode on `buy`/`sell`. CCA `BidSubmitted` has no memo field. Memo-on-bid is a later product choice, not part of this proposal.
+
+#### Notes that stay true
+
 - `registerProphet` recovers EIP-191 `personal_sign` of `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` (section 3). `chainId` must be `block.chainid` and `launchpad` must be this contract; the signed wallet must be `msg.sender`. Label is chosen by the caller and is not in the signed payload.
-- Constructor is `(protocolFeeRecipient, worldSigner, ens)`. This PR does not add constructor arguments.
-- Deploy order: Launchpad, then Hook (CREATE2 using the Launchpad address), then Locker, then a deployer-only one-time `setUniswap(poolManager, hook, locker)`. A second call or a non-deployer call reverts. Graduation reverts if Uniswap is not set.
-- `receive()` accepts leftover seed ETH only from the locker and the PoolManager.
-- Constants are exactly the "Constants" section of SPEC.md.
-- `memo` is only emitted, never stored. `buy`/`sell` revert if it is longer than 140 bytes (DECISIONS #15).
-- Rounding:
-  - Buy: fee rounds up, tokens out round down.
-  - Sell: fee rounds up, ETH out rounds down.
+- `Graduated.poolId` is the V4 `PoolId` (`keccak256` of the `PoolKey`). `currency0` is native ETH (`address(0)`); `currency1` is `token`. The frontend reconstructs the key from `token`, `fee`, `tickSpacing`, and `hooks`.
+- `graduate` is a separate transaction after the auction, not the last curve buy.
+- Official LBPStrategy (`0x95434E898Af471945Cab33D5064d2aC1A6Ba2000` on Sepolia) is **out of this Launchpad interface**. Path B would replace `graduate` with `LBPStrategy.migrate` and cannot use our hook/locker.
 
 ### `ProphecyToken`
 
@@ -103,7 +181,7 @@ event UniswapSet(address poolManager, address hook, address locker);
 
 ### `LiquidityLocker`
 
-- `lock(address token, address prophet, address protocolFeeRecipient, PoolKey key, uint256 tokenAmount)` is called only by the Launchpad at graduation. Recipients are fixed then.
+- `lock(address token, address prophet, address protocolFeeRecipient, PoolKey key, uint256 tokenAmount)` is called only by the Launchpad from `graduate` (Path A). Recipients are fixed then. Official LBPStrategy NFT mint is not used.
 - `collect(address token)` can be called by anyone. Collected fees go **only** to prophet 24 : protocol 76.
 - No withdraw of principal. Liquidity cannot be decreased or burned.
 - If sending ETH to the prophet fails, `collect` still pays the protocol and accrues the prophet share. The prophet later calls `withdrawAccrued()`. Seed leftovers must not sweep `accruedEth`.
@@ -160,17 +238,18 @@ Live IDKit uses `app_id`, `action`, and `environment` from this envelope so the 
 
 Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check can take a minute when the World server has been idle. The issue button stays off while the check is running. The retry sentence is shown only after a timeout or a dropped connection — not while the request is still open.
 
-## 4. How the web app reads
+## 4. How the web app reads `(PROPOSAL)`
 
-1. List: `Launched` logs.
+1. List: `Launched` logs (now includes `auction`).
 2. Names, resolved through the Universal Resolver (`VITE_UNIVERSAL_RESOLVER`):
    - token: `getEnsAddress(name)`
    - sentence: `getEnsText(name, "prophecy")`
    - deadline: `getEnsText(name, "deadline")`
-3. Price and progress: `curve(token)`.
-4. Graduation: `curve(token).complete` on load. Watch `Graduated` so the trade panel flips during a live last buy. There is no `getState`. The Uniswap link uses `Graduated.poolId` (V4 `PoolId`). If the event is not in hand yet, reconstruct the key: native ETH (`address(0)`), `token`, fee `10000`, tickSpacing `200`, `hooks` from the event or `launchpad.hook()`.
-5. Chart and trade memos: `Trade` logs.
+3. Auction: `auctionOf(token)` then CCA views / CCALens. Price is `clearingPrice()` (Q96, ETH per token). Progress is checkpoints and `isGraduated()`, not virtual reserves.
+4. After the auction: watch Launchpad `Graduated`. The Uniswap link uses `Graduated.poolId` (V4 `PoolId`). If the event is not in hand yet, reconstruct the key: native ETH (`address(0)`), `token`, fee `10000`, tickSpacing `200`, `hooks` from the event or `launchpad.hook()`.
+5. Bid list: CCA `BidSubmitted` / `BidExited` / `TokensClaimed`. `(removed)` `Trade` logs and memos.
 6. Name next to a wallet: reverse lookup, falling back to `prophetOf(wallet)`.
+7. Issue: unchanged World ID → `registerProphet` → `launch` (no `msg.value` first buy).
 
 ## 5. Environment variables
 
@@ -180,6 +259,7 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 | `VITE_LAUNCHPAD_ADDRESS` | web |
 | `VITE_LAUNCHPAD_DEPLOY_BLOCK` | web (`fromBlock` for `Launched` logs) |
 | `VITE_HOOK_ADDRESS`, `VITE_LOCKER_ADDRESS` | web (optional) |
+| `VITE_CCA_FACTORY` | web (optional; empty = `launchpad.ccaFactory()` / official Sepolia factory) |
 | `VITE_PARENT_NAME` | web (e.g. `prophecy.eth`) |
 | `VITE_UNIVERSAL_RESOLVER` | web ([`ENSV2.md`](ENSV2.md) section 0) |
 | `VITE_WORLD_APP_ID`, `VITE_WORLD_ACTION` | web |
@@ -200,7 +280,7 @@ Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web 
 
 After a successful send, infra writes a machine-readable record (no secrets) to `deployments/sepolia.json`, or `deployments/anvil.json` on a local / fork run (gitignored). Format: [`infra/README.md`](../infra/README.md) “Deployment record”. Web copies `launchpad` into `VITE_LAUNCHPAD_ADDRESS` and `launchpadBlock` into `VITE_LAUNCHPAD_DEPLOY_BLOCK` (optional; empty means the web uses a recent block range). `hook` / `locker` / `poolManager` are recorded after `setUniswap`; optional `VITE_HOOK_ADDRESS` / `VITE_LOCKER_ADDRESS` copy the first two. `VITE_CHAIN_ID` stays `11155111` on Sepolia.
 
-`Deploy.s.sol` order matches section 2: Launchpad, CREATE2 Hook (Launchpad in the constructor; salt mined for permission flags), Locker, then deployer-only `setUniswap(poolManager, hook, locker)` once. The script requires `launchpad.hook()`, `launchpad.locker()`, and `launchpad.poolManager()` match.
+`Deploy.s.sol` order matches section 2: Launchpad, CREATE2 Hook (Launchpad in the constructor; salt mined for permission flags), Locker, then deployer-only `setUniswap(poolManager, hook, locker)` once, then `setCcaFactory` (official Sepolia factory). The script requires `launchpad.hook()`, `launchpad.locker()`, and `launchpad.poolManager()` match. This proposal does not edit the script; a later contracts PR does.
 
 `ENS_ADAPTER_ADDRESS` is the `ProphecyEns` address. **Default: output.** `Deploy.s.sol` creates the adapter (predicted Launchpad CREATE address) and the Launchpad in one broadcast, then the CREATE2 Hook, Locker, and `setUniswap`, then logs `ENS_ADAPTER_ADDRESS`. **Optional input override:** if the env var is set, the script does not CREATE an adapter and passes that address as Launchpad `ens`. Off anvil, a set value cannot be `address(0)` or placeholder `0xe05` — the same `#24` guard as `PROTOCOL_FEE_RECIPIENT` / `0xfee` and `worldSigner` / `0x51e`. Anvil dry-run (`chainid == 31337`) fills `0xe05` when unset (Launchpad reverts on zero). The hook / locker / `setUniswap` steps still run.
 
@@ -208,11 +288,15 @@ After a successful send, infra writes a machine-readable record (no secrets) to 
 
 Parent lock (revoke `SET_SUBREGISTRY` on `.eth` for `prophecy`) is not part of this deploy. A later PR adds that irreversible step after a person confirms.
 
-## 6. Curve quote vectors
+## 6. Curve quote vectors `(removed)`
 
-Canonical rows live in backend M1 PR #8 as `contracts/test/Curve.vectors.json`. Web keeps a byte-matching copy at `web/src/lib/Curve.vectors.json`. Do not re-derive the numbers. Do not edit `contracts/` from this lane.
+Bonding-curve quote vectors (`contracts/test/Curve.vectors.json`, `web/src/lib/Curve.vectors.json`) are unused on Path A. Do not re-derive them. A later contracts PR deletes the callers; this proposal does not edit those files.
 
-- Web: `web/src/lib/curve.vectors.test.ts` imports the web copy.
-- Contracts: forge tests read `contracts/test/Curve.vectors.json`.
+## 7. Implementation plan (short)
 
-In the fixture, sell `ethOut` is the seller payout. SPEC's pre-fee `ethOut` is the fixture's `rawOut`. Rounding matches section 2.
+Full research: [`CCA_RESEARCH.md`](CCA_RESEARCH.md) section 5.
+
+1. Person accepts this INTERFACE (DECISIONS row). Contracts PR implements Path A only.
+2. Launchpad rewrite + web auction panel. World / ENS unchanged.
+3. Effort: same order as the existing curve + graduation stack (one contracts rewrite, one web trade-panel rewrite). Exact hours **UNVERIFIED**.
+4. **Fallback if CCA is not working by 22:00 KST:** keep the bonding-curve Launchpad already on `main`. Do not merge Path A contracts. Record blockers in `FEEDBACK.md`.

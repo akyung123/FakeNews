@@ -7,6 +7,7 @@ Who reads what. Nobody needs to read everything.
 | New teammate, not a developer | [`PRD.md`](PRD.md) | [`../README.md`](../README.md) "Status" |
 | New person or agent | [`../AGENTS.md`](../AGENTS.md) | [`PRD.md`](PRD.md), [`SPEC.md`](SPEC.md) |
 | Contracts | [`INTERFACE.md`](INTERFACE.md) | [`ENSV2.md`](ENSV2.md), [`PLAN.md`](PLAN.md) sections 1–2 |
+| CCA / auction proposal | [`CCA_RESEARCH.md`](CCA_RESEARCH.md) | [`INTERFACE.md`](INTERFACE.md) (PROPOSAL banner) |
 | Web | [`INTERFACE.md`](INTERFACE.md) | [`PLAN.md`](PLAN.md) section 3 |
 | World server | [`INTERFACE.md`](INTERFACE.md) | [`PLAN.md`](PLAN.md) section 4 |
 | "Why is it like this?" | [`DECISIONS.md`](DECISIONS.md) | — |

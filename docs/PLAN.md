@@ -86,6 +86,10 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] If the ENS app cannot read Sepolia ENSv2 names: use the viem lookup script in `infra/` (`getEnsAddress` and text record) output as the external lookup evidence for scenes 1 and 2.
 - [ ] `FEEDBACK.md` (Uniswap): keep notes of blockers during development; it is the fallback deliverable if Uniswap graduation is cut.
 
+## 6. CCA research (`docs/` only)
+
+- [x] Official Uniswap CCA / Liquidity Launchpad research + INTERFACE Path A proposal ([CCA_RESEARCH.md](CCA_RESEARCH.md)) @cursor
+
 ## If there is time
 
 - [ ] Holder talk: a holder-only board (DECISIONS #15 leaves it for later)
