@@ -1,21 +1,93 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { formatEther } from "viem";
+import { formatEther, type Address } from "viem";
+import { getAccount, readContract } from "wagmi/actions";
 import { Bar } from "../components/CoinCard";
+import { contracts, hasLaunchpad } from "../lib/contracts";
+import { createReadProphetOf } from "../lib/launchpad";
+import { launchpadAbi } from "../lib/launchpadAbi";
 import {
+  canClaimCreatorFee,
   getProphetPage,
+  normalizeProphetLabel,
+  prophetPageFromChain,
   prophecyDetailPath,
   prophecyTradeLabel,
   type ProphetPageData,
   type ProphetProphecy,
 } from "../lib/prophetData";
-import { hasLaunchpad } from "../lib/contracts";
+import { wagmiConfig } from "../lib/wagmi";
 import { createClaim, writeErrorMessage, writePhaseCopy, WRITE_COPY, type WritePhase } from "../lib/writes";
 
-export function ProphetPage({ claimFee }: { claimFee?: () => Promise<unknown> } = {}) {
+export type ProphetPageProps = {
+  claimFee?: () => Promise<unknown>;
+  loadProphet?: (name: string) => Promise<ProphetPageData | null>;
+};
+
+async function loadOwnChainProphet(name: string): Promise<ProphetPageData | null> {
+  if (!hasLaunchpad() || !contracts.launchpad) return null;
+  const label = normalizeProphetLabel(name);
+  if (!label) return null;
+  let wallet: Address | undefined;
+  try {
+    wallet = getAccount(wagmiConfig).address;
+  } catch {
+    return null;
+  }
+  if (!wallet) return null;
+  try {
+    const onChain = await createReadProphetOf()(wallet);
+    if (!onChain || onChain.toLowerCase() !== label) return null;
+    let claimableFeeWei = 0n;
+    try {
+      const fee = await readContract(wagmiConfig, {
+        address: contracts.launchpad,
+        abi: launchpadAbi,
+        functionName: "creatorFeeOf",
+        args: [wallet],
+      });
+      if (typeof fee === "bigint") claimableFeeWei = fee;
+    } catch {
+      claimableFeeWei = 0n;
+    }
+    return prophetPageFromChain({ label, wallet, claimableFeeWei });
+  } catch {
+    return null;
+  }
+}
+
+export function ProphetPage({ claimFee, loadProphet }: ProphetPageProps = {}) {
   const { name = "" } = useParams();
-  const data = getProphetPage(name);
+  const chain = hasLaunchpad() || Boolean(loadProphet);
+  const mock = getProphetPage(name);
+  const [chainData, setChainData] = useState<ProphetPageData | null>(null);
+  const [chainReady, setChainReady] = useState(!chain);
+
+  useEffect(() => {
+    if (!chain) return;
+    let cancelled = false;
+    const run = loadProphet ?? loadOwnChainProphet;
+    void run(name)
+      .then((row) => {
+        if (cancelled) return;
+        setChainData(row);
+        setChainReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setChainData(null);
+        setChainReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chain, loadProphet, name]);
+
+  const data = chain ? (chainData ?? (chainReady ? mock : null)) : mock;
   if (!data) {
+    if (chain && !chainReady) {
+      return <main className="prophet-page stack" />;
+    }
     return (
       <main className="narrow">
         <section className="block">
@@ -28,14 +100,16 @@ export function ProphetPage({ claimFee }: { claimFee?: () => Promise<unknown> } 
       </main>
     );
   }
-  return <ProphetView data={data} claimFee={claimFee} />;
+  return <ProphetView data={data} chain={chain} claimFee={claimFee} />;
 }
 
 function ProphetView({
   data,
+  chain,
   claimFee,
 }: {
   data: ProphetPageData;
+  chain: boolean;
   claimFee?: () => Promise<unknown>;
 }) {
   const departed = data.prophecies.filter((p) => p.departed);
@@ -45,7 +119,7 @@ function ProphetView({
   const [phase, setPhase] = useState<WritePhase | null>(null);
   const [error, setError] = useState<string | null>(null);
   const feeWei = claimed ? 0n : data.claimableFeeWei;
-  const showClaim = Boolean(claimFee) || !hasLaunchpad();
+  const showClaim = canClaimCreatorFee(data, { chain, claimFee });
 
   return (
     <main className="prophet-page stack">

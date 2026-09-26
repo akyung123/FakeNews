@@ -141,14 +141,16 @@ export function CoinPage({
       </div>
 
       <aside className="stack side">
-        <TradeBox
-          coin={coin}
-          balance={s.balance}
-          held={pos?.tokens ?? 0}
-          chain={chain}
-          sendBuy={sendBuy}
-          sendSell={sendSell}
-        />
+        {!chain || isChainWriteTarget(coin) ? (
+          <TradeBox
+            coin={coin}
+            balance={s.balance}
+            held={pos?.tokens ?? 0}
+            chain={chain}
+            sendBuy={sendBuy}
+            sendSell={sendSell}
+          />
+        ) : null}
         {pos ? (
           <section className="block you-hold">
             <p className="faint small">You hold</p>

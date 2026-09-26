@@ -44,7 +44,7 @@ describe("chain-mode token detail", () => {
     expect(screen.queryByText("Prophecy not found")).toBeNull();
   });
 
-  it("hides write buttons and never sends for a mock coin", async () => {
+  it("hides the trade box and never sends for a mock coin", async () => {
     actions.reset();
     const sendBuy = vi.fn(async () => true);
     const sendSell = vi.fn(async () => true);
@@ -59,6 +59,10 @@ describe("chain-mode token detail", () => {
       </MemoryRouter>,
     );
     await waitFor(() => expect(screen.getByText(/venue Wi-Fi dies/i)).toBeInTheDocument());
+    expect(document.querySelector(".trade")).toBeNull();
+    expect(screen.queryByLabelText(/^Memo$/i)).toBeNull();
+    expect(screen.queryByText("Amount (ETH)")).toBeNull();
+    expect(screen.queryByText("Amount (% of holding)")).toBeNull();
     expect(screen.queryByRole("button", { name: /Buy \$WIFI/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /Sell \$WIFI/i })).toBeNull();
     expect(screen.queryByRole("button", { name: /Curve sold out/i })).toBeNull();

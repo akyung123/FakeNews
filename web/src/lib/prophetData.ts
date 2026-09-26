@@ -44,6 +44,8 @@ export type ProphetPageData = {
   prophecies: ProphetProphecy[];
   departedCount: number;
   claimableFeeWei: bigint;
+  /** Set when the page came from prophetOf / creatorFeeOf, not MOCK_PROPHETS. */
+  fromChain?: boolean;
 };
 
 export function prophetEnsName(label: string, parent = MOCK_PARENT_NAME): string {
@@ -141,6 +143,45 @@ export function normalizeProphetLabel(input: string, parent = MOCK_PARENT_NAME):
   }
   if (trimmed.includes(".")) return null;
   return trimmed;
+}
+
+export function prophetPageFromChain(input: {
+  label: string;
+  wallet: Address;
+  claimableFeeWei: bigint;
+  prophecies?: ProphetProphecy[];
+  parentName?: string;
+}): ProphetPageData {
+  const prophecies = input.prophecies ?? [];
+  return {
+    prophet: {
+      label: input.label,
+      ensName: prophetEnsName(input.label, input.parentName),
+      wallet: input.wallet,
+    },
+    prophecies,
+    departedCount: prophecies.filter((p) => p.departed).length,
+    claimableFeeWei: input.claimableFeeWei,
+    fromChain: true,
+  };
+}
+
+/** Mock seed prophets (ringo / mina) — never a claimCreatorFee target in chain mode. */
+export function isMockProphetRecord(data: Pick<ProphetPageData, "fromChain" | "prophet">): boolean {
+  if (data.fromChain) return false;
+  const label = data.prophet.label.toLowerCase();
+  const wallet = data.prophet.wallet.toLowerCase();
+  return MOCK_PROPHETS.some((row) => row.label === label || row.wallet.toLowerCase() === wallet);
+}
+
+/** Chain mode hides claim on mock rows; a live own page still sends claimCreatorFee. */
+export function canClaimCreatorFee(
+  data: Pick<ProphetPageData, "fromChain" | "prophet">,
+  options: { chain?: boolean; claimFee?: unknown } = {},
+): boolean {
+  if (options.claimFee) return true;
+  if (!options.chain) return true;
+  return !isMockProphetRecord(data);
 }
 
 /**
