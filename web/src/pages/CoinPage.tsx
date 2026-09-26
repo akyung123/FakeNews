@@ -170,7 +170,7 @@ function PostBox({ coinId, holds }: { coinId: string; holds: boolean }) {
 function curveProgressHeader(coin: Coin): string {
   const pctFilled = Math.round(progress(coin) * 100);
   const raised = (pctFilled / 100) * GRADUATION_ETH;
-  return `${pctFilled}% ${raised.toFixed(4)} / ${GRADUATION_ETH} ETH`;
+  return `${pctFilled}% ${raised.toFixed(4)} of ${GRADUATION_ETH} ETH to graduate`;
 }
 
 function Sparkline({ coin }: { coin: Coin }) {
