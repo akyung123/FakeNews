@@ -90,6 +90,7 @@ export function IssueScreen({
         onSubmit={(e) => {
           e.preventDefault();
           if (!canLaunch) return;
+          if (!returningProphet && !verified) return;
           const id = actions.create({
             prophecy: prophecy.trim(),
             name: slug,
@@ -187,9 +188,6 @@ export function IssueScreen({
         </button>
         {!returningProphet && worldStatus !== "success" ? (
           <p className="faint small">The issue button stays off until World verification succeeds.</p>
-        ) : null}
-        {verified && !returningProphet ? (
-          <p className="faint small">Nullifier ready for registerProphet when the launchpad is wired.</p>
         ) : null}
       </form>
     </main>
