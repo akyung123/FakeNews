@@ -90,6 +90,73 @@ describe("verifyAndSign", () => {
     }
   });
 
+  test("pinned context: matching chainId and launchpad still signs", async () => {
+    const config = testConfig({
+      chainId: SEPOLIA_CHAIN_ID,
+      launchpad: "0x1111111111111111111111111111111111111111",
+    });
+    const result = await verifyAndSign(
+      config,
+      verifyBody({ launchpad: "0x1111111111111111111111111111111111111111" }),
+      okPortal(),
+    );
+    expect(result.nullifier).toBe(FIXTURE_NULLIFIER);
+  });
+
+  test("pinned context: launchpad match is case-insensitive", async () => {
+    const config = testConfig({
+      launchpad: "0xAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAa",
+    });
+    const result = await verifyAndSign(
+      config,
+      verifyBody({ launchpad: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }),
+      okPortal(),
+    );
+    expect(result.nullifier).toBe(FIXTURE_NULLIFIER);
+  });
+
+  test("pinned chainId mismatch is context_mismatch and skips Portal", async () => {
+    let called = false;
+    const portal: PortalClient = {
+      async verify() {
+        called = true;
+        return { success: true, nullifier: FIXTURE_NULLIFIER };
+      },
+    };
+
+    try {
+      await verifyAndSign(testConfig({ chainId: 1n }), verifyBody(), portal);
+      throw new Error("expected context_mismatch");
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).code).toBe("context_mismatch");
+    }
+    expect(called).toBe(false);
+  });
+
+  test("pinned launchpad mismatch is context_mismatch and skips Portal", async () => {
+    let called = false;
+    const portal: PortalClient = {
+      async verify() {
+        called = true;
+        return { success: true, nullifier: FIXTURE_NULLIFIER };
+      },
+    };
+
+    try {
+      await verifyAndSign(
+        testConfig({ launchpad: "0x3333333333333333333333333333333333333333" }),
+        verifyBody(),
+        portal,
+      );
+      throw new Error("expected context_mismatch");
+    } catch (error) {
+      expect(error).toBeInstanceOf(HttpError);
+      expect((error as HttpError).code).toBe("context_mismatch");
+    }
+    expect(called).toBe(false);
+  });
+
   test("malformed payload is rejected", () => {
     const cases: unknown[] = [
       null,
