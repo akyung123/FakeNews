@@ -5,7 +5,7 @@ import { App } from "./App";
 import { Web3Provider } from "./providers/Web3Provider";
 import "./styles.css";
 
-// Vite BASE_URL is `/` or `/Prophecy/`. React Router matching wants no trailing slash.
+// Vite BASE_URL is `/` locally or `/<repo>/` on GitHub Pages. React Router matching wants no trailing slash.
 function routerBasename(baseUrl: string): string {
   const trimmed = baseUrl.replace(/\/+$/, "");
   return trimmed === "" ? "/" : trimmed;
