@@ -92,6 +92,21 @@ describe("http", () => {
     expect(body.error).toBe("malformed_payload");
   });
 
+  test("POST /verify rejects a pinned context mismatch", async () => {
+    const response = await createHandler(
+      testConfig({ chainId: 1n }),
+    )(
+      new Request("http://world.test/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(verifyBody()),
+      }),
+    );
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe("context_mismatch");
+  });
+
   test("GET /health reports the signer address", async () => {
     const response = await handle(new Request("http://world.test/health"));
     expect(response.status).toBe(200);
