@@ -2,7 +2,9 @@ import { useState } from "react";
 import { sepolia } from "wagmi/chains";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { ensureSepoliaChain } from "../lib/cca/sepolia";
+import { eth } from "../lib/format";
 import { isCcaDemoMode } from "../lib/mode";
+import { useEthBalance } from "../lib/useWalletBalance";
 
 function shortAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
@@ -13,6 +15,7 @@ export function WalletButton() {
   const { address, isConnected, chainId } = useAccount();
   const { connectors, connect, isPending } = useConnect();
   const { disconnect } = useDisconnect();
+  const ethBalance = useEthBalance();
   const [switching, setSwitching] = useState(false);
   const onSepolia = chainId === sepolia.id;
   const injected = connectors.find((c) => c.id === "injected") ?? connectors[0];
@@ -49,7 +52,10 @@ export function WalletButton() {
       <p className="faint small">Wallet</p>
       <p className="strong">{shortAddress(address)}</p>
       {onSepolia ? (
-        <p className="faint small">Ethereum Sepolia</p>
+        <>
+          <p className="faint small">Ethereum Sepolia</p>
+          {ethBalance != null ? <p className="small">{eth(ethBalance)}</p> : null}
+        </>
       ) : (
         <button
           type="button"
