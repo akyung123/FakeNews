@@ -51,11 +51,12 @@ const REMOVED = [
 const SIGNED_PCT = /[+-]\d+(?:\.\d+)?%/;
 
 function renderApp(path: string): string {
-  return renderToStaticMarkup(
+  const html = renderToStaticMarkup(
     <MemoryRouter initialEntries={[path]}>
       <App />
     </MemoryRouter>,
   );
+  return html.replace(/&#x27;/g, "'").replace(/&apos;/g, "'");
 }
 
 function assertRemoved(html: string) {
