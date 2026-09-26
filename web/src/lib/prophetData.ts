@@ -12,6 +12,7 @@
  */
 import { CURVE_SUPPLY as PROTOTYPE_CURVE_SUPPLY } from "./curve";
 import { mockEnsAddress, mockEnsText, parseDeadlineText, ENS_TEXT_DEADLINE, ENS_TEXT_PROPHECY } from "./ens";
+import { isMockMode } from "./mode";
 import { GRADUATION_ETH, MOCK_PARENT_NAME, MOCK_PROPHETS, MOCK_PROPHECIES } from "./mock";
 import { marketCap, type Coin } from "./store";
 
@@ -89,8 +90,15 @@ export function getProphecyByName(name: string, nowSec = Math.floor(Date.now() /
 /**
  * Prototype Screen 3 (`CoinPage`) still reads a localStorage coin.
  * Map a name from this read interface onto that shape so `/n/:name` is not blank.
+ * Mock only. Chain-mode list and curve reads belong to the FE C PR.
  */
-export function prototypeCoinFromName(name: string, nowSec?: number): Coin | null {
+export function prototypeCoinFromName(
+  name: string,
+  nowSec?: number,
+  options?: { mock?: boolean },
+): Coin | null {
+  const mock = options?.mock ?? isMockMode();
+  if (!mock) return null;
   const p = getProphecyByName(name, nowSec);
   if (!p) return null;
   const sold = p.complete ? PROTOTYPE_CURVE_SUPPLY : Number(p.sold / 10n ** 18n);
