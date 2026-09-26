@@ -38,7 +38,7 @@ describe("world client", () => {
   it("maps world/ verify error codes and never treats unknown codes as portal_rejected", () => {
     expect(worldErrorKindFromServerCode("portal_rejected")).toBe("portal_rejected");
     expect(worldErrorKindFromServerCode("malformed_payload")).toBe("malformed_payload");
-    expect(worldErrorKindFromServerCode("context_mismatch")).toBe("network");
+    expect(worldErrorKindFromServerCode("context_mismatch")).toBe("malformed_payload");
     expect(worldErrorKindFromServerCode("nope")).toBe("network");
   });
 
@@ -129,6 +129,22 @@ describe("world client", () => {
     });
     await client.checkHealth();
     expect(seen[0]).toBe(`${DEFAULT_WORLD_SERVER_URL}/health`);
+  });
+
+  it("maps context_mismatch to the same kind and retry sentence as malformed_payload", async () => {
+    expect(worldErrorKindFromServerCode("context_mismatch")).toBe("malformed_payload");
+    const client = createWorldClient({
+      mock: false,
+      serverUrl: "http://world.test",
+      launchpad: MOCK_WORLD_LAUNCHPAD,
+      fetch: async () => new Response(JSON.stringify({ error: "context_mismatch" }), { status: 400 }),
+    });
+    await expect(
+      client.verifyProof({
+        wallet: "0x2222222222222222222222222222222222222222",
+        idkitResponse: MOCK_IDKIT_RESULT,
+      }),
+    ).rejects.toMatchObject({ kind: "malformed_payload", message: "World verification failed" });
   });
 
   it("throws a typed WorldClientError for portal_rejected and malformed_payload", async () => {

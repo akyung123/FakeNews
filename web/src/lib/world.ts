@@ -14,7 +14,7 @@ import {
  * Thin World ID client. Mock by default (`VITE_WORLD_MOCK` is not `0`/`false`).
  * Live HTTP matches world/ PR #10 and INTERFACE §3:
  *   GET  {serverUrl}/rp-context  → IDKit 4 { app_id, action, environment, rp_context }
- *   POST {serverUrl}/verify      → Portal v4; errors portal_rejected / malformed_payload
+ *   POST {serverUrl}/verify      → Portal v4; errors portal_rejected / malformed_payload / context_mismatch
  *   GET  {serverUrl}/health
  * Default server URL is http://localhost:8787.
  * Live GET /rp-context and POST /verify wait up to 60s (sleeping World server).
@@ -161,7 +161,7 @@ export function worldStatusFromIdKitError(code: string): "cancelled" | "failed" 
 
 export function worldErrorKindFromServerCode(code: unknown): WorldErrorKind {
   if (code === "portal_rejected") return "portal_rejected";
-  if (code === "malformed_payload") return "malformed_payload";
+  if (code === "malformed_payload" || code === "context_mismatch") return "malformed_payload";
   return "network";
 }
 

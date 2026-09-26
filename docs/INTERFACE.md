@@ -115,7 +115,7 @@ The web app never holds the RP signing key. HTTP matches `world/` (PR #10, now o
 }
 ```
 
-`idkitResponse` is the IDKit 4 result, forwarded as-is (`proof` is an accepted alias on the server). On success:
+`idkitResponse` is the IDKit 4 result, forwarded as-is (`proof` is an accepted alias on the server). Verify errors: `portal_rejected`, `malformed_payload`, `context_mismatch` — the last two share the retry sentence. On success:
 
 ```json
 { "nullifier": "0x<uint256>", "serverSig": "0x<eip191>" }

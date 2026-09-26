@@ -126,6 +126,7 @@ describe("designer World copy mapping", () => {
     );
     expect(worldUserMessage("network")).toBe("Something went wrong with the check. Please try again.");
     expect(worldUserMessage("malformed_payload")).not.toMatch(/malformed_payload/);
+    expect(worldUserMessage("malformed_payload")).not.toMatch(/context_mismatch/);
   });
 
   it("maps a Launchpad nullifier reuse revert to one-human-one-name", () => {
