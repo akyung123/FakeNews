@@ -7,13 +7,13 @@ export function CreatePage() {
   const [prophecy, setProphecy] = useState("");
   const [name, setName] = useState("");
   const [ticker, setTicker] = useState("");
-  const [firstBuy, setFirstBuy] = useState("0.05");
+  const [firstBuy, setFirstBuy] = useState("0.001");
   const ready = prophecy.trim() && name.trim() && ticker.trim();
 
   return (
     <main className="narrow stack">
       <h1>Write a prophecy</h1>
-      <p className="faint">It launches as a coin right away. The more it comes true, the more it's worth.</p>
+      <p className="faint">It launches as a coin right away. Buying raises the price and selling lowers it.</p>
       <form
         className="block create"
         onSubmit={(e) => {
