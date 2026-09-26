@@ -117,11 +117,12 @@ export async function loadLaunchedCoins(options: LoadLaunchedOptions = {}): Prom
       let next = { ...coin };
       if (token) {
         try {
-          const curve = options.readCurve
-            ? await options.readCurve(token)
-            : client.readContract
-              ? await readCurveView(token, client)
+          const read = options.readCurve
+            ? options.readCurve
+            : typeof client.readContract === "function"
+              ? (t: Address) => readCurveView(t, { readContract: client.readContract as PublicClient["readContract"] })
               : null;
+          const curve = read ? await read(token) : null;
           if (curve) {
             next = { ...next, sold: curve.sold, ethRaised: curve.ethRaised, complete: curve.complete };
           }
