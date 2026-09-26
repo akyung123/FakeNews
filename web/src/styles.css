@@ -307,7 +307,30 @@ input:focus, textarea:focus { outline: none; border-color: var(--gold-300); }
 /* prophecy detail — gold Buy / navy Sell, no red */
 .coin-page { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
 .side { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); }
-.coin-name { font-weight: 700; }
+.coin-name { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 10px; }
+.token-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.token-slug { font-weight: 700; font-size: 18px; line-height: 1.2; }
+.coin-id .token-slug { font-size: 22px; }
+.token-ens {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.token-copy { font-size: 12px; font-weight: 600; }
+.launch .token-slug,
+.featured .token-slug {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--gold-ink);
+}
+.launch .token-ens,
+.featured .token-ens { color: var(--paper-muted); }
+.prophet-card .token-slug { font-size: 16px; }
 .prophecy-title {
   margin: 14px 0 12px;
   font-family: var(--font-display);

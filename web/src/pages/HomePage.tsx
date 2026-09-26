@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { CommentItem } from "../components/CommentItem";
 import { SampleBadge } from "../components/SampleBadge";
+import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { graduated, progress } from "../lib/curve";
 import { ago, gwei } from "../lib/format";
 import { isMockMode } from "../lib/mode";
@@ -30,7 +31,7 @@ export function HomePage() {
               <p className="featured-kicker">Closest to graduation</p>
               <p className="featured-text">{featured.prophecy}</p>
               <div className="featured-meta">
-                <span className="launch-ticker">${featured.ticker}</span>
+                <TokenName {...tokenDisplayName(featured)} />
                 <span className="strong">Price {gwei(price(featured))}</span>
                 <span className="faint small">{ago(featured.createdAt)}</span>
               </div>
@@ -90,7 +91,7 @@ function LaunchCard({ coin, talk }: { coin: Coin; talk: number }) {
   return (
     <Link className="launch" to={`/coin/${coin.id}`}>
       <div className="launch-head">
-        <span className="launch-ticker">${coin.ticker}</span>
+        <TokenName {...tokenDisplayName(coin)} />
         <span className="faint small">{ago(coin.createdAt)}</span>
       </div>
       <p className="launch-text">{coin.prophecy}</p>

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
 import { SampleBadge } from "../components/SampleBadge";
+import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { graduated, progress, quoteBuy, quoteSell, TOTAL_SUPPLY } from "../lib/curve";
 import { ago, eth, gwei, tokens } from "../lib/format";
 import { isMockMode } from "../lib/mode";
@@ -43,9 +44,10 @@ export function CoinPage() {
         <section className="block">
           <div className="coin-id">
             <div>
-              <p className="coin-name">
-                {coin.name} <span className="faint">${coin.ticker}</span> <SampleBadge />
-              </p>
+              <div className="coin-name">
+                <TokenName {...tokenDisplayName(coin)} copy />
+                <SampleBadge />
+              </div>
               <p className="faint small">
                 by {coin.creator} · {ago(coin.createdAt)}
               </p>

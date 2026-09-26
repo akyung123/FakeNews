@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { SampleBadge } from "../components/SampleBadge";
+import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { price, quoteSell } from "../lib/curve";
 import { eth, gwei, tokens } from "../lib/format";
 import { isMockMode } from "../lib/mode";
@@ -74,7 +75,7 @@ export function MyPage() {
                   <span className="cell-coin">
                     <span className="cell-coin-text">
                       <span className="row-title">{coin.prophecy}</span>
-                      <span className="row-sub">${coin.ticker}</span>
+                      <TokenName {...tokenDisplayName(coin)} />
                     </span>
                   </span>
                   <span className="num col-mid">{tokens(pos.tokens)}</span>

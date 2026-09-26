@@ -97,6 +97,9 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(empty).toContain("Trade memos");
     expect(empty).toContain("Curve progress");
     expect(empty).toContain("0% 0.0000 of 0.02 ETH to graduate");
+    expect(empty).toContain("curve-out");
+    expect(empty).toContain("curve-out.ringo.prophecy.eth");
+    expect(empty).toContain("Copy");
     expect(empty).not.toContain("0.93 ETH");
     assertRemoved(empty);
 
@@ -124,6 +127,7 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(home).not.toContain("Market cap");
     expect(home).not.toContain("holders");
     expect(home).not.toContain(">Prophet<");
+    expect(home).not.toContain(">Copy<");
     assertRemoved(home);
   });
 
@@ -193,6 +197,7 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(profile).toContain("ringo.prophecy.eth");
     expect(profile).not.toContain(">Prophet<");
     expect(profile).not.toContain("holder share");
+    expect(profile).not.toContain(">Copy<");
     assertRemoved(profile);
   });
 });

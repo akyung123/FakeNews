@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatEther } from "viem";
 import { Bar } from "../components/CoinCard";
+import { TokenName } from "../components/TokenName";
 import {
   getProphetPage,
   prophecyDetailPath,
@@ -118,8 +119,7 @@ function ProphetView({ data }: { data: ProphetPageData }) {
               <Link key={row.ensName} className="tr" role="row" to={prophecyDetailPath(row.ensName)}>
                 <span className="cell-coin">
                   <span className="cell-coin-text">
-                    <span className="row-title">{row.ensName}</span>
-                    <span className="row-sub">{row.slug}</span>
+                    <TokenName slug={row.slug} ensName={row.ensName} />
                   </span>
                 </span>
                 <span className="prophet-sentence">{row.sentence}</span>
@@ -151,7 +151,7 @@ function ProphecyCard({ row }: { row: ProphetProphecy }) {
   const label = prophecyTradeLabel(row);
   return (
     <article className="prophet-card">
-      <p className="row-sub">{row.ensName}</p>
+      <TokenName slug={row.slug} ensName={row.ensName} />
       <p className="prophet-card-sentence">{row.sentence}</p>
       <Status row={row} />
       <p className="faint small mono" title={row.token}>
