@@ -37,10 +37,15 @@ Sending is opt-in (`--broadcast` on the wrapper) and needs `DEPLOYER_PRIVATE_KEY
 | Deployer key (person, local) | `DEPLOYER_PRIVATE_KEY` |
 | Protocol fee recipient (TBD) | `PROTOCOL_FEE_RECIPIENT` |
 | World Portal app / action / RP id | `VITE_WORLD_APP_ID`, `VITE_WORLD_ACTION`, `VITE_WORLD_RP_ID`, `WORLD_APP_ID`, `WORLD_ACTION`, `WORLD_RP_ID` |
+| World server URL (web) | `VITE_WORLD_SERVER_URL` |
 | World server keys (local) | `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` |
+| World server optional | `WORLD_ENVIRONMENT`, `WORLD_PORTAL_URL`, `PORT` |
 | Launchpad signer address | `WORLD_SIGNER` |
 | Parent label + commit secret | `PARENT_LABEL`, `ENS_REGISTRATION_SECRET`, `ENS_DURATION_SECONDS` |
 | After Launchpad exists | `LAUNCHPAD_ADDRESS`, `PARENT_USER_REGISTRY` |
+| Upcoming web contracts / wallet | `VITE_HOOK_ADDRESS`, `VITE_LOCKER_ADDRESS`, `VITE_WALLETCONNECT_PROJECT_ID` |
+
+This repo has one `.env.example` (this lane). Do not add `world/.env.example`. Other lanes list new names in their PR bodies and infra collects them here.
 
 ## `prophecy.eth` runbook
 
