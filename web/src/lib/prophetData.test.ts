@@ -67,11 +67,12 @@ describe("getProphetPage", () => {
     const open = page.prophecies.filter((p) => !p.departed);
     expect(page.departedCount).toBe(2);
     expect(departed.map((p) => p.slug).sort()).toEqual(["last-talk", "two-min"]);
-    expect(open.map((p) => p.slug).sort()).toEqual(["badges-2028", "curve-out"]);
-    const graduated = page.prophecies.find((p) => p.complete)!;
-    expect(graduated.slug).toBe("two-min");
-    expect(graduated.departed).toBe(true);
-    expect(graduated.curveProgress).toBe(1);
+    expect(open.map((p) => p.slug).sort()).toEqual(["badges-2028", "curve-out", "sold-out"]);
+    const graduated = page.prophecies.filter((p) => p.complete).map((p) => p.slug).sort();
+    expect(graduated).toEqual(["sold-out", "two-min"]);
+    expect(page.prophecies.find((p) => p.slug === "two-min")!.departed).toBe(true);
+    expect(page.prophecies.find((p) => p.slug === "sold-out")!.departed).toBe(false);
+    expect(page.prophecies.find((p) => p.slug === "sold-out")!.curveProgress).toBe(1);
   });
 
   test("returns null for an unknown prophet", () => {

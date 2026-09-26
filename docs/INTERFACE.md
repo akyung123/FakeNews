@@ -174,8 +174,9 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
    - sentence: `getEnsText(name, "prophecy")`
    - deadline: `getEnsText(name, "deadline")`
 3. Price and progress: `curve(token)`.
-4. Chart and trade memos: `Trade` logs.
-5. Name next to a wallet: reverse lookup, falling back to `prophetOf(wallet)`.
+4. Graduation: `curve(token).complete` on load. Watch `Graduated` so the trade panel flips during a live last buy. There is no `getState`. The Uniswap link uses `Graduated.poolId` (V4 `PoolId`). If the event is not in hand yet, reconstruct the key: native ETH (`address(0)`), `token`, fee `10000`, tickSpacing `200`, `hooks` from the event or `launchpad.hook()`.
+5. Chart and trade memos: `Trade` logs.
+6. Name next to a wallet: reverse lookup, falling back to `prophetOf(wallet)`.
 
 ## 5. Environment variables
 

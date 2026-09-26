@@ -4,7 +4,8 @@ Who reads what. Nobody needs to read everything.
 
 | Who | First | Then |
 |-----|-------|------|
-| New person or agent | [`../AGENTS.md`](../AGENTS.md) | [`SPEC.md`](SPEC.md) |
+| New teammate, not a developer | [`PRD.md`](PRD.md) | [`../README.md`](../README.md) "Status" |
+| New person or agent | [`../AGENTS.md`](../AGENTS.md) | [`PRD.md`](PRD.md), [`SPEC.md`](SPEC.md) |
 | Contracts | [`INTERFACE.md`](INTERFACE.md) | [`ENSV2.md`](ENSV2.md), [`PLAN.md`](PLAN.md) sections 1–2 |
 | Web | [`INTERFACE.md`](INTERFACE.md) | [`PLAN.md`](PLAN.md) section 3 |
 | World server | [`INTERFACE.md`](INTERFACE.md) | [`PLAN.md`](PLAN.md) section 4 |
@@ -12,6 +13,6 @@ Who reads what. Nobody needs to read everything.
 
 ## Rules
 
-- Design goes in SPEC, contracts between folders in INTERFACE, reasons in DECISIONS, tasks in PLAN. Do not repeat content across files; link instead.
+- What and why (users, goals, scope) goes in PRD, design in SPEC, contracts between folders in INTERFACE, reasons in DECISIONS, tasks in PLAN. Do not repeat content across files; link instead.
 - Everything in this repo is written in English: Markdown, code comments, commit messages, PR descriptions.
 - Reasons are product reasons: what a choice does for users or for the system.
