@@ -37,6 +37,11 @@ Transactions on the deployed Launchpad. Each link opens Sepolia Etherscan; a ste
 
 Launch costs ~5.35M gas (token + ENS subname + CCA auction + LBP strategy in one tx), paid as network gas only; no protocol fee on launch. Mainnet plan: L2 deploy and minimal-proxy clones.
 
+### Trust assumptions
+
+- The `prophecy.eth` owner still holds `SET_SUBREGISTRY` and `REGISTRAR` on the parent, to be revoked after the hackathon. Until then that wallet could point `prophecy.eth` at another registry or register a prophet name without World ID. Details in [Invariants & trust assumptions](#invariants--trust-assumptions).
+- Prophet registration requires an Orb-level World ID: one prophet name per verified human.
+
 ## How it works
 
 ```text
