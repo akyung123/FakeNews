@@ -29,7 +29,8 @@ export type WorldErrorKind =
   | "portal_rejected"
   | "malformed_payload"
   | "network"
-  | "nullifier_reuse";
+  | "nullifier_reuse"
+  | "already_verified";
 
 export class WorldClientError extends Error {
   readonly kind: WorldErrorKind;
@@ -108,6 +109,8 @@ export type WorldClientOptions = {
 };
 
 const CANCELLED_CODES = new Set(["cancelled", "user_rejected", "verification_rejected"]);
+/** World App refuses a second uniqueness proof for the same action from the same person. */
+const ALREADY_VERIFIED_CODES = new Set(["nullifier_replayed", "max_verifications_reached"]);
 const SEPOLIA_CHAIN_ID = 11_155_111;
 
 /** First check can take a minute when the World server has been idle. */
@@ -148,7 +151,9 @@ export function isWorldMockEnabled(value = import.meta.env.VITE_WORLD_MOCK): boo
 }
 
 export function worldErrorKindFromIdKit(code: string): WorldErrorKind {
-  return CANCELLED_CODES.has(code) ? "cancelled" : "network";
+  if (CANCELLED_CODES.has(code)) return "cancelled";
+  if (ALREADY_VERIFIED_CODES.has(code)) return "already_verified";
+  return "network";
 }
 
 export function worldStatusFromKind(kind: WorldErrorKind): "cancelled" | "failed" {

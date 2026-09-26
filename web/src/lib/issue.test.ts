@@ -128,6 +128,8 @@ describe("designer World copy mapping", () => {
       "Something went wrong with the check. Please try again.",
     );
     expect(worldUserMessage("network")).toBe("Something went wrong with the check. Please try again.");
+    expect(worldUserMessage("already_verified")).toBe(ISSUE_COPY.alreadyVerified);
+    expect(ISSUE_COPY.alreadyVerified).not.toMatch(/try again/i);
     expect(worldUserMessage("malformed_payload")).not.toMatch(/malformed_payload/);
     expect(worldUserMessage("malformed_payload")).not.toMatch(/context_mismatch/);
   });

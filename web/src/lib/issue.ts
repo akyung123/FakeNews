@@ -36,6 +36,8 @@ export const ISSUE_COPY = {
   portalRejected: "World ID couldn't confirm this check. Try again in World App.",
   checkFailed: "Something went wrong with the check. Please try again.",
   nullifierReuse: "This human already has a prophet name. One human, one name.",
+  alreadyVerified:
+    "This World ID was already used to claim a prophet name. Connect the wallet you claimed it with. World ID is not asked again for that wallet.",
   step1: "Step 1 of 2",
   step2: "Step 2 of 2",
   oneTransaction: "One transaction",
@@ -142,6 +144,7 @@ export function worldUserMessage(kind: WorldErrorKind | null | undefined): strin
   if (kind === "cancelled") return ISSUE_COPY.cancelled;
   if (kind === "portal_rejected") return ISSUE_COPY.portalRejected;
   if (kind === "nullifier_reuse") return ISSUE_COPY.nullifierReuse;
+  if (kind === "already_verified") return ISSUE_COPY.alreadyVerified;
   return ISSUE_COPY.checkFailed;
 }
 

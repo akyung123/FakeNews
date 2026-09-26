@@ -9,7 +9,13 @@ import { IssueScreen } from "./CreatePage";
 const calls = vi.hoisted(() => ({ created: 0, health: 0, signals: [] as string[] }));
 
 vi.mock("@worldcoin/idkit", () => ({
-  IDKitRequestWidget: () => <div data-testid="idkit-widget" />,
+  IDKitRequestWidget: ({ onError }: { onError: (code: string) => void }) => (
+    <div data-testid="idkit-widget">
+      <button type="button" onClick={() => onError("nullifier_replayed")}>
+        World App refuses
+      </button>
+    </div>
+  ),
   proofOfHuman: ({ signal }: { signal: string }) => {
     calls.signals.push(signal);
     return {};
@@ -62,5 +68,19 @@ describe("Screen 2 live World ID", () => {
     // The proof is bound to the same wallet that later sends registerProphet.
     expect(calls.signals.length).toBeGreaterThan(0);
     expect(new Set(calls.signals)).toEqual(new Set([MOCK_ISSUE_SESSION.wallet]));
+  });
+
+  it("tells a person whose World ID was already used to connect the wallet that holds the name", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <IssueScreen session={MOCK_ISSUE_SESSION} lookupProphet={async () => ""} />
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: ISSUE_COPY.prove }));
+    await user.click(await screen.findByRole("button", { name: "World App refuses" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(ISSUE_COPY.alreadyVerified));
+    expect(screen.getByRole("alert")).not.toHaveTextContent(ISSUE_COPY.checkFailed);
+    expect(document.body.textContent).not.toContain("nullifier_replayed");
   });
 });

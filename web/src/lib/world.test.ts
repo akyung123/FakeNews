@@ -36,6 +36,10 @@ describe("world client", () => {
     expect(worldErrorKindFromIdKit("user_rejected")).toBe("cancelled");
     expect(worldErrorKindFromIdKit("verification_rejected")).toBe("cancelled");
     expect(worldErrorKindFromIdKit("generic_error")).toBe("network");
+    // World App refuses a second proof for the same action from the same person.
+    expect(worldErrorKindFromIdKit("nullifier_replayed")).toBe("already_verified");
+    expect(worldErrorKindFromIdKit("max_verifications_reached")).toBe("already_verified");
+    expect(worldStatusFromIdKitError("nullifier_replayed")).toBe("failed");
     expect(worldStatusFromIdKitError("cancelled")).toBe("cancelled");
     expect(worldStatusFromIdKitError("generic_error")).toBe("failed");
   });
