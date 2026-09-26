@@ -73,6 +73,8 @@ if [[ "${args[0]}" == *Deploy.s.sol* ]]; then
   echo "After a send, paste onto Render and restart:" >&2
   echo "  WORLD_CHAIN_ID=11155111" >&2
   echo "  WORLD_LAUNCHPAD_ADDRESS=<PasteIntoRender line from the log>" >&2
+  echo "  worldSigner address: <from the log — address only>" >&2
+  echo "  WORLD_SIGNER_KEY: paste from local new-world-signer.sh only. Never print it here or in CI." >&2
 fi
 
 exec "${cmd[@]}"
