@@ -10,7 +10,9 @@ import {
   CCA_LAUNCH_ERROR_MESSAGE,
   CCA_LAUNCH_ERROR_NAMES,
   CCA_MIGRATE_ERROR_COPY,
+  CCA_SWAP_ERROR_COPY,
   FEE_COLLECT_COPY,
+  SWAP_CANCELED_COPY,
   SWAP_SECTION_COPY,
   auctionLiveCopy,
   auctionStatusCopy,
@@ -26,6 +28,7 @@ import {
   openMarketBeforeCopy,
   raisedProgressCopy,
   refundUnusedCopy,
+  swapErrorCopy,
   swapSectionCopy,
   yourBidCopy,
 } from "./copy";
@@ -222,10 +225,36 @@ describe("designer FINAL CCA copy", () => {
     ).toEqual({ claim: false, openMarket: false, exit: true });
   });
 
-  test("leaves swap section and fee collect TBD", () => {
-    expect(SWAP_SECTION_COPY).toBe(INTERFACE_CCA_TBD);
+  test("has INTERFACE_CCA 7.10 swap copy, and leaves fee collect TBD", () => {
+    expect(SWAP_SECTION_COPY.title).toBe("Swap");
+    expect(SWAP_SECTION_COPY.beforePoolOpen).toBe("Swapping opens when the market opens.");
+    expect(SWAP_SECTION_COPY.feeNote).toBe(
+      "Pool fee 1%. Fees are split 24% to the prophet and 76% to the protocol.",
+    );
+    expect(SWAP_SECTION_COPY.allowHelp).toBe("One-time step before your first sale of this token.");
+
+    const filled = swapSectionCopy({ symbol: "LINGO", amount: "12.5", minAmount: "12.0" });
+    expect(filled.buyCta).toBe("Buy LINGO");
+    expect(filled.buyOutput).toBe("You get about 12.5 LINGO");
+    expect(filled.buyMinimum).toBe("At least 12.0 LINGO");
+    expect(filled.sellField).toBe("You sell (LINGO)");
+    expect(filled.allowCta).toBe("Allow Uniswap to use your LINGO");
+    expect(filled.confirmCta).toBe("Confirm LINGO for this sale");
+    expect(filled.notEnoughToken).toBe("Not enough LINGO.");
+    expect(swapSectionCopy({ n: 1, total: 2 }).stepCounter).toBe("Step 1 of 2");
+
+    expect(swapErrorCopy("V4TooLittleReceived")).toBe(
+      "The price moved before your swap went through. Try again.",
+    );
+    expect(swapErrorCopy("InsufficientAllowance", "LINGO")).toBe(
+      "Confirm LINGO for this sale again, then sell.",
+    );
+    expect(swapErrorCopy("PoolNotInitialized")).toBe("Swapping opens when the market opens.");
+    expect(swapErrorCopy("NotAnError")).toBeUndefined();
+    expect(SWAP_CANCELED_COPY).toBe("Swap canceled.");
+
     expect(FEE_COLLECT_COPY).toBe(INTERFACE_CCA_TBD);
-    expect(() => swapSectionCopy()).toThrow(InterfaceCcaPendingError);
+    expect(() => feeCollectCopy()).toThrow(InterfaceCcaPendingError);
     expect(() => feeCollectCopy()).toThrow(/fee collect copy/);
   });
 
@@ -233,6 +262,9 @@ describe("designer FINAL CCA copy", () => {
     const joined = [
       ...Object.values(CCA_COPY),
       ...Object.values(CCA_ERROR_COPY),
+      ...Object.values(SWAP_SECTION_COPY),
+      ...Object.values(CCA_SWAP_ERROR_COPY),
+      SWAP_CANCELED_COPY,
     ]
       .join(" ")
       .toLowerCase();

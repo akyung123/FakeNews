@@ -1,7 +1,4 @@
-/**
- * Additive CCA auction library. Do not import this from existing pages
- * or components — PR 1 has no UI wiring.
- */
+/** CCA auction library: reads, writes and copy for the auction and the v4 pool. */
 export { ccaAbi } from "./abi/cca";
 export { ccaLensAbi } from "./abi/ccaLens";
 export { lbpStrategyAbi } from "./abi/lbpStrategy";
@@ -61,13 +58,23 @@ export {
   openMarketBeforeCopy,
   raisedProgressCopy,
   refundUnusedCopy,
+  swapErrorCopy,
   swapSectionCopy,
   yourBidCopy,
+  CCA_SWAP_ERROR_COPY,
+  SWAP_CANCELED_COPY,
   type AuctionCopyStatus,
   type CcaErrorCopyVars,
   type CcaOfficialErrorName,
 } from "./copy";
-export { ccaErrorCopyFor, ccaUserMessage, errorText, mapCcaError, type CcaErrorKind } from "./errors";
+export {
+  ccaErrorCopyFor,
+  ccaUserMessage,
+  errorText,
+  mapCcaError,
+  swapErrorCopyFor,
+  type CcaErrorKind,
+} from "./errors";
 export {
   auctionActionVisibility,
   auctionScheduleRequest,
@@ -99,13 +106,19 @@ export {
 } from "./exit";
 export { openMarket, openMarketWrite } from "./migrate";
 export {
+  UNIVERSAL_ROUTER,
+  approvePermit2Write,
   encodeV4ExactInSingle,
+  encodeV4SwapActions,
   ethTokenPoolKey,
+  permit2AllowanceRead,
+  permit2ApproveRouterWrite,
   swapExactInSingle,
   swapExactInSingleWrite,
   type ExactInSingleInput,
   type V4PoolKey,
 } from "./swap";
+export { PERMIT2_MAX_AMOUNT, PERMIT2_MAX_EXPIRATION, permit2Abi } from "./abi/permit2";
 export {
   INTERFACE_CCA_PENDING,
   INTERFACE_CCA_TBD,

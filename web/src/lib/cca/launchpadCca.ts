@@ -124,11 +124,9 @@ export function backendLaunchErrorNames(): never {
 
 export const INTERFACE_CCA_PENDING = [
   "initializeDistribution salt",
-  "Universal Router 2.1.2 V4_SWAP command + inputs encoding",
   "LiquidityLocker tokenId → token / prophet binding",
   "Launchpad custom-error names (LbpNotSet and the like)",
   "PositionManager fees-only collect action bytes",
   "reservedTokenAmountForLP",
-  "swap section copy",
   "fee collect copy",
 ] as const;

@@ -74,7 +74,55 @@ export const CCA_COPY = {
   marketOpen: "Market open. You can swap now.",
 } as const;
 
-export const SWAP_SECTION_COPY = INTERFACE_CCA_TBD;
+/** §7.10. `{SYMBOL}`, `{amount}`, `{minAmount}`, `{n}`, `{total}` are interpolated below. */
+export const SWAP_SECTION_COPY = {
+  title: "Swap",
+  beforePoolOpen: "Swapping opens when the market opens.",
+  buyTab: "Buy",
+  sellTab: "Sell",
+  feeNote: "Pool fee 1%. Fees are split 24% to the prophet and 76% to the protocol.",
+
+  buyField: "You pay (ETH)",
+  buyOutput: "You get about {amount} {SYMBOL}",
+  buyMinimum: "At least {minAmount} {SYMBOL}",
+  buyCta: "Buy {SYMBOL}",
+  buying: "Buying…",
+  bought: "Bought {amount} {SYMBOL}",
+  notEnoughEth: "Not enough ETH.",
+
+  sellField: "You sell ({SYMBOL})",
+  sellOutput: "You get about {amount} ETH",
+  sellMinimum: "At least {minAmount} ETH",
+  allowCta: "Allow Uniswap to use your {SYMBOL}",
+  allowing: "Allowing…",
+  allowed: "{SYMBOL} allowed",
+  allowHelp: "One-time step before your first sale of this token.",
+  confirmCta: "Confirm {SYMBOL} for this sale",
+  confirming: "Confirming…",
+  readyToSell: "Ready to sell",
+  confirmHelp:
+    "Lets the Uniswap router move the {SYMBOL} you sell. You may need this again later.",
+  stepCounter: "Step {n} of {total}",
+  sellCta: "Sell {SYMBOL}",
+  selling: "Selling…",
+  sold: "Sold {amount} {SYMBOL}",
+  notEnoughToken: "Not enough {SYMBOL}.",
+} as const;
+
+/** §7.10 error table. Permit2 rows interpolate `{SYMBOL}`. */
+export const CCA_SWAP_ERROR_COPY = {
+  V4TooLittleReceived: "The price moved before your swap went through. Try again.",
+  TransactionDeadlinePassed: "This swap took too long. Try again.",
+  ExecutionFailed: "The swap didn't go through. Try again.",
+  LengthMismatch: "The swap didn't go through. Try again.",
+  InsufficientAllowance: "Confirm {SYMBOL} for this sale again, then sell.",
+  AllowanceExpired: "Confirm {SYMBOL} for this sale again, then sell.",
+  PoolNotInitialized: "Swapping opens when the market opens.",
+} as const;
+
+/** Wallet rejection during a swap. No revert, so it is not in the table above. */
+export const SWAP_CANCELED_COPY = "Swap canceled.";
+
 export const FEE_COLLECT_COPY = INTERFACE_CCA_TBD;
 
 export const CCA_BID_ERROR_COPY = {
@@ -298,8 +346,36 @@ export function departedReplacesAuctionStatus(): false {
   return false;
 }
 
-export function swapSectionCopy(): never {
-  throw new InterfaceCcaPendingError("swap section copy");
+export type SwapCopyVars = {
+  symbol?: string;
+  amount?: string;
+  minAmount?: string;
+  n?: number;
+  total?: number;
+};
+
+/** §7.10 copy with `{SYMBOL}` and the amount placeholders filled in. */
+export function swapSectionCopy(vars: SwapCopyVars = {}): Record<
+  keyof typeof SWAP_SECTION_COPY,
+  string
+> {
+  const filled = {} as Record<keyof typeof SWAP_SECTION_COPY, string>;
+  for (const [key, template] of Object.entries(SWAP_SECTION_COPY)) {
+    filled[key as keyof typeof SWAP_SECTION_COPY] = fill(template, {
+      SYMBOL: vars.symbol ?? "{SYMBOL}",
+      amount: vars.amount ?? "{amount}",
+      minAmount: vars.minAmount ?? "{minAmount}",
+      n: vars.n ?? "{n}",
+      total: vars.total ?? "{total}",
+    });
+  }
+  return filled;
+}
+
+/** §7.10 error row for a swap revert name, or undefined when it is not a swap error. */
+export function swapErrorCopy(name: string, symbol = "{SYMBOL}"): string | undefined {
+  if (!(name in CCA_SWAP_ERROR_COPY)) return undefined;
+  return fill(CCA_SWAP_ERROR_COPY[name as keyof typeof CCA_SWAP_ERROR_COPY], { SYMBOL: symbol });
 }
 
 export function feeCollectCopy(): never {

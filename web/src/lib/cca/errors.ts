@@ -3,7 +3,14 @@
  * Official error names look up `CCA_ERROR_COPY` first. Kind messages are
  * fallbacks and must never leak a revert name.
  */
-import { CCA_CLAIM_ERROR_COPY, ccaErrorCopy, officialCcaErrorName, type CcaErrorCopyVars } from "./copy";
+import {
+  CCA_CLAIM_ERROR_COPY,
+  SWAP_CANCELED_COPY,
+  ccaErrorCopy,
+  officialCcaErrorName,
+  swapErrorCopy,
+  type CcaErrorCopyVars,
+} from "./copy";
 
 export type CcaErrorKind =
   | "auction_not_live"
@@ -61,7 +68,11 @@ export function mapCcaError(error: unknown): CcaErrorKind {
   ) {
     return "launch_rejected";
   }
-  if (/ExecutionFailed|TransactionDeadlinePassed|V4TooLittleReceived|LengthMismatch/i.test(text)) {
+  if (
+    /ExecutionFailed|TransactionDeadlinePassed|V4TooLittleReceived|LengthMismatch|InsufficientAllowance|AllowanceExpired|PoolNotInitialized/i.test(
+      text,
+    )
+  ) {
     return "swap_failed";
   }
   if (/did not succeed|reverted/i.test(text)) return "reverted";
@@ -94,6 +105,31 @@ export function ccaUserMessage(kind: CcaErrorKind): string {
     case "network":
       return "Something went wrong. Please try again.";
   }
+}
+
+/**
+ * Swap-only copy (§7.10). Returns `null` on a wallet rejection so the caller
+ * can show `Swap canceled.` without a revert banner.
+ */
+export function swapErrorCopyFor(error: unknown, symbol: string): string {
+  const text = errorText(error);
+  if (mapCcaError(error) === "user_rejected") return SWAP_CANCELED_COPY;
+  const names = [
+    "V4TooLittleReceived",
+    "TransactionDeadlinePassed",
+    "InsufficientAllowance",
+    "AllowanceExpired",
+    "PoolNotInitialized",
+    "LengthMismatch",
+    "ExecutionFailed",
+  ];
+  for (const name of names) {
+    if (text.includes(name)) {
+      const line = swapErrorCopy(name, symbol);
+      if (line) return line;
+    }
+  }
+  return ccaUserMessage("swap_failed");
 }
 
 /** Prefer the official-name map; fall back to the kind sentence. */

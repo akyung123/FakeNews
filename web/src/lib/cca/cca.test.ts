@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { encodePacked, parseEther, zeroAddress } from "viem";
+import { decodeAbiParameters, encodePacked, getAddress, parseEther, zeroAddress } from "viem";
 import { wagmiConfig } from "../wagmi";
 import { ccaAbi } from "./abi/cca";
 import { ccaLensAbi } from "./abi/ccaLens";
 import { lbpStrategyAbi } from "./abi/lbpStrategy";
 import { launchpadCcaAbi, lockerCcaAbi } from "./abi/launchpadCca";
-import { V4_SWAP_COMMAND, universalRouterAbi } from "./abi/universalRouter";
+import {
+  V4_SWAP_COMMAND,
+  currencyAmountAbi,
+  exactInputSingleParamsAbi,
+  universalRouterAbi,
+} from "./abi/universalRouter";
 import { CCA_SEPOLIA, FUNDS_RECIPIENT } from "./addresses";
 import {
   auctionActionVisibility,
@@ -68,7 +73,13 @@ import {
   snapMaxPriceToTick,
   weiPerTokenToQ96,
 } from "./price";
-import { encodeV4ExactInSingle, ethTokenPoolKey } from "./swap";
+import {
+  approvePermit2Write,
+  encodeV4ExactInSingle,
+  ethTokenPoolKey,
+  permit2ApproveRouterWrite,
+  swapExactInSingleWrite,
+} from "./swap";
 import {
   CCA_LOG_CHUNK_BLOCKS,
   bidExitedLogsQuery,
@@ -577,7 +588,32 @@ describe("chain writes: simulate then write then require success", () => {
 });
 
 describe("v4 swap encoding", () => {
-  it("keeps the ETH/token pool key and leaves 2.1.2 command bytes TBD", () => {
+  const buyInput = {
+    token: TOKEN,
+    hooks: HOOKS,
+    zeroForOne: true,
+    amountIn: parseEther("0.001"),
+    amountOutMinimum: 2n,
+    deadline: 1n,
+  };
+
+  /** inputs[0] = abi.encode(actions, params) — INTERFACE_CCA 4.7. */
+  function decodeSwap(inputs: readonly `0x${string}`[]) {
+    const [actions, params] = decodeAbiParameters(
+      [{ type: "bytes" }, { type: "bytes[]" }],
+      inputs[0],
+    ) as [`0x${string}`, readonly `0x${string}`[]];
+    const [swap] = decodeAbiParameters([exactInputSingleParamsAbi], params[0]);
+    return {
+      actions,
+      params,
+      swap,
+      settle: decodeAbiParameters(currencyAmountAbi, params[1]),
+      take: decodeAbiParameters(currencyAmountAbi, params[2]),
+    };
+  }
+
+  it("keeps the ETH/token pool key", () => {
     expect(ethTokenPoolKey(TOKEN, HOOKS)).toEqual({
       currency0: zeroAddress,
       currency1: TOKEN,
@@ -585,17 +621,79 @@ describe("v4 swap encoding", () => {
       tickSpacing: POOL_TICK_SPACING,
       hooks: HOOKS,
     });
-    const input = {
-      token: TOKEN,
-      hooks: HOOKS,
-      zeroForOne: true,
-      amountIn: parseEther("0.001"),
-      amountOutMinimum: 2n,
-      deadline: 1n,
-    };
-    expect(() => encodeV4ExactInSingle(input)).toThrow(InterfaceCcaPendingError);
-    expect(() => encodeV4ExactInSingle(input)).toThrow(/V4_SWAP command/);
+    expect(() => ethTokenPoolKey(zeroAddress, HOOKS)).toThrow(/native ETH/);
+  });
+
+  it("encodes V4_SWAP with SWAP_EXACT_IN_SINGLE, SETTLE_ALL, TAKE_ALL", () => {
+    const encoded = encodeV4ExactInSingle(buyInput);
     expect(V4_SWAP_COMMAND).toBe(0x10);
+    expect(encoded.commands).toBe("0x10");
+    expect(encoded.inputs).toHaveLength(1);
+    expect(encoded.deadline).toBe(1n);
+
+    const { actions, params, swap } = decodeSwap(encoded.inputs);
+    expect(actions).toBe("0x060c0f");
+    expect(params).toHaveLength(3);
+    expect(swap.poolKey).toEqual({
+      currency0: zeroAddress,
+      currency1: getAddress(TOKEN),
+      fee: POOL_FEE,
+      tickSpacing: POOL_TICK_SPACING,
+      hooks: getAddress(HOOKS),
+    });
+    expect(swap.amountIn).toBe(parseEther("0.001"));
+    expect(swap.amountOutMinimum).toBe(2n);
+    // Six-field params: 0 disables the per-hop price check.
+    expect(swap.minHopPriceX36).toBe(0n);
+    expect(swap.hookData).toBe("0x");
+  });
+
+  it("settles the currency in and takes the currency out, each way", () => {
+    const buy = decodeSwap(encodeV4ExactInSingle(buyInput).inputs);
+    expect(buy.swap.zeroForOne).toBe(true);
+    expect(buy.settle).toEqual([zeroAddress, parseEther("0.001")]);
+    expect(buy.take).toEqual([getAddress(TOKEN), 2n]);
+
+    const sellInput = { ...buyInput, zeroForOne: false, amountIn: 500n, amountOutMinimum: 7n };
+    const sell = decodeSwap(encodeV4ExactInSingle(sellInput).inputs);
+    expect(sell.swap.zeroForOne).toBe(false);
+    expect(sell.settle).toEqual([getAddress(TOKEN), 500n]);
+    expect(sell.take).toEqual([zeroAddress, 7n]);
+  });
+
+  it("pays ETH in only on a buy", () => {
+    expect(encodeV4ExactInSingle(buyInput).value).toBe(parseEther("0.001"));
+    expect(encodeV4ExactInSingle({ ...buyInput, zeroForOne: false }).value).toBe(0n);
+  });
+
+  it("rejects amounts that do not fit in uint128", () => {
+    expect(() => encodeV4ExactInSingle({ ...buyInput, amountIn: 1n << 128n })).toThrow(/uint128/);
+    expect(() => encodeV4ExactInSingle({ ...buyInput, amountOutMinimum: 1n << 128n })).toThrow(
+      /uint128/,
+    );
+  });
+
+  it("builds an execute request against Universal Router 2.1.2", () => {
+    const request = swapExactInSingleWrite(buyInput);
+    expect(request.address).toBe(CCA_SEPOLIA.universalRouter);
+    expect(request.functionName).toBe("execute");
+    expect(request.args).toHaveLength(3);
+    expect(request.value).toBe(parseEther("0.001"));
+  });
+
+  it("builds the two Permit2 steps a sell needs", () => {
+    const step1 = approvePermit2Write(TOKEN, 500n);
+    expect(step1.address).toBe(TOKEN);
+    expect(step1.functionName).toBe("approve");
+    expect(step1.args).toEqual([CCA_SEPOLIA.permit2, 500n]);
+
+    const step2 = permit2ApproveRouterWrite(TOKEN, 500n, 999n);
+    expect(step2.address).toBe(CCA_SEPOLIA.permit2);
+    expect(step2.functionName).toBe("approve");
+    expect(step2.args).toEqual([TOKEN, CCA_SEPOLIA.universalRouter, 500n, 999n]);
+
+    expect(() => permit2ApproveRouterWrite(TOKEN, 1n << 160n, 1n)).toThrow(/uint160/);
+    expect(() => permit2ApproveRouterWrite(TOKEN, 1n, 1n << 48n)).toThrow(/uint48/);
   });
 });
 
@@ -667,14 +765,17 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
     expect(INTERFACE_CCA_PENDING).toEqual(
       expect.arrayContaining([
         "initializeDistribution salt",
-        "Universal Router 2.1.2 V4_SWAP command + inputs encoding",
         "LiquidityLocker tokenId → token / prophet binding",
         "Launchpad custom-error names (LbpNotSet and the like)",
-        "swap section copy",
         "fee collect copy",
       ]),
     );
     expect(INTERFACE_CCA_TBD).toBe("TBD(INTERFACE_CCA)");
+    // 4.7 is answered, so the swap is no longer pending.
+    expect(INTERFACE_CCA_PENDING).not.toContain(
+      "Universal Router 2.1.2 V4_SWAP command + inputs encoding",
+    );
+    expect(INTERFACE_CCA_PENDING).not.toContain("swap section copy");
   });
 
   it("records the four fork-test steps from INTERFACE_CCA §8", () => {
@@ -686,14 +787,18 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
       firstBidId: 0n,
     });
     expect(CCA_FORK_STEPS[2].calls).toEqual(["checkpoint", "exitBid", "claimTokens", "migrate"]);
-    expect(CCA_FORK_STEPS[3].encoding).toBe(INTERFACE_CCA_TBD);
+    expect(CCA_FORK_STEPS[3]).toMatchObject({
+      name: "swap",
+      encoding: "universalRouter.execute",
+      command: 0x10,
+    });
     const schedule = forkHappyPathSchedule(11_784_960n);
     expect(schedule.endBlock).toBe(11_784_985n);
     expect(schedule.claimBlock).toBe(11_784_985n);
     expect(schedule.migrationBlock).toBe(11_784_986n);
     expect(schedule.submitBidArity).toBe(5);
     expect(schedule.firstBidId).toBe(0n);
-    expect(schedule.swapEncoding).toBe(INTERFACE_CCA_TBD);
+    expect(schedule.swapEncoding).toBe("universalRouter.execute");
   });
 });
 
