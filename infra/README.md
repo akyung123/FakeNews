@@ -78,6 +78,13 @@ Adapter wiring (`ProphecyEns` constructor) is TODO until #17 and #8 merge.
 
 The script prints two paste-ready lines: `WORLD_CHAIN_ID=11155111` and `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`.
 
+**Mandatory after Launchpad deploy.** Set these on Render and restart the world service. If either is empty, the server-side context check is off (PR #16).
+
+```
+WORLD_CHAIN_ID=11155111
+WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>
+```
+
 ## Human-input checklist (names only)
 
 ### From the user (via lead, by 17:00 KST)
@@ -107,7 +114,9 @@ Also needed from a person (not World Portal):
 | `WORLD_SIGNER_KEY` | `infra/new-world-signer.sh` (`cast wallet new`) |
 | `WORLD_SIGNER_ADDRESS` | Printed by that helper; deploy also derives it from the key |
 
-### Set after Launchpad deploy (script prints them)
+### Mandatory after Launchpad deploy (script prints them; paste onto Render and restart)
+
+Empty values turn the server-side context check **off** (PR #16).
 
 | Env name | Value |
 |----------|--------|

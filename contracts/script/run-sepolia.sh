@@ -69,4 +69,10 @@ else
   echo "Dry-run (simulation only)." >&2
 fi
 
+if [[ "${args[0]}" == *Deploy.s.sol* ]]; then
+  echo "After a send, paste onto Render and restart:" >&2
+  echo "  WORLD_CHAIN_ID=11155111" >&2
+  echo "  WORLD_LAUNCHPAD_ADDRESS=<PasteIntoRender line from the log>" >&2
+fi
+
 exec "${cmd[@]}"
