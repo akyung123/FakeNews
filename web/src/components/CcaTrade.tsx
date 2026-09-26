@@ -434,26 +434,37 @@ export function CcaTrade({
                 className="btn primary full"
                 disabled={writesBlocked || !snap?.locker || !token || snap.tokenId == null}
                 onClick={() => {
+                  const registering = Boolean(snap?.needsRegister);
+                  const done = registering ? FEE_COLLECT_COPY.feeCollectionReady : FEE_COLLECT_COPY.feesSent;
                   if (demo && (prototype || !snap?.locker || !token || snap.tokenId == null)) {
-                    setSuccess(FEE_COLLECT_COPY.feesSent);
+                    setSuccess(done);
                     return;
                   }
                   if (!snap?.locker || !token || snap.tokenId == null) return;
                   const locker = snap.locker;
                   const tokenId = snap.tokenId;
+                  // Not linked yet: one-time register only. Once linked, collect sends the fees.
                   void run(
-                    FEE_COLLECT_COPY.collectingFees,
+                    registering ? FEE_COLLECT_COPY.settingUp : FEE_COLLECT_COPY.collectingFees,
                     async () => {
-                      if (snap.needsRegister) {
+                      if (registering) {
                         await registerLocker(locker, token, tokenId, writes);
+                        return done;
                       }
-                      return sendCcaWrite(collectCcaWrite(locker, token, tokenId), "collect", writes);
+                      await sendCcaWrite(collectCcaWrite(locker, token, tokenId), "collect", writes);
+                      return done;
                     },
-                    FEE_COLLECT_COPY.feesSent,
+                    done,
                   );
                 }}
               >
-                {pending === FEE_COLLECT_COPY.collectingFees ? FEE_COLLECT_COPY.collectingFees : FEE_COLLECT_COPY.collectFees}
+                {snap?.needsRegister
+                  ? pending === FEE_COLLECT_COPY.settingUp
+                    ? FEE_COLLECT_COPY.settingUp
+                    : FEE_COLLECT_COPY.setupFeeCollection
+                  : pending === FEE_COLLECT_COPY.collectingFees
+                    ? FEE_COLLECT_COPY.collectingFees
+                    : FEE_COLLECT_COPY.collectFees}
               </button>
             </>
           )}
