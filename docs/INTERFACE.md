@@ -6,6 +6,10 @@ What `contracts/`, `web/` and `world/` rely on from each other. Only the contrac
 - **Sources:** [`SPEC.md`](SPEC.md), [`DECISIONS.md`](DECISIONS.md)
 - `(draft)` means the shape may still change during implementation. Remove the mark once it settles.
 
+> **The curve is gone (DECISIONS #18).** `Launchpad` has no `buy`, `sell`, `curve`, `quoteBuy` or `quoteSell`, and emits no `Trade` or `Graduated`; `launch` opens an official Continuous Clearing Auction. The entries for those in section 2 below are left over from the curve and do not exist in `contracts/src/Launchpad.sol`.
+>
+> **The contract between folders is [`INTERFACE_CCA.md`](INTERFACE_CCA.md)** — auction, migrate, swap, locker and the official Uniswap addresses. Sections 1 (names), 3 (World server) and 5 (environment) below still apply unchanged: DECISIONS #21 keeps ENS and World ID exactly as they were.
+
 ## 1. Names (ENS)
 
 The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NAME` (see DECISIONS "Not decided yet").

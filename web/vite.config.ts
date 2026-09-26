@@ -1,8 +1,12 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { sepoliaDeploymentDefine } from "./scripts/sepoliaDeployment";
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    __SEPOLIA_DEPLOYMENT__: sepoliaDeploymentDefine(__dirname),
+  },
   server: {
     fs: {
       allow: [".."],
@@ -24,4 +28,3 @@ export default defineConfig({
     ],
   },
 });
-
