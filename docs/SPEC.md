@@ -298,7 +298,6 @@ The only credential is Proof of Human. A passport is more than this needs.
 - The proof is verified on a server or on chain.
 - The nullifier is stored in the contract, so one person cannot create two prophet names.
 - If verification is cancelled or fails, only issuing is blocked. Browsing and buying still work.
-- The demo shows this failure path.
 
 An optional extension: an agent drafts a sentence, and the name is minted only after a person verifies again on the spot. Cancelling means no mint. A draft button that never stops a person is no different from a login screen.
 
@@ -372,8 +371,6 @@ Two to four minutes, five scenes:
 3. Another wallet buys by name; selling lowers the price.
 4. An already departed prophecy sits under the name, and the next issue screen shows departed 1.
 5. Switching wallets does not allow issuing. Editing the sentence reverts. Cancelling verification blocks issuing.
-
-Commit progress as you go; a single commit at the end is not a history. The README links to contracts with line numbers.
 
 ## Out of scope
 

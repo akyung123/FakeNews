@@ -67,13 +67,11 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 - [ ] IDKit 4 rp-context, Portal v4 verify (see PactShare `apps/back/src/lib/worldid.ts`)
 - [ ] On success, sign in the format of INTERFACE section 3
-- [ ] Keep notes while integrating: time to first success, where it got stuck, missing docs, one improvement
 
 ## 5. Demo
 
 - [ ] Create a prophecy with a 2-minute deadline beforehand so it is already Departed
 - [ ] Record the five scenes in SPEC "Demo" (2–4 minutes)
-- [ ] README links the contracts with line numbers
 
 ## If there is time
 

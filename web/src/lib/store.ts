@@ -109,7 +109,7 @@ function applyComment(state: State, user: string, coinId: string, text: string, 
   return { ...state, comments: [comment, ...state.comments] };
 }
 
-// ---- seed: prophecies about the hackathon itself ----
+// ---- seed: sample prophecies ----
 
 type SeedEvent =
   | { min: number; coin: string; user: string; buy: number; say?: string }
@@ -120,8 +120,8 @@ const SEED_COINS = [
   { id: "wifi", ticker: "WIFI", name: "Wifi Dies", prophecy: "The venue Wi-Fi dies at 3am on Saturday", creator: "yuki.eth", min: 180 },
   { id: "oops", ticker: "OOPS", name: "Mainnet Oops", prophecy: "Someone deploys to mainnet by accident before Sunday", creator: "0xHana", min: 140 },
   { id: "coffee", ticker: "COFFEE", name: "No Coffee", prophecy: "Coffee runs out before Sunday breakfast", creator: "tokyo_bob", min: 95 },
-  { id: "yolo", ticker: "YOLO", name: "Zero Tests", prophecy: "A team with zero tests wins a prize", creator: "degen_kim", min: 60 },
-  { id: "why", ticker: "WHY", name: "Why Blockchain", prophecy: "Judges ask “why blockchain?” more than 10 times", creator: "wagmi_lee", min: 25 },
+  { id: "yolo", ticker: "YOLO", name: "Zero Tests", prophecy: "A team with zero tests ships on time", creator: "degen_kim", min: 60 },
+  { id: "why", ticker: "WHY", name: "Why Blockchain", prophecy: "Someone asks “why blockchain?” more than 10 times today", creator: "wagmi_lee", min: 25 },
   { id: "sleep", ticker: "SLEEP", name: "No Sleep", prophecy: "Nobody on our team sleeps before 5am", creator: "moon_park", min: 6 },
 ];
 
