@@ -75,7 +75,8 @@ contract LaunchpadFuzzTest is Test {
     /// A buy followed by selling every token received never returns more ETH than was spent.
     function testFuzz_roundTripNeverGains(uint256 ethIn) public {
         address token = _launch();
-        ethIn = bound(ethIn, 2, 0.015 ether);
+        // Below ~3 wei a sell-back floors to 0 ETH and reverts ZeroAmount.
+        ethIn = bound(ethIn, 1_000, 0.015 ether);
 
         vm.prank(traders[0]);
         launchpad.buy{value: ethIn}(token, 0, "");
