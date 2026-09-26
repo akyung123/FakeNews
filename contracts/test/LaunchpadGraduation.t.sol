@@ -84,6 +84,13 @@ contract LaunchpadGraduationTest is LaunchpadStack {
         uint160 expected = Graduation.sqrtPriceX96FromVirtualReserves(vEth, vToken);
         assertEq(sqrtP, expected);
         assertLt(Graduation.priceGapPpm(vEth, vToken, sqrtP), Graduation.MAX_PRICE_GAP_PPM);
+        address dead = address(0x000000000000000000000000000000000000dEaD);
+        uint256 burned = ProphecyToken(token).balanceOf(dead);
+        assertEq(ProphecyToken(token).balanceOf(address(launchpad)), 0);
+        assertEq(
+            ProphecyToken(token).balanceOf(buyer) + ProphecyToken(token).balanceOf(address(manager)) + burned,
+            ProphecyToken(token).totalSupply()
+        );
     }
 
     function test_liquidityLockedNoWithdraw() public {
