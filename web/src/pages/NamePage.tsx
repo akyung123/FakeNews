@@ -6,16 +6,15 @@ import {
   ISSUE_COPY,
   isValidProphetLabel,
   storeProphetLabel,
-  worldErrorKindFromRegisterProphet,
   worldUserMessage,
   type IssueSession,
   type WorldStatus,
 } from "../lib/issue";
+import { createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_PARENT_NAME } from "../lib/mock";
 import { resolveIssueSession } from "./CreatePage";
 import {
   createWorldClient,
-  type Hex,
   type WorldClient,
   type WorldErrorKind,
   type WorldServerSignature,
@@ -31,12 +30,12 @@ export function ClaimNameScreen({
   session,
   world = createWorldClient(),
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
-  registerProphet,
+  registerProphet = createRegisterProphet(),
 }: {
   session: IssueSession;
   world?: WorldClient;
   parentName?: string;
-  registerProphet?: (input: { label: string; nullifier: Hex; serverSig: Hex }) => Promise<void>;
+  registerProphet?: (input: RegisterProphetInput) => Promise<void>;
 }) {
   const navigate = useNavigate();
   const returningProphet = Boolean(session.prophetLabel);
@@ -44,11 +43,23 @@ export function ClaimNameScreen({
   const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
   const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
+  const [registerStatus, setRegisterStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
 
   const labelOk = isValidProphetLabel(prophetLabel);
-  const canContinue = returningProphet || (labelOk && worldStatus === "success");
-  const pending = !returningProphet && worldStatus === "pending" ? ISSUE_COPY.pending : null;
-  const error = returningProphet || worldStatus === "pending" ? null : worldUserMessage(worldError);
+  const registerBusy = registerStatus === "pending";
+  const canContinue = (returningProphet || (labelOk && worldStatus === "success")) && !registerBusy;
+  const pending =
+    registerBusy
+      ? ISSUE_COPY.registerPending
+      : !returningProphet && worldStatus === "pending"
+        ? ISSUE_COPY.pending
+        : null;
+  const error =
+    registerStatus === "failed"
+      ? ISSUE_COPY.registerFailed
+      : returningProphet || worldStatus === "pending" || registerBusy
+        ? null
+        : worldUserMessage(worldError);
   const fullName = prophetLabel ? `${prophetLabel}.${parentName}` : "";
 
   return (
@@ -63,8 +74,8 @@ export function ClaimNameScreen({
           <span className="step on">{ISSUE_COPY.oneTransaction}</span>
         ) : (
           <>
-            <span className="step on">{ISSUE_COPY.step1}</span>
-            <span className="step">{ISSUE_COPY.step2}</span>
+            <span className={`step${worldStatus !== "success" ? " on" : ""}`}>{ISSUE_COPY.step1}</span>
+            <span className={`step${worldStatus === "success" ? " on" : ""}`}>{ISSUE_COPY.step2}</span>
           </>
         )}
       </div>
@@ -81,19 +92,20 @@ export function ClaimNameScreen({
         className="block create name-hero"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!canContinue) return;
+          if (!canContinue || registerBusy) return;
+          if (!returningProphet && !verified) return;
           void (async () => {
             if (!returningProphet && verified && registerProphet) {
+              setRegisterStatus("pending");
               try {
                 await registerProphet({
                   label: prophetLabel,
                   nullifier: verified.nullifier,
                   serverSig: verified.serverSig,
                 });
-              } catch (err) {
-                const kind = worldErrorKindFromRegisterProphet(err);
-                setWorldError(kind);
-                setWorldStatus("failed");
+                setRegisterStatus("success");
+              } catch {
+                setRegisterStatus("failed");
                 return;
               }
             }
@@ -134,8 +146,13 @@ export function ClaimNameScreen({
         />
 
         {pending ? (
-          <p className="banner-lock" data-testid="world-pending">
+          <p className="banner-lock" data-testid={registerBusy ? "register-pending" : "world-pending"}>
             {pending}
+          </p>
+        ) : null}
+        {registerStatus === "success" ? (
+          <p className="up" data-testid="register-success">
+            {ISSUE_COPY.registerSuccess}
           </p>
         ) : null}
         {error ? (
@@ -144,7 +161,7 @@ export function ClaimNameScreen({
           </p>
         ) : null}
 
-        <button type="submit" className="btn primary full" disabled={!canContinue}>
+        <button type="submit" className="btn primary full" disabled={!canContinue || registerBusy}>
           {returningProphet ? ISSUE_COPY.oneTransaction : ISSUE_COPY.continueIssue}
         </button>
       </form>

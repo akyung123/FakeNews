@@ -29,6 +29,7 @@ describe("Screen 3 name route", () => {
       expect(html).toContain(row.slug);
       expect(html).toContain(row.ensName);
       expect(html).toContain(">Copy<");
+      expect(html).toContain('aria-label="Copy full name"');
       expect(html).not.toContain("holders");
       expect(html).toContain("Buy");
       expect(html).toContain("Trade memos");

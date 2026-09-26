@@ -45,6 +45,7 @@ function CopyFullName({ value }: { value: string }) {
     <button
       type="button"
       className="link token-copy"
+      aria-label="Copy full name"
       onClick={() => {
         if (!navigator.clipboard) return;
         void navigator.clipboard.writeText(value).then(() => {
