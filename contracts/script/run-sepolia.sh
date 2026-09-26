@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Dry-run a Sepolia Foundry script. Sending a transaction is opt-in and person-only.
 #
-# Order after prophecy.eth is registered:
-#   deployUserRegistry → Deploy.s.sol (Launchpad) → deployAdapter → linkParent → grantLaunchpadRegistrar
+# Order after prophecy.eth is registered (or use infra/scripts/deploy-sepolia.sh):
+#   deployUserRegistry → Deploy.s.sol (adapter, Launchpad, Hook, Locker, setUniswap)
+#   → linkParent → grantAdapterRegistrar
+# Do not lock the parent name.
 #
 #   ./script/run-sepolia.sh script/Deploy.s.sol
 #   ./script/run-sepolia.sh script/RegisterParent.s.sol --sig "commit()"
-#   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployAdapter()"
+#   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "grantAdapterRegistrar()"
 #   ./script/run-sepolia.sh script/Deploy.s.sol --broadcast
 set -euo pipefail
 
@@ -26,6 +28,10 @@ load_env() {
       val="${val#\"}"
       val="${val%\'}"
       val="${val#\'}"
+      # Empty values must not mask Solidity envOr defaults (e.g. ENS_ADAPTER_ADDRESS).
+      if [[ -z "$val" ]]; then
+        continue
+      fi
       if [[ -z "${!key:-}" ]]; then
         export "${key}=${val}"
       fi
@@ -35,8 +41,13 @@ load_env() {
 
 load_env "$root/.env"
 
+# Wrapper sets this so Deploy.s.sol creates ProphecyEns instead of reading a leftover override.
+if [[ "${CREATE_ENS_ADAPTER:-}" == "1" ]]; then
+  unset ENS_ADAPTER_ADDRESS || true
+fi
+
 if [[ -z "${SEPOLIA_RPC_URL:-}" ]]; then
-  echo "Set SEPOLIA_RPC_URL (no API key in git). See docs/INFRA.md." >&2
+  echo "Set SEPOLIA_RPC_URL (no API key in git). See infra/README.md." >&2
   exit 1
 fi
 
@@ -62,7 +73,7 @@ if [[ "$send" -eq 1 ]]; then
     echo "Sending needs DEPLOYER_PRIVATE_KEY in the environment (or contracts/.env). A person runs this." >&2
     exit 1
   fi
-  echo "Sending to Sepolia. This is a real transaction." >&2
+  echo "Sending to the RPC in SEPOLIA_RPC_URL. This is a real transaction on that endpoint." >&2
   # Do not put the key on argv. The Solidity script reads DEPLOYER_PRIVATE_KEY.
   cmd+=(--broadcast)
 else
@@ -73,8 +84,39 @@ if [[ "${args[0]}" == *Deploy.s.sol* ]]; then
   echo "After a send, paste onto Render and restart:" >&2
   echo "  WORLD_CHAIN_ID=11155111" >&2
   echo "  WORLD_LAUNCHPAD_ADDRESS=<PasteIntoRender line from the log>" >&2
+  echo "  ENS_ADAPTER_ADDRESS=<logged ProphecyEns>" >&2
   echo "  worldSigner address: <from the log — address only>" >&2
   echo "  WORLD_SIGNER_KEY: paste from local new-world-signer.sh only. Never print it here or in CI." >&2
+  echo "  Web: VITE_LAUNCHPAD_ADDRESS and VITE_LAUNCHPAD_DEPLOY_BLOCK from the deployment record." >&2
+fi
+
+if [[ "$send" -eq 1 && "${args[0]}" == *Deploy.s.sol* ]]; then
+  tmp="$(mktemp)"
+  set +e
+  "${cmd[@]}" | tee "$tmp"
+  rc=${PIPESTATUS[0]}
+  set -e
+  if [[ "$rc" -eq 0 ]]; then
+    repo="$(cd "$root/.." && pwd)"
+    val="$(grep -oE 'LAUNCHPAD_ADDRESS=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export LAUNCHPAD_ADDRESS="$val"
+    val="$(grep -oE 'ENS_ADAPTER_ADDRESS=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export ENS_ADAPTER_ADDRESS="$val"
+    val="$(grep -oE 'DEPLOYER=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export DEPLOYER="$val"
+    val="$(grep -oE 'HOOK_ADDRESS=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export HOOK_ADDRESS="$val"
+    val="$(grep -oE 'LOCKER_ADDRESS=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export LOCKER_ADDRESS="$val"
+    val="$(grep -oE 'POOL_MANAGER=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export POOL_MANAGER="$val"
+    if [[ "$SEPOLIA_RPC_URL" == *"127.0.0.1"* || "$SEPOLIA_RPC_URL" == *"localhost"* ]]; then
+      export DEPLOY_RECORD_LOCAL=1
+    fi
+    "$repo/infra/scripts/write-deployment-record.sh" || true
+  fi
+  rm -f "$tmp"
+  exit "$rc"
 fi
 
 exec "${cmd[@]}"
