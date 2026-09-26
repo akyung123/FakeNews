@@ -114,6 +114,11 @@ export function isDeparted(deadline: number, nowSec: number): boolean {
   return nowSec >= deadline;
 }
 
+/** Open rows buy; Departed (and later, held) rows sell. SPEC Screen 4. */
+export function prophecyTradeLabel(row: { departed: boolean }): "Buy" | "Sell" {
+  return row.departed ? "Sell" : "Buy";
+}
+
 export function curveProgress(sold: bigint, complete: boolean): number {
   if (complete || sold >= CURVE_SUPPLY) return 1;
   if (sold <= 0n) return 0;

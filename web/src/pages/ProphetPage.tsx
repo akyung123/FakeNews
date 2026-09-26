@@ -5,6 +5,7 @@ import { Bar } from "../components/CoinCard";
 import {
   getProphetPage,
   prophecyDetailPath,
+  prophecyTradeLabel,
   type ProphetPageData,
   type ProphetProphecy,
 } from "../lib/prophetData";
@@ -75,7 +76,7 @@ function ProphetView({ data }: { data: ProphetPageData }) {
           ) : (
             <ul className="prophet-cards">
               {departed.map((row) => (
-                <ProphecyCard key={row.ensName} row={row} action="sell" />
+                <ProphecyCard key={row.ensName} row={row} />
               ))}
             </ul>
           )}
@@ -87,7 +88,7 @@ function ProphetView({ data }: { data: ProphetPageData }) {
             <span className="faint">an open prophecy beside the departed ones</span>
           </div>
           {nextBuy ? (
-            <ProphecyCard row={nextBuy} action="buy" />
+            <ProphecyCard row={nextBuy} />
           ) : (
             <p className="empty">
               No open prophecy under this name.{" "}
@@ -133,7 +134,9 @@ function ProphetView({ data }: { data: ProphetPageData }) {
                   <CurveMark row={row} />
                 </span>
                 <span className="num">
-                  <span className="prophet-row-sell">Sell</span>
+                  <span className={row.departed ? "prophet-row-sell" : "strong"}>
+                    {prophecyTradeLabel(row)}
+                  </span>
                 </span>
               </Link>
             ))}
@@ -144,8 +147,9 @@ function ProphetView({ data }: { data: ProphetPageData }) {
   );
 }
 
-function ProphecyCard({ row, action }: { row: ProphetProphecy; action: "buy" | "sell" }) {
+function ProphecyCard({ row }: { row: ProphetProphecy }) {
   const href = prophecyDetailPath(row.ensName);
+  const label = prophecyTradeLabel(row);
   return (
     <article className="prophet-card">
       <p className="row-sub">{row.ensName}</p>
@@ -156,14 +160,9 @@ function ProphecyCard({ row, action }: { row: ProphetProphecy; action: "buy" | "
       </p>
       <CurveMark row={row} labelled />
       <div className="prophet-card-actions">
-        <Link to={href} className={`btn ${action === "sell" ? "sell" : "primary"}`}>
-          {action === "sell" ? "Sell" : "Buy"}
+        <Link to={href} className={`btn ${label === "Sell" ? "sell" : "primary"}`}>
+          {label}
         </Link>
-        {action === "buy" ? (
-          <Link to={href} className="btn sell">
-            Sell
-          </Link>
-        ) : null}
       </div>
     </article>
   );

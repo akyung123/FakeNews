@@ -8,6 +8,7 @@ import {
   normalizeProphetLabel,
   prophecyDetailPath,
   prophecyEnsName,
+  prophecyTradeLabel,
   prophetEnsName,
   prototypeCoinFromName,
 } from "./prophetData";
@@ -88,6 +89,15 @@ describe("curveProgress", () => {
     expect(curveProgress(793_100_000n * 10n ** 18n, false)).toBe(1);
     expect(curveProgress(1n, true)).toBe(1);
     expect(curveProgress(317_240_000n * 10n ** 18n, false)).toBeCloseTo(0.4, 4);
+  });
+});
+
+describe("prophecyTradeLabel", () => {
+  test("open rows buy; departed rows sell", () => {
+    const page = getProphetPage("ringo", NOW)!;
+    for (const row of page.prophecies) {
+      expect(prophecyTradeLabel(row)).toBe(row.departed ? "Sell" : "Buy");
+    }
   });
 });
 

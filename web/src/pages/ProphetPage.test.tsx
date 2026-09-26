@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { MOCK_PROPHECIES } from "../lib/mock";
-import { getProphetPage, prophecyDetailPath } from "../lib/prophetData";
+import { getProphetPage, prophecyDetailPath, prophecyTradeLabel } from "../lib/prophetData";
 import { ProphetPage } from "./ProphetPage";
 
 const NOW = 1_750_000_000;
@@ -44,7 +44,12 @@ describe("ProphetPage", () => {
         expect(html).toContain(row.ensName);
         expect(html).toContain(prophecyDetailPath(row.ensName));
         expect(html).toContain(row.token.slice(0, 6));
+        expect(prophecyTradeLabel(row)).toBe(row.departed ? "Sell" : "Buy");
       }
+      expect((html.match(/class="btn sell"/g) ?? []).length).toBe(data.departedCount);
+      expect(html).toContain("prophet-row-sell");
+      expect(html).toContain(">Buy</span>");
+      expect(html).toContain(">Sell</span>");
 
       expect(html).not.toContain("True");
       expect(html).not.toContain("False");
