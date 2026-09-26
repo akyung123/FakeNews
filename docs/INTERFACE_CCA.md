@@ -38,30 +38,38 @@ The CCA README at tag `v2.1.0` still lists v2.0.0 as “latest” in its own tab
 
 ## 0.1 Fixed Sepolia addresses and parameters
 
-| Item | Value | Who uses it |
-|---|---|---|
-| LBPStrategy v3.3.0 | `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000` | Launchpad `initializeDistribution`; web `migrate` |
-| CCA factory v2.1.0 | `0x000000001F26a0044BaA66024e7b6599c61963F8` | LBPStrategy `initializerFactory()` (already wired on chain). Launchpad does **not** call `create` |
-| InitializerHook reference | `0x1600059B95A80d500fC42400ea9a88A9C29D2000` | Reference only. `ProphecyHook` **inherits** `InitializerHook`; `authorized()` must be the LBPStrategy above |
-| CCALens v2.0.0 | `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53` | Web `state(auction)` via `eth_call` |
-| PoolManager | `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543` | Hook, locker, fork tests |
-| PositionManager | `0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4` | LBPStrategy mints the LP NFT here; locker holds it |
-| Universal Router 2.1.2 | `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3` | Web v4 swap after migrate |
-| StateView | `0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c` | Optional pool reads |
-| Quoter | `0x61b3f2011a92d183c7dbadbda940a7555ccf9227` | Optional quotes |
-| Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | Not used for ETH bids |
-| Currency | native ETH (`address(0)`) | `AuctionParameters.currency` and `MigratorParameters.currency` |
-| Auction length | **25 blocks** | `endBlock = startBlock + 25` |
-| Graduation threshold | **0.02 ETH** (`20000000000000000` wei) | `AuctionParameters.requiredCurrencyRaised` |
-| Pool fee | **1% = `10000` pips** | `PoolParameters.fee` |
-| Pool tickSpacing | **200** | `PoolParameters.tickSpacing` |
-| LP NFT holder | `LiquidityLocker` | `MigratorParameters.positionRecipient` |
-| Fee split after the pool | prophet **24** : protocol **76** | locker `collect` |
-| `recipient` | protocol fee recipient **or** Launchpad — **never the prophet** | unused currency / unused reserved tokens after migrate (and recover-on-fail) |
-| `tokensRecipient` | protocol fee recipient **or** Launchpad — **never the prophet**, and **never** LBPStrategy | unsold auction tokens via `sweepUnsoldTokens` |
-| `fundsRecipient` | **LBPStrategy** (`0x9543…2000`) | official `InvalidFundsRecipient` if anything else |
-| Deadline vs auction | **not linked** | ENS `deadline` / Departed stay as today. Auction blocks do not read the deadline |
-| World ID / ENS | **unchanged** | section 1 and section 3 |
+Verified on a Sepolia fork at block **11_784_960** in [PR #41](https://github.com/prism-toggle-ai/FakeNews/pull/41) `d84aed4` (`contracts/test/fork/CCAFork.t.sol` + `CCAForkHelpers.sol`). Forge green at 25 and 10 blocks. These rows replace the old `TBD(backend)` for the same fields.
+
+| Item | Value | Who uses it | Source |
+|---|---|---|---|
+| LBPStrategy v3.3.0 | `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000` | Launchpad `initializeDistribution`; web `migrate` | official + #41 |
+| CCA factory v2.1.0 | `0x000000001F26a0044BaA66024e7b6599c61963F8` | LBPStrategy `initializerFactory()` (already wired on chain). Launchpad does **not** call `create` | official + #41 |
+| InitializerHook reference | `0x1600059B95A80d500fC42400ea9a88A9C29D2000` | Reference only. `ProphecyHook` **inherits** `InitializerHook`; `authorized()` must be the LBPStrategy above | official + #41 |
+| CCALens v2.0.0 | `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53` | Web `state(auction)` via `eth_call` | official |
+| PoolManager | `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543` | Hook, locker, fork tests | official + #41 |
+| PositionManager | `0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4` | LBPStrategy mints the LP NFT here; locker holds it | official + #41 |
+| Universal Router 2.1.2 | `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3` | Web v4 swap after migrate | official (see §0 vs #43) |
+| StateView | `0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c` | Optional pool reads | official |
+| Quoter | `0x61b3f2011a92d183c7dbadbda940a7555ccf9227` | Optional quotes | official |
+| Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | Not used for ETH bids | official |
+| Currency | native ETH (`address(0)`) | `AuctionParameters.currency` and `MigratorParameters.currency` | **#41** |
+| `N` (auction blocks) | **25** default (also green at **10**) | `endBlock = startBlock + N` | **#41** |
+| Auction windows | `startBlock = block.number`; `endBlock = start + N`; `claimBlock = end`; `migrationBlock = end + 1` | Launchpad `configData` | **#41** `CCAForkHelpers._auctionWindows` |
+| `auctionStepsData` | `abi.encodePacked(uint24(1e7 / N), uint40(N))` so `mps * N == 1e7`. N=25 → `(400_000, 25)`; N=10 → `(1_000_000, 10)` | `AuctionParameters.auctionStepsData` | **#41** `packUniformSteps` |
+| Floor price (auction Q96) | `1000 << 96` | `AuctionParameters.floorPrice` | **#41** (`CCA_FLOOR_PRICE`) |
+| Auction price tick | `100 << 96` | `AuctionParameters.tickSpacing` — **not** the v4 pool tick | **#41** (`CCA_TICK_SPACING`) |
+| Graduation threshold | **0.02 ETH** (`20000000000000000` wei) | `AuctionParameters.requiredCurrencyRaised` | **#41** |
+| Pool fee | **1% = `10000` pips** | `PoolParameters.fee` | **#41** |
+| Pool tickSpacing | **200** | `PoolParameters.tickSpacing` | **#41** |
+| First bid id | **0** | `submitBid` return / `BidSubmitted.id` | **#41** |
+| `fundsRecipient` | **LBPStrategy** (`0x9543…2000`) | official `InvalidFundsRecipient` if anything else | **#41** |
+| `tokensRecipient` | **protocol** (`protocolFeeRecipient`) — **never the prophet**, never LBPStrategy | unsold auction tokens via `sweepUnsoldTokens` | **#41** |
+| `recipient` | **protocol** (`protocolFeeRecipient`) — **never the prophet** | unused currency / recover-on-fail | **#41** |
+| Goal not reached (`raised < 0.02 ETH`) | `exitBid` refunds **full ETH**, **0 tokens**; `claimTokens` reverts `NotGraduated`; **no v4 pool** | UI **Get back unused ETH** | **#41** `test_goalNotReached_refundAndTokenSink` |
+| LP NFT holder | `LiquidityLocker` | `MigratorParameters.positionRecipient` (product). #41 used a temp address — harness only | product |
+| Fee split after the pool | prophet **24** : protocol **76** | locker `collect` | product |
+| Deadline vs auction | **not linked** | ENS `deadline` / Departed stay as today. Auction blocks do not read the deadline | DECISIONS #21 |
+| World ID / ENS | **unchanged** | section 1 and section 3 | DECISIONS #5 / #10 |
 
 Do not describe the auction or the pool in terms of returns, profit, or prediction. Do not use “coin”. Do not show a percent price change.
 
@@ -167,25 +175,25 @@ event LbpSet(address lbpStrategy, address positionManager);
 // IContinuousClearingAuction.sol — AuctionParameters
 struct AuctionParameters {
     address currency;                 // address(0) = ETH
-    address tokensRecipient;          // protocol or Launchpad — NEVER prophet, NEVER LBPStrategy
+    address tokensRecipient;          // protocol — NEVER prophet, NEVER LBPStrategy (#41)
     address fundsRecipient;           // MUST be LBPStrategy
-    uint64 startBlock;
-    uint64 endBlock;                  // startBlock + 25
-    uint64 claimBlock;                // >= endBlock
-    uint256 tickSpacing;              // Q96 price granularity (NOT pool tickSpacing 200)
+    uint64 startBlock;                // block.number (#41)
+    uint64 endBlock;                  // startBlock + N (#41)
+    uint64 claimBlock;                // = endBlock (#41)
+    uint256 tickSpacing;              // 100 << 96 — NOT pool tickSpacing 200 (#41)
     address validationHook;           // address(0) = none
-    uint256 floorPrice;               // Q96; official minimum is 2^32 + 1
+    uint256 floorPrice;               // 1000 << 96 (#41)
     uint128 requiredCurrencyRaised;   // 0.02 ether
-    bytes auctionStepsData;           // packed MPS + block deltas
+    bytes auctionStepsData;           // abi.encodePacked(uint24(1e7/N), uint40(N)) (#41)
 }
 
 // MigratorParams.sol — MigratorParameters
 struct MigratorParameters {
     address token;
     address currency;                 // address(0)
-    uint64 migrationBlock;            // MUST be > endBlock
+    uint64 migrationBlock;            // endBlock + 1 (#41)
     uint128 reservedTokenAmountForLP; // pulled to the strategy; rest is auction supply
-    address recipient;                // protocol or Launchpad — NEVER prophet
+    address recipient;                // protocol — NEVER prophet (#41)
     address positionRecipient;        // LiquidityLocker
     PoolParameters poolParameters;
     bytes positionDefinitions;        // abi.encode(PositionDefinition[])
@@ -467,7 +475,9 @@ function submitBid(uint256 maxPriceQ96, uint128 amount, address owner, bytes cal
 | `amount` | budget in wei; `msg.value` **must** equal `amount` |
 | `maxPriceQ96` | max price the bidder accepts (Q96 ETH per token), strictly above current clearing and `<= MAX_BID_PRICE` |
 | `owner` | bidder (receives tokens and leftover ETH) |
-| `prevTickPriceQ96` | hint; prefer `floorPrice` for the first bid on that tick |
+| `prevTickPriceQ96` | hint; #41 uses `floor + (n-1) * tick` with `maxPrice = floor + n * tick` |
+
+First `submitBid` return / `BidSubmitted.id` is **0** ([PR #41](https://github.com/prism-toggle-ai/FakeNews/pull/41)).
 
 ```solidity
 event BidSubmitted(uint256 indexed id, address indexed owner, uint256 priceQ96, uint128 amount);
@@ -511,12 +521,12 @@ Demo: prefer a bid strictly above final clearing so the UI can `exitBid` without
 
 #### If the auction ends below 0.02 ETH (`requiredCurrencyRaised`)
 
-**Yes — every bid is fully refunded.** Official source, not inferred:
+**Yes — every bid is fully refunded. 0 tokens. No pool.** Official source, and observed on the Sepolia fork in [PR #41](https://github.com/prism-toggle-ai/FakeNews/pull/41) `d84aed4` `test_goalNotReached_refundAndTokenSink` (raised 0.01 ETH):
 
 - Graduation rule: `currencyRaised >= requiredCurrencyRaised`. “If the auction never graduates, bidders can refund their full bid amount via `exitBid` and all tokens are returned to the tokens recipient.” ([TechnicalDocumentation.md — Protocol Overview](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/docs/TechnicalDocumentation.md#protocol-overview), pin `7d7602d`)
 - Implementation: `exitBid` after `endBlock` — if `!_isGraduated()`, it `_processExit(_bidId, 0, 0)` (zero tokens filled, full currency back). Comment: “Fully refund the bid if the auction did not graduate, since it is over.” ([`ContinuousClearingAuction.sol` L495–L501](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuction.sol#L495-L501))
+- Fork (#41): `exitBid` refunds the **full ETH**; bidder token balance stays **0**. `claimTokens` **reverts `NotGraduated`**. `sweepUnsoldTokens` sends the auction supply to protocol. `LBPStrategy.migrate` does **not** revert: `tryMigrate` fails `NotGraduated`, then the strategy recovers the LP reserve to `recipient` (`FundsRecovered` + `MigrationFailed`). **No v4 pool** is opened.
 - `exitPartiallyFilledBid` after `endBlock` does the same full refund when not graduated ([L525–L529](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuction.sol#L525-L529)). Prefer `exitBid` in the UI (label: **Get back unused ETH**).
-- `claimTokens` reverts `NotGraduated`. `migrate` will not open a pool.
 
 UI copy for this state: **Get back unused ETH** → `exitBid(bidId)` on the CCA.
 
@@ -667,14 +677,16 @@ Create-time revert names (factory / constructor, prophet sees these on `launch`)
 
 ## 8. Four fork-test steps (02:00 KST gate)
 
-Sepolia fork. Same harness idea as `ForkE2EHelpers` (`SEPOLIA_RPC_URL` + `vm.createSelectFork` + `vm.skip` when unset). Fork PRs do not get the Actions secret. Official factory / LBPStrategy / PoolManager / PositionManager already have bytecode.
+**Canonical sequence:** [PR #41](https://github.com/prism-toggle-ai/FakeNews/pull/41) `d84aed4` [`contracts/test/fork/CCAFork.t.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/d84aed4c327f8b2f169c92b2726f7a2d1c092fb8/contracts/test/fork/CCAFork.t.sol) `_runHappyPath` (25 and 10 blocks) plus `test_goalNotReached_refundAndTokenSink`. Pin `vm.createSelectFork(rpc, 11_784_960)`. Helpers: `CCAForkHelpers.sol`. That suite talks to official LBPStrategy / CCA directly (no Launchpad). A later Launchpad fork wraps step 1 with `launch`.
 
-| # | Step | Calls (official) | Pass when |
+| # | Step | Calls (as in #41) | Pass when |
 |---|---|---|---|
-| 1 | Launch + create auction | Local Launchpad `launch` → LBPStrategy `initializeDistribution` → factory `create` + `onTokensReceived` | `Launched` + `InitializerCreated` + `TokensReceived`. `auctionOf(token).auction != 0`. `fundsRecipient == LBPStrategy`, `tokensRecipient` and `recipient` are not the prophet |
-| 2 | Bid | `vm.roll` to `startBlock`. CCA `submitBid{value: amount}(maxPriceQ96, amount, bidder, prevTick, "")` | `BidSubmitted`. CCALens `state(auction)` shows raised demand |
-| 3 | Migrate opens v4 pool | `vm.roll` to `endBlock`, `checkpoint()`, `isGraduated() == true`. `vm.roll` to `migrationBlock`. `LBPStrategy.migrate(auction)` | `Migrated`. `PoolManager.getSlot0(poolId)` is non-zero. Hook in the key is `ProphecyHook`. Locker `balanceOf` (ERC-721) is 1 (or `tokenIdOf` set). Fee 10000, tickSpacing 200 |
-| 4 | Swap | After (3), a v4 swap on the new pool (Universal Router `execute` **or** harness `PoolSwapTest` if command bytes are still TBD) | Pool price / balances move. Locker still holds the NFT |
+| 1 | Create auction | `initializeDistribution` → factory `create` + `onTokensReceived` | Auction code at the predicted address. `fundsRecipient == LBPStrategy`, `tokensRecipient` and `recipient` are protocol, not the prophet |
+| 2 | Bid | 5-arg `submitBid{value: amount}(maxPrice, amount, owner, prevTick, "")`. First `bidId` is **0**. Hint: `maxPrice = floor + n * tick`, `prevTick = floor + (n-1) * tick` | `BidSubmitted`. Raised demand ≥ 0.02 ETH for the happy path |
+| 3 | Settle + open market | `vm.roll` to `endBlock`, `checkpoint()`, `exitBid` (unused ETH), `claimTokens`. Then `vm.roll` to `endBlock + 1`, `LBPStrategy.migrate(auction)` | `isGraduated() == true`. `PoolManager.getSlot0(poolId)` non-zero. Fee 10000, tickSpacing 200 |
+| 4 | Swap | After (3), one ETH→token swap (`PoolSwapTest` in #41; product may use Universal Router once command bytes are set) | Token balance of the trader moves |
+
+Goal not reached is the same file, not a fifth happy-path step: `exitBid` full ETH / 0 tokens; `claimTokens` reverts `NotGraduated`; no pool (section 4.5).
 
 `TBD(backend):` gas for each step. Record in `FEEDBACK.md` after the run (`TODO(team)` until then).
 
@@ -694,14 +706,14 @@ Do not merge CCA contracts into `main` before the final gate.
 
 Copy these into the contracts PR. Do not invent answers here.
 
-1. `salt` derivation for `initializeDistribution` (unique per prophecy; included in `initializerSalt = keccak256(abi.encode(salt, migrationParams))`).
-2. `AuctionParameters.floorPrice` Q96 (must be `>= 2^32 + 1`) and auction `tickSpacing` Q96 (must be `>= 2`).
-3. `auctionStepsData` bytes for a 25-block schedule (official pack: 24-bit MPS + 40-bit block delta; 1e7 MPS = 100%). Steps must land on `endBlock` or the constructor reverts `InvalidEndBlockGivenStepData`.
-4. `startBlock` at `launch`: `block.number` vs `block.number + 1`.
-5. `claimBlock` offset (`>= endBlock`) and `migrationBlock` offset (`> endBlock`). Demo intent: `claimBlock = endBlock`, `migrationBlock = endBlock + 1`.
-6. `reservedTokenAmountForLP` and therefore auction supply (`totalSupply - reserved`). Former SPEC split 206.9M / 793.1M is **not** decided for CCA (#7 is superseded).
-7. Exact `positionDefinitions` / `lpAllocationSchedule` encodings (demo intent: one full-range `PositionDefinition` at weight `1e7`, one bracket `{0, 1e7}`).
-8. Whether `tokensRecipient` and `recipient` are `protocolFeeRecipient` or Launchpad (neither may be the prophet; `tokensRecipient` may not be LBPStrategy).
+1. `salt` derivation for `initializeDistribution` (unique per prophecy; included in `initializerSalt = keccak256(abi.encode(salt, migrationParams))`). #41’s harness salt is not the product salt.
+2. ~~`floorPrice` / auction `tickSpacing`~~ → section 0.1 (`1000 << 96` / `100 << 96`) from #41.
+3. ~~`auctionStepsData`~~ → section 0.1 (`abi.encodePacked(uint24(1e7/N), uint40(N))`) from #41.
+4. ~~`startBlock`~~ → `block.number` from #41.
+5. ~~`claimBlock` / `migrationBlock`~~ → `end` / `end + 1` from #41.
+6. `reservedTokenAmountForLP` and therefore auction supply (`totalSupply - reserved`). Former SPEC split 206.9M / 793.1M is **not** decided for CCA (#7 is superseded). #41’s spike used `800e18` / `200e18` on a `1000e18` test token — not the 1B product mint.
+7. Exact `positionDefinitions` / `lpAllocationSchedule` encodings. #41 used empty `PositionDefinition[]` (implicit full-range) and one bracket `{0, 1e7}`. Still confirm for the 1B Launchpad mint.
+8. ~~`tokensRecipient` / `recipient`~~ → **protocol** (never the prophet) from #41.
 9. Whether Launchpad wraps `migrate` (`openMarket`) or web always calls the strategy.
 10. How `auctionOf(token).poolOpened` is set if web calls `migrate` directly.
 11. New Launchpad custom-error names (`LbpNotSet` and the like).
