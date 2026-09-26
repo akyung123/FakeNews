@@ -2,7 +2,7 @@
 
 /* Prototype class names stay; colors and type map onto v1 tokens. */
 :root {
-  --hero-image: url("/hero.jpg");
+  --hero-image: url("./assets/hero.jpg");
   --ground: var(--ink-950);
   --surface: var(--ink-800);
   --soft: var(--ink-700);
@@ -85,7 +85,7 @@ button { font: inherit; cursor: pointer; }
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
-  background: url("/logo.svg") center / contain no-repeat;
+  background: url("./assets/logo.svg") center / contain no-repeat;
 }
 .logo span { color: var(--gold-300); }
 .side-nav { display: flex; flex-direction: column; gap: 2px; }
