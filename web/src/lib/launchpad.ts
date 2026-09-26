@@ -295,3 +295,38 @@ export async function fetchLaunchedLogsChunked(
   launchedLogsCache.set(address, { scannedTo: latest, logs });
   return logs;
 }
+
+export function protocolFeeRecipientRead(address = contracts.launchpad) {
+  if (!address) {
+    throw new Error("Launchpad address is not set");
+  }
+  return {
+    address,
+    abi: launchpadAbi,
+    functionName: "protocolFeeRecipient" as const,
+    args: [] as const,
+  };
+}
+
+/**
+ * Launchpad.protocolFeeRecipient() (immutable). `launch` reverts ProphetRecipient
+ * when the sender is this wallet, so the issue screen checks it first.
+ * null when no launchpad is set or the read fails.
+ */
+export function createReadProtocolFeeRecipient(
+  options: { address?: Address; readContract?: (config: typeof wagmiConfig, request: ReturnType<typeof protocolFeeRecipientRead>) => Promise<unknown> } = {},
+): () => Promise<Address | null> {
+  const address = "address" in options ? options.address : contracts.launchpad;
+  let cached: Promise<Address | null> | null = null;
+  return () => {
+    if (!address) return Promise.resolve(null);
+    const read = options.readContract ?? (readContract as NonNullable<typeof options.readContract>);
+    cached ??= read(wagmiConfig, protocolFeeRecipientRead(address))
+      .then((value) => (typeof value === "string" && isAddress(value) ? value : null))
+      .catch(() => {
+        cached = null;
+        return null;
+      });
+    return cached;
+  };
+}

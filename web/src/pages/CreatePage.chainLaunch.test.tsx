@@ -44,3 +44,46 @@ describe("chain-mode launch with no token back", () => {
     expect(new Set(sizes).size).toBe(1);
   });
 });
+
+describe("protocol fee recipient", () => {
+  it("disables Launch and says why when the wallet receives protocol fees", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <IssueScreen
+          session={MOCK_RETURNING_SESSION}
+          world={createWorldClient({ mock: true })}
+          launchProphecy={async () => null}
+          lookupProphet={async () => MOCK_RETURNING_SESSION.prophetLabel ?? ""}
+          readFeeRecipient={async () => MOCK_RETURNING_SESSION.wallet.toUpperCase().replace("0X", "0x")}
+        />
+      </MemoryRouter>,
+    );
+    await user.type(screen.getByLabelText(/^Prophecy$/i), "Coffee lasts until the last pitch");
+    await user.type(screen.getByLabelText(/^Short name$/i), "coffee-last");
+    await waitFor(() =>
+      expect(screen.getByTestId("fee-recipient")).toHaveTextContent(
+        "This wallet receives protocol fees and can't launch",
+      ),
+    );
+    expect(screen.getByRole("button", { name: ISSUE_COPY.launch })).toBeDisabled();
+  });
+
+  it("leaves Launch on for any other wallet", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <IssueScreen
+          session={MOCK_RETURNING_SESSION}
+          world={createWorldClient({ mock: true })}
+          lookupProphet={async () => MOCK_RETURNING_SESSION.prophetLabel ?? ""}
+          readFeeRecipient={async () => "0x9999999999999999999999999999999999999999"}
+        />
+      </MemoryRouter>,
+    );
+    await user.type(screen.getByLabelText(/^Prophecy$/i), "Coffee lasts until the last pitch");
+    await user.type(screen.getByLabelText(/^Short name$/i), "coffee-last");
+    await waitFor(() => expect(screen.getByRole("button", { name: ISSUE_COPY.launch })).toBeEnabled());
+    expect(screen.queryByTestId("fee-recipient")).toBeNull();
+  });
+});

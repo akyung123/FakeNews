@@ -55,6 +55,7 @@ export const ISSUE_COPY = {
   checkingWallet: "Checking your wallet for a prophet name…",
   lookupFailed: "Couldn't check whether this wallet already has a name. Check your connection and try again.",
   launchUnavailable: "Couldn't launch: this site isn't connected to the Launchpad. Nothing was sent.",
+  feeRecipient: "This wallet receives protocol fees and can't launch",
 } as const;
 
 /** Chain-mode input hints. Demo mode uses the sample placeholders in mock.ts. */
@@ -101,14 +102,20 @@ export function isNamedProphet(input: {
   return input.returningProphet || input.registerStatus === "success";
 }
 
-/** Launch write — hidden until the wallet is a prophet (NotProphet). */
+/** Same wallet as Launchpad.protocolFeeRecipient (launch would revert ProphetRecipient). */
+export function isProtocolFeeRecipient(wallet: string | null | undefined, recipient: string | null | undefined): boolean {
+  return Boolean(wallet && recipient && wallet.toLowerCase() === recipient.toLowerCase());
+}
+
+/** Launch write — hidden until the wallet is a prophet (NotProphet), never for the fee recipient. */
 export function isLaunchEnabled(input: {
   returningProphet: boolean;
   worldStatus: WorldStatus;
   formValid: boolean;
   registerStatus?: RegisterStatus;
+  feeRecipient?: boolean;
 }): boolean {
-  if (!input.formValid) return false;
+  if (!input.formValid || input.feeRecipient) return false;
   return isNamedProphet(input);
 }
 
