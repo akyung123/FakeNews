@@ -10,7 +10,6 @@ import {
   CCA_LAUNCH_ERROR_MESSAGE,
   CCA_LAUNCH_ERROR_NAMES,
   CCA_MIGRATE_ERROR_COPY,
-  CLEARING_PRICE_HELP_TBD,
   FEE_COLLECT_COPY,
   SWAP_SECTION_COPY,
   auctionLiveCopy,
@@ -69,9 +68,8 @@ describe("designer FINAL CCA copy", () => {
     expect(CCA_COPY.currentClearingPrice).toBe("Current clearing price");
     expect(CCA_COPY.finalClearingPrice).toBe("Final clearing price");
     expect(CCA_COPY.clearingPriceHelp).toBe(
-      "Bids in the same block pay the same price per token. You never pay more than your max price.",
+      "Everyone buying in the same block pays that block's price per token. You never pay more than your max price.",
     );
-    expect(CLEARING_PRICE_HELP_TBD).toBe(INTERFACE_CCA_TBD);
     expect(CCA_COPY.raisedProgress).toBe("{raised} of 0.02 ETH raised to open the market");
     expect(CCA_COPY.budgetEth).toBe("Budget (ETH)");
     expect(CCA_COPY.maxPricePerToken).toBe("Max price per token (ETH)");
@@ -150,7 +148,7 @@ describe("designer FINAL CCA copy", () => {
     }
 
     expect(CCA_EXIT_ERROR_COPY.AuctionIsNotOver).toBe("You can get your ETH back after the auction ends.");
-    expect(CCA_EXIT_ERROR_COPY.BidAlreadyExited).toBe("You already got the unused ETH back for this bid.");
+    expect(CCA_EXIT_ERROR_COPY.BidAlreadyExited).toBe("You already got your ETH back for this bid.");
     expect(CCA_EXIT_ERROR_COPY.CannotExitBid).toBe("This bid can't be settled this way. Refresh and try again.");
     expect(CCA_EXIT_ERROR_COPY.CannotPartiallyExitBidBeforeGraduation).toBe(
       "This bid can be settled after the auction ends.",
@@ -215,7 +213,7 @@ describe("designer FINAL CCA copy", () => {
     ).toEqual({ claim: false, openMarket: false, exit: true });
   });
 
-  test("leaves swap section, fee collect, and clearing-price confirmation TBD", () => {
+  test("leaves swap section and fee collect TBD", () => {
     expect(SWAP_SECTION_COPY).toBe(INTERFACE_CCA_TBD);
     expect(FEE_COLLECT_COPY).toBe(INTERFACE_CCA_TBD);
     expect(() => swapSectionCopy()).toThrow(InterfaceCcaPendingError);

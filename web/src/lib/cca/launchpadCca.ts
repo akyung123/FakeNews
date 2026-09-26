@@ -129,7 +129,6 @@ export const INTERFACE_CCA_PENDING = [
   "Launchpad custom-error names (LbpNotSet and the like)",
   "PositionManager fees-only collect action bytes",
   "reservedTokenAmountForLP",
-  "clearing-price helper (per-block price)",
   "swap section copy",
   "fee collect copy",
 ] as const;

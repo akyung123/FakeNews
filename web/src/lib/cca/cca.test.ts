@@ -640,7 +640,6 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
         "Universal Router 2.1.2 V4_SWAP command + inputs encoding",
         "LiquidityLocker tokenId → token / prophet binding",
         "Launchpad custom-error names (LbpNotSet and the like)",
-        "clearing-price helper (per-block price)",
         "swap section copy",
         "fee collect copy",
       ]),

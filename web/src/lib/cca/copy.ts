@@ -40,12 +40,8 @@ export const CCA_COPY = {
 
   currentClearingPrice: "Current clearing price",
   finalClearingPrice: "Final clearing price",
-  /**
-   * TBD(INTERFACE_CCA): backend to confirm per-block price.
-   * Keep the designer string; do not treat it as settled.
-   */
   clearingPriceHelp:
-    "Bids in the same block pay the same price per token. You never pay more than your max price.",
+    "Everyone buying in the same block pays that block's price per token. You never pay more than your max price.",
 
   raisedProgress: "{raised} of 0.02 ETH raised to open the market",
 
@@ -78,7 +74,6 @@ export const CCA_COPY = {
   marketOpen: "Market open. You can swap now.",
 } as const;
 
-export const CLEARING_PRICE_HELP_TBD = INTERFACE_CCA_TBD;
 export const SWAP_SECTION_COPY = INTERFACE_CCA_TBD;
 export const FEE_COLLECT_COPY = INTERFACE_CCA_TBD;
 
@@ -104,7 +99,7 @@ export const CCA_BID_ERROR_COPY = {
 
 export const CCA_EXIT_ERROR_COPY = {
   AuctionIsNotOver: "You can get your ETH back after the auction ends.",
-  BidAlreadyExited: "You already got the unused ETH back for this bid.",
+  BidAlreadyExited: "You already got your ETH back for this bid.",
   CannotExitBid: "This bid can't be settled this way. Refresh and try again.",
   CannotPartiallyExitBidBeforeGraduation: "This bid can be settled after the auction ends.",
   CannotPartiallyExitBidBeforeEndBlock: "This bid can be settled after the auction ends.",
