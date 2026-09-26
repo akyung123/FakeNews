@@ -68,29 +68,103 @@ After a person sets the Actions secret `SEPOLIA_RPC_URL` and re-runs CI on `main
 
 From `contracts/`, with `contracts/.env` filled:
 
+Preferred path (one wallet, commit-reveal wait included). Does **not** lock the parent name:
+
 ```bash
 # once, locally — generates WORLD_SIGNER_KEY + WORLD_SIGNER_ADDRESS (do not commit)
 ../infra/new-world-signer.sh
 
-./script/run-sepolia.sh script/RegisterParent.s.sol --sig "commit()"
-# wait 60 seconds
-./script/run-sepolia.sh script/RegisterParent.s.sol --sig "registerName()"
-./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployUserRegistry()"
-./script/run-sepolia.sh script/Deploy.s.sol
-# TODO(#17): deploy adapter — launchpad, parentRegistry, parent DNS name,
-# factory, UserRegistryImpl, PermissionedResolverImpl
-./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployAdapter()"
-./script/run-sepolia.sh script/SetupParent.s.sol --sig "linkParent()"
-./script/run-sepolia.sh script/SetupParent.s.sol --sig "grantLaunchpadRegistrar()"
+# from repo root. SEND=1 is person-only. WARP_COMMIT=1 on a local anvil fork.
+./infra/scripts/deploy-sepolia.sh
+SEND=1 ./infra/scripts/deploy-sepolia.sh
 ```
 
-Sending is opt-in and needs `DEPLOYER_PRIVATE_KEY` in the environment, never on argv.
+Equivalent step-by-step from `contracts/`:
 
-`Deploy.s.sol` deploys `Launchpad` as `new Launchpad(protocolFeeRecipient, worldSigner)` — the order in `contracts/src/Launchpad.sol`. Both args are `public immutable`; zero address reverts. There is no setter. Right after deploy the script requires `launchpad.worldSigner() == worldSigner` and `launchpad.protocolFeeRecipient() == protocolFeeRecipient` so a swapped constructor order fails in dry-run. `worldSigner` is derived from `WORLD_SIGNER_KEY` (generated at deploy, never committed). `protocolFeeRecipient` is `PROTOCOL_FEE_RECIPIENT`.
+```bash
+./script/run-sepolia.sh script/RegisterParent.s.sol --sig "commit()"
+# wait ~70 seconds (forge simulates a run before sending — do not combine with register)
+./script/run-sepolia.sh script/RegisterParent.s.sol --sig "fundPaymentToken()"
+./script/run-sepolia.sh script/RegisterParent.s.sol --sig "registerName()"
+./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployUserRegistry()"
+# adapter, Launchpad, CREATE2 Hook, Locker, setUniswap — one broadcast
+./script/run-sepolia.sh script/Deploy.s.sol
+./script/run-sepolia.sh script/SetupParent.s.sol --sig "linkParent()"
+./script/run-sepolia.sh script/SetupParent.s.sol --sig "grantAdapterRegistrar()"
+```
 
-Adapter wiring (`new ProphecyEns(...)`) is still TODO in `deployAdapter()`.
+Sending is opt-in and needs `DEPLOYER_PRIVATE_KEY` in the environment, never on argv. `TEAM_WALLET` defaults to that deployer; a different value reverts.
 
-The script prints paste-ready lines for a visual check: `WORLD_CHAIN_ID=11155111`, `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`, and `worldSigner address: 0x…` (address only, never the private key).
+`Deploy.s.sol` creates `ProphecyEns` at the current nonce, then `Launchpad` at nonce+1, after predicting that address (`LaunchpadEns.t.sol`). Constructor: `new Launchpad(protocolFeeRecipient, worldSigner, ens)` — the order in `contracts/src/Launchpad.sol`. All three args are `public immutable`; zero address reverts. In the same broadcast, after Launchpad exists, the script mines a CREATE2 salt against the Arachnid/Foundry factory (`0x4e59b448…` — forge script `new Hook{salt}` uses that factory, not the EOA) so `ProphecyHook` lands on an address whose low bits are `Hooks.BEFORE_INITIALIZE_FLAG` (`HookMiner.prophecyFlags()`), deploys the hook with `(poolManager, launchpad)`, deploys `LiquidityLocker(poolManager, launchpad, hook)`, then calls `launchpad.setUniswap(poolManager, hook, locker)` once from the deployer. It requires `launchpad.hook() == hook`, `launchpad.locker() == locker`, and `launchpad.poolManager() == poolManager`. PoolManager is the official Uniswap v4 Sepolia address (`SepoliaConfig.POOL_MANAGER` / [docs.uniswap.org/contracts/v4/deployments](https://docs.uniswap.org/contracts/v4/deployments)); override with `UNISWAP_V4_POOL_MANAGER`. Optional `HOOK_SALT` skips the miner (must still produce the flags). Right after deploy the script also requires `address(launchpad) == predictedPad`, `adapter.launchpad() == launchpad`, `launchpad.ens() == adapter`, plus the `#24` fee/signer checks. `worldSigner` is derived from `WORLD_SIGNER_KEY` (generated at deploy, never committed). `protocolFeeRecipient` is `PROTOCOL_FEE_RECIPIENT`. `ENS_ADAPTER_ADDRESS` is logged as an output. If that env var is already set, the script skips the adapter CREATE and uses it as `ens` (reject `0` and placeholder `0xe05` off anvil).
+
+`grantAdapterRegistrar()` gives `ROLE_REGISTRAR` on the parent UserRegistry to the **adapter** (`ProphecyEns`), not the Launchpad. The old `grantLaunchpadRegistrar()` name reverts.
+
+The deployer must be a **plain EOA**. `ETHRegistrar.register` mints an ERC-1155 to the owner; a wallet with code or an EIP-7702 delegation (the well-known Anvil addresses have 23-byte designations on Sepolia) reverts on `onERC1155Received`. Fork rehearsals should `anvil_setCode` that account to empty first.
+
+Gas on a Sepolia fork (14 txs, ~6.82M gas, including MockUSDC mint + Hook CREATE2 + Locker + `setUniswap`): about 0.0068 ETH at 1 gwei, 0.034 ETH at 5 gwei, 0.136 ETH at 20 gwei. A 0.05 ETH deployer balance covers 1–5 gwei, not 20 gwei. If `Deploy.s.sol` is split from `deployAdapter()`, do not send any other deployer transaction in between — the Launchpad CREATE nonce is predicted.
+
+The script prints paste-ready lines for a visual check: `WORLD_CHAIN_ID=11155111`, `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`, and `worldSigner address: 0x…` (address only, never the private key). After a send it also writes the deployment record below and prints `chainId`, `launchpad`, `launchpadBlock`, `adapter`, `parentUserRegistry`, `hook`, `locker`, `poolManager`, `deployer`, and `commit`.
+
+## Deployment record
+
+After a successful **send** (`SEND=1` / `--broadcast`), `infra/scripts/write-deployment-record.sh` writes one JSON file. No private keys, RPC URLs, or signer keys.
+
+| File | When |
+|------|------|
+| `deployments/sepolia.json` | Chain 11155111 on a remote Sepolia RPC. A person may commit this after the live send. |
+| `deployments/anvil.json` | Anvil (`31337`) or a local / forked RPC (`127.0.0.1`, `localhost`, `WARP_COMMIT=1`). **Gitignored.** |
+
+```json
+{
+  "chainId": 11155111,
+  "launchpad": "0xLaunchpadAddress…",
+  "launchpadBlock": 12345678,
+  "adapter": "0xProphecyEnsAddress…",
+  "parentUserRegistry": "0xParentUserRegistry…",
+  "hook": "0xProphecyHookAddress…",
+  "locker": "0xLiquidityLockerAddress…",
+  "poolManager": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
+  "deployer": "0xDeployerAddress…",
+  "commit": "<git rev-parse HEAD>"
+}
+```
+
+JSON values are hex addresses or numbers — the ellipses above are documentation only.
+
+`launchpadBlock` is the receipt block of the Launchpad CREATE (from Foundry `broadcast/Deploy.s.sol/<chainId>/run-latest.json`). Addresses are checksummed when Foundry logs them.
+
+**Web** (INTERFACE §5):
+
+| JSON field | Web |
+|---|---|
+| `launchpad` | `VITE_LAUNCHPAD_ADDRESS` (Actions variable / `web/.env`) |
+| `launchpadBlock` | `VITE_LAUNCHPAD_DEPLOY_BLOCK` — `fromBlock` for `Launched`. Optional; empty = recent block range |
+| `hook` | optional `VITE_HOOK_ADDRESS` |
+| `locker` | optional `VITE_LOCKER_ADDRESS` |
+| `poolManager` | official Uniswap v4 Sepolia PoolManager (not a Vite var) |
+| `chainId` | `VITE_CHAIN_ID` is already `11155111` on Sepolia |
+
+Stdout after a send (same keys, plus the web env lines to paste):
+
+```
+--- deployment ---
+chainId=11155111
+launchpad=0x…
+launchpadBlock=11783750
+adapter=0x…
+parentUserRegistry=0x…
+hook=0x…
+locker=0x…
+poolManager=0xE03A1074c86CFeDd5C142C4F04F1a1536e203543
+deployer=0x…
+commit=7c075cd…
+VITE_LAUNCHPAD_ADDRESS=0x…
+VITE_LAUNCHPAD_DEPLOY_BLOCK=11783750
+VITE_HOOK_ADDRESS=0x…
+VITE_LOCKER_ADDRESS=0x…
+VITE_CHAIN_ID=11155111
+wrote /…/deployments/sepolia.json
+```
 
 **Mandatory after Launchpad deploy.** Set these on Render and restart the world service. Empty `WORLD_CHAIN_ID` / `WORLD_LAUNCHPAD_ADDRESS` turns the server-side context check off (PR #16).
 
@@ -109,7 +183,10 @@ Never commit `WORLD_SIGNER_KEY`. Never print it in CI logs. A person pastes it f
 | Variable | Value |
 |----------|--------|
 | `VITE_WORLD_SERVER_URL` | Render `https://….onrender.com` origin |
-| `VITE_LAUNCHPAD_ADDRESS` | Deployed Launchpad |
+| `VITE_LAUNCHPAD_ADDRESS` | `launchpad` from `deployments/sepolia.json` |
+| `VITE_LAUNCHPAD_DEPLOY_BLOCK` | `launchpadBlock` from that file. Optional; empty is allowed |
+| `VITE_HOOK_ADDRESS` | optional `hook` from that file |
+| `VITE_LOCKER_ADDRESS` | optional `locker` from that file |
 | `VITE_CHAIN_ID` | `11155111` |
 | `VITE_RPC_URL` | Public / rate-limited Sepolia RPC (not the `SEPOLIA_RPC_URL` secret) |
 | `VITE_PARENT_NAME` | `prophecy.eth` |
@@ -135,7 +212,7 @@ Also needed from a person (not World Portal):
 
 | Env name | What it is |
 |----------|------------|
-| `TEAM_WALLET` | Team address + Sepolia ETH |
+| `TEAM_WALLET` | Optional; defaults to the deployer. If set, must be that same address |
 | `SEPOLIA_RPC_URL` | Private Sepolia RPC for deploy scripts and PR #19 fork tests (Actions secret). Do not ship this to the web app |
 | `VITE_RPC_URL` | Public / rate-limited Sepolia RPC shipped to browsers (Actions variable) |
 | `VITE_WALLETCONNECT_PROJECT_ID` | Optional, public WalletConnect project id |
@@ -176,14 +253,13 @@ This repo has one `.env.example`. Do not add `world/.env.example`.
 ## `prophecy.eth` runbook
 
 1. Confirm the label is still free (`isAvailable`). PLAN §0 last checked it available on 2026-09-26.
-2. `mint` MockUSDC on the team wallet (5+ chars ≈ $8 / year).
-3. `commit()` → wait **60 seconds** → `registerName()`.
+2. Script mints MockUSDC via public `mint(address,uint256)` on the 71a3b73 token (`docs/ENSV2.md` section 0). If that mint is gone, fund the deployer by hand (5+ chars ≈ $8 / year).
+3. `commit()` → wait **~70 seconds** → `registerName()` (`approve` the ETHRegistrar, `subregistry=0`, `resolver=0`). Same `DEPLOYER_PRIVATE_KEY` for every step.
 4. `deployUserRegistry()` — VerifiableFactory proxy of `UserRegistryImpl`.
-5. Deploy Launchpad (`Deploy.s.sol`). Constructor: `protocolFeeRecipient`, `worldSigner` (PR #8).
-6. Deploy the ENS adapter with `launchpad`, `parentRegistry`, parent DNS name, `factory`, `UserRegistryImpl`, `PermissionedResolverImpl` (TODO(#17) until merge).
-7. `linkParent()` — `setSubregistry` on ETHRegistry, `setParent` on the new registry.
-8. `grantLaunchpadRegistrar()` — `ROLE_REGISTRAR` to `LAUNCHPAD_ADDRESS` only.
-9. Final lock is irreversible. A person confirms before anyone prepares it.
+5. `Deploy.s.sol` — **adapter first** with a predicted Launchpad CREATE address, then Launchpad, CREATE2 Hook (mined flags), Locker, and deployer `setUniswap(poolManager, hook, locker)` once, in one broadcast. Constructor: `protocolFeeRecipient`, `worldSigner`, `ens`.
+6. `linkParent()` — `setSubregistry` on ETHRegistry, `setParent` on the new registry, revoke `SET_PARENT`.
+7. `grantAdapterRegistrar()` — `ROLE_REGISTRAR` to `ENS_ADAPTER_ADDRESS` (`ProphecyEns`) only.
+8. Final lock is irreversible. **Do not run it from this script.** A person confirms before anyone prepares it.
 
 ## CI
 
