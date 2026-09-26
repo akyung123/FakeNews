@@ -70,6 +70,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - [x] replace the prototype's holder talk with trade memos @cursor
   - [x] hide Buy/Sell after graduation; Uniswap V4 panel @cursor-agent
 - [x] Screen 4: prophet page. Every prophecy under the name, claimable fees @cursor
+- [x] Following page (`/following`): feed of followed prophets' prophecies, prophet list with filter and Unfollow, chips on narrow screens @claude
 - [ ] Every sentence is read from ENS. Nothing hardcoded
 - [x] Read budget: one poll per block, shared list load, found ENS text read once per session @claude
 - [ ] Republish the demo page (skill `demo-publish`)

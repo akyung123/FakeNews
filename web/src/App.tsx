@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { WalletButton } from "./components/WalletButton";
 import { SampleBadge } from "./components/SampleBadge";
@@ -11,6 +11,7 @@ import { isMockMode } from "./lib/mode";
 import { YOU, actions, useStore } from "./lib/store";
 import { CoinPage } from "./pages/CoinPage";
 import { CreatePage } from "./pages/CreatePage";
+import { FollowingPage } from "./pages/FollowingPage";
 import { HomePage } from "./pages/HomePage";
 import { MyPage } from "./pages/MyPage";
 import { NamePage } from "./pages/NamePage";
@@ -24,10 +25,7 @@ export function App() {
   const { address, isConnected } = useAccount();
   const [prophetLabel, setProphetLabel] = useState<string | null>(null);
   const following = useFollowing();
-  const { pathname, hash } = useLocation();
-  // NavLink ignores the hash, so /me and /me#following would both light up.
-  const onMe = pathname === "/me";
-  const onFollowing = onMe && hash === "#following";
+  const { hash } = useLocation();
   const held = mock ? Object.values(s.positions[YOU] ?? {}).filter((p) => p.tokens > 1e-6).length : 0;
 
   useEffect(() => {
@@ -67,20 +65,12 @@ export function App() {
           <NavLink to="/name">
             Claim your name
           </NavLink>
-          <Link
-            to="/me"
-            className={onMe && !onFollowing ? "active" : undefined}
-            aria-current={onMe && !onFollowing ? "page" : undefined}
-          >
+          <NavLink to="/me">
             My prophecies{"\u00a0"}<span className="count">{held}</span>
-          </Link>
-          <Link
-            to="/me#following"
-            className={onFollowing ? "active" : undefined}
-            aria-current={onFollowing ? "page" : undefined}
-          >
+          </NavLink>
+          <NavLink to="/following">
             Following{"\u00a0"}<span className="count">{following.length}</span>
-          </Link>
+          </NavLink>
         </nav>
 
         <Link to="/create" className="btn primary full side-cta">
@@ -110,7 +100,12 @@ export function App() {
       <div className="content">
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/me" element={<MyPage />} />
+          {/* Old links pointed at the Following section of My page. */}
+          <Route
+            path="/me"
+            element={hash === "#following" ? <Navigate to="/following" replace /> : <MyPage />}
+          />
+          <Route path="/following" element={<FollowingPage />} />
           <Route path="/create" element={<CreatePage />} />
           <Route path="/name" element={<NamePage />} />
           <Route path="/coin/:id" element={<CoinPage />} />

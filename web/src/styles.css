@@ -542,6 +542,14 @@ input:focus, textarea:focus { outline: none; border-color: var(--gold-300); }
   .featured { padding: 16px; }
   .featured-text { font-size: 20px; }
 }
+/* Following page: prophet chips replace the side list on narrow screens.
+   After the phone rules so the chips stay on one scrolling line. */
+.follow-chips { display: none; }
+@media (max-width: 1000px) {
+  .follow-chips { display: flex; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; gap: 6px; }
+  .follow-chips a { white-space: nowrap; }
+  .follow-list { display: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
