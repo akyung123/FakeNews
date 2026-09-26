@@ -1,0 +1,35 @@
+# Render Blueprint for the world/ verification server.
+# Not at the repo root — a root render.yaml would collide with other lanes.
+# In the dashboard: New Blueprint → this GitHub repo → path infra/render.yaml.
+# Env names only, sync: false, no values. A person pastes them. Never commit secrets.
+
+services:
+  - type: web
+    name: prophecy-world
+    runtime: node
+    plan: free
+    rootDir: world
+    buildCommand: curl -fsSL https://bun.sh/install | bash && ~/.bun/bin/bun install
+    startCommand: ~/.bun/bin/bun start
+    healthCheckPath: /health
+    envVars:
+      - key: WORLD_APP_ID
+        sync: false
+      - key: WORLD_ACTION
+        sync: false
+      - key: WORLD_RP_ID
+        sync: false
+      - key: WORLD_RP_SIGNING_KEY
+        sync: false
+      - key: WORLD_SIGNER_KEY
+        sync: false
+      - key: PORT
+        sync: false
+      - key: WORLD_ENVIRONMENT
+        sync: false
+      - key: WORLD_PORTAL_URL
+        sync: false
+      - key: WORLD_CHAIN_ID
+        sync: false
+      - key: WORLD_LAUNCHPAD_ADDRESS
+        sync: false
