@@ -73,8 +73,14 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 ## 5. Demo
 
-- [ ] Create a prophecy with a 2-minute deadline beforehand so it is already Departed
-- [ ] Record the five scenes in SPEC "Demo" (2–4 minutes)
+- [ ] Rehearse scene 1 (prophet name registration with World ID) end to end on a local or forked chain first. On Sepolia scene 1 is one shot: one World ID gives one name.
+- [ ] Record scene 1 on Sepolia (register `ringo.prophecy.eth`).
+  - If it fails: record it again with another person's World ID and a different name.
+  - Redeploying the contracts is the last resort only.
+- [ ] Right after scene 1, off camera: issue a prophecy under `ringo` with a 2-minute deadline so it is already Departed for the later scenes.
+- [ ] Record the remaining scenes in SPEC "Demo" (total 2–4 minutes, success and failure paths).
+- [ ] If the ENS app cannot read Sepolia ENSv2 names: use the viem lookup script in `infra/` (`getEnsAddress` and text record) output as the external lookup evidence for scenes 1 and 2.
+- [ ] `FEEDBACK.md` (Uniswap): keep notes of blockers during development; it is the fallback deliverable if Uniswap graduation is cut.
 
 ## If there is time
 
