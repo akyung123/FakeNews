@@ -152,6 +152,8 @@ main.narrow { max-width: 720px; }
 .empty a { color: var(--gold-300); font-weight: 600; }
 
 .home { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+/* Chain mode has no memo column, so the list takes the full width. */
+.home.solo { grid-template-columns: minmax(0, 1fr); }
 .talk { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); max-height: calc(100vh - 48px); overflow-y: auto; }
 
 .home-toolbar {
@@ -163,112 +165,184 @@ main.narrow { max-width: 720px; }
 }
 .home-toolbar h1 { font-size: 28px; }
 
-/* Auction live — featured slot */
-.featured {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(180px, 0.7fr);
-  gap: 20px;
-  padding: 22px 24px;
+/* Market stage colors, shared by the featured card and the list cards.
+   Each stage sets these local values; the rules below only read them. */
+.featured,
+.launch {
+  --stage-bg: var(--card-live);
+  --stage-ink: var(--paper-ink);
+  --stage-muted: var(--paper-muted);
+  --stage-name: var(--gold-ink);
+  --stage-accent: var(--card-live-accent);
+  --stage-track: var(--card-track);
+  --stage-rule: var(--gold-600);
+  --stage-badge-bg: var(--card-live-accent);
+  --stage-badge-ink: var(--card-live-accent-ink);
+  --stage-badge-line: var(--card-live-accent);
+  min-width: 0;
   border-radius: var(--radius-card);
-  background: var(--paper-100);
-  color: var(--paper-ink);
+  background: var(--stage-bg);
+  color: var(--stage-ink);
+}
+.stage-market {
+  --stage-bg: var(--card-market);
+  --stage-accent: var(--card-market-ring);
+  --stage-badge-bg: var(--card-market-badge);
+  --stage-badge-ink: var(--card-market-badge-ink);
+  --stage-badge-line: var(--card-market-badge);
+}
+.stage-ended {
+  --stage-bg: var(--card-ended);
+  --stage-ink: var(--card-ended-ink);
+  --stage-muted: var(--card-ended-ink);
+  --stage-name: var(--card-ended-ink);
+  --stage-accent: var(--card-ended-ink);
+  --stage-track: var(--card-ended-line);
+  --stage-rule: var(--card-ended-line);
+  --stage-badge-bg: transparent;
+  --stage-badge-ink: var(--card-ended-ink);
+  --stage-badge-line: var(--card-ended-ink);
+}
+.stage-badge {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--stage-badge-line);
+  border-radius: var(--radius-pill);
+  background: var(--stage-badge-bg);
+  color: var(--stage-badge-ink);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.featured .bar,
+.launch .bar { background: var(--stage-track); }
+.featured .bar-fill,
+.launch .bar-fill { background: var(--stage-accent); }
+
+/* Featured slot: the newest live auction, else the market that opened last.
+   Badge 12 sentence 12 name / ENS 16 bar 8 raised 4 memos. */
+.featured {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
   border: 1px solid var(--featured-ring);
   box-shadow: var(--glow-gold), var(--shadow-card);
 }
 .featured:hover { border-color: var(--gold-300); }
-.featured-kicker {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-  color: var(--gold-ink);
-}
+/* 2px ring, 1px less padding, so the content stays where a 1px card has it. */
+.featured.stage-market { border: 2px solid var(--card-market-ring); padding: 23px; }
+.featured .stage-badge { text-transform: uppercase; letter-spacing: var(--tracking-caps); }
+.featured .faint { color: var(--stage-muted); }
 .featured-text {
-  margin-top: 10px;
+  margin-top: 12px;
   font-family: var(--font-display);
   font-size: 26px;
   font-weight: 500;
   font-variation-settings: "opsz" 72;
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 .featured-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 14px;
+  align-items: center;
+  gap: 8px 24px;
+  margin-top: 12px;
+  min-width: 0;
   font-variant-numeric: tabular-nums;
 }
-.featured-meta .faint { color: var(--paper-muted); }
-.featured-empty { display: block; }
-.stage-badge {
-  align-self: flex-start;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  border: 1px solid currentColor;
-}
-.stage-live { color: var(--gold-ink); }
-.stage-ended { color: var(--paper-muted); }
-.stage-market_open { color: var(--success-ink); }
-.featured-side { display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; }
-.featured .bar { height: 8px; background: rgba(26, 26, 26, 0.12); }
-.featured .bar-fill { background: var(--gold-500); }
+.featured-meta .token-name { min-width: 0; }
+/* Ticker and price keep 24px apart; the launch time is centered on the price line. */
+.featured-quote { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; min-width: 0; }
+.featured-price { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.featured-side { display: flex; flex-direction: column; margin-top: 16px; }
+.featured .bar-wrap { margin-top: 0; }
+.featured .bar { height: 8px; }
+.featured-raised { margin-top: 8px; }
+.featured-memos { margin-top: 4px; }
+.featured .bar-wrap + .featured-memos { margin-top: 8px; }
 
-/* live token grid */
+/* Stage filter chips over the list. */
+.stage-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.chip {
+  padding: 4px 12px;
+  border: 1px solid var(--gold-800);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.chip:hover { border-color: var(--gold-600); color: var(--text); }
+.chip.on { border-color: var(--gold-500); background: var(--gold-500); color: var(--ink-950); }
+
+/* Just launched grid. Same 16px gap across and down. */
 .token-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
+/* Card rhythm on the 8px grid: badge 8 name 2 ENS 8 ticker 12 rule 12 sentence 12 price 4 memos 8 bar.
+   The price block sits at the bottom, so every card in a row lines up. */
 .launch {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: var(--radius-card);
-  background: var(--paper-100);
-  color: var(--paper-ink);
+  padding: 16px;
   border: 1px solid var(--gold-600);
   box-shadow: var(--shadow-card);
-  min-height: 168px;
 }
 .launch:hover { border-color: var(--gold-500); }
-.launch .faint { color: var(--paper-muted); }
+.launch.stage-market { border: 2px solid var(--card-market-ring); padding: 15px; }
+.launch.stage-ended { border-color: var(--card-ended-line); opacity: var(--card-ended-opacity); transition: opacity 120ms ease; }
+/* Still a link: full strength on hover and keyboard focus. */
+.launch.stage-ended:hover,
+.launch.stage-ended:focus-visible { opacity: 1; }
+.launch .faint { color: var(--stage-muted); }
 .launch .up { color: var(--success-ink); }
-/* Name / ENS on the first line, ticker and date on the second; long text ends in "…". */
-.launch-head { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.launch .stage-badge { margin-bottom: 8px; }
+/* Name / ENS on the first lines, ticker and date on the next; long text ends in "…". */
+.launch-head { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .launch-name,
 .launch-name .token-name,
 .launch-name .token-slug,
 .launch-name .token-ens { min-width: 0; max-width: 100%; }
 .launch-name .token-slug,
 .launch-name .token-ens { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
-.launch-meta { display: flex; align-items: baseline; gap: 8px; min-width: 0; white-space: nowrap; }
-.launch-meta > span:first-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.launch-meta .small { margin-left: auto; flex-shrink: 0; }
-.launch-ticker { font-family: var(--font-mono); font-weight: 500; color: var(--gold-ink); }
+.launch-meta { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.launch-ticker { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.launch-date { flex-shrink: 0; margin-left: auto; text-align: right; white-space: nowrap; }
+.launch-rule {
+  display: block;
+  flex-shrink: 0;
+  height: 12px;
+  margin-top: 12px;
+  background:
+    radial-gradient(circle, var(--stage-accent) 5.5px, transparent 6px) center / 12px 12px no-repeat,
+    linear-gradient(var(--stage-rule), var(--stage-rule)) center / 100% 1px no-repeat;
+}
 .launch-text {
-  padding-top: 22px;
+  margin: 12px 0;
   font-family: var(--font-display);
   font-size: var(--fs-body);
   font-weight: 500;
   font-variation-settings: "opsz" 36;
-  line-height: 1.38;
-  min-height: 2.8em;
+  line-height: 1.375;
+  /* Always two lines tall, so a one-line sentence keeps the price row level with its neighbors. */
+  min-height: 2.75em;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  background:
-    radial-gradient(circle, var(--gold-500) 6px, transparent 6.5px) center 5px / 12px 12px no-repeat,
-    linear-gradient(var(--gold-600), var(--gold-600)) center 10px / 100% 1px no-repeat;
+  overflow-wrap: anywhere;
 }
-.launch-foot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.launch-foot .faint { margin-left: auto; }
-.launch .bar { background: rgba(26, 26, 26, 0.12); }
-.launch .bar-fill { background: var(--gold-600); }
+.launch-foot { margin-top: auto; min-width: 0; font-variant-numeric: tabular-nums; }
+.launch-foot .strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.launch-memos { margin-top: 4px; }
+.launch .bar-wrap { margin-top: 8px; }
 
 /* tables */
 .table { display: flex; flex-direction: column; }
@@ -352,10 +426,10 @@ input:focus, textarea:focus { outline: none; border-color: var(--gold-300); }
   font-family: var(--font-mono);
   font-weight: 500;
   font-size: 14px;
-  color: var(--gold-ink);
+  color: var(--stage-name);
 }
 .launch .token-ens,
-.featured .token-ens { color: var(--paper-muted); }
+.featured .token-ens { color: var(--stage-muted); }
 .prophecy-title {
   margin: 14px 0 12px;
   font-family: var(--font-display);
@@ -546,7 +620,6 @@ input:focus, textarea:focus { outline: none; border-color: var(--gold-300); }
 @media (max-width: 1000px) {
   .home, .coin-page { grid-template-columns: 1fr; }
   .talk, .side { position: static; max-height: none; }
-  .featured { grid-template-columns: 1fr; }
 }
 /* Phones only: stack the columns. */
 @media (max-width: 640px) {
@@ -570,6 +643,7 @@ input:focus, textarea:focus { outline: none; border-color: var(--gold-300); }
   .prophecy-title { font-size: 22px; }
   .home-toolbar h1 { font-size: 22px; }
   .featured { padding: 16px; }
+  .featured.stage-market { padding: 15px; }
   .featured-text { font-size: 20px; }
 }
 /* Following page: prophet chips replace the side list on narrow screens.

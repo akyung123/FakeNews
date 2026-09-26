@@ -137,8 +137,8 @@ describe("prophet profile", () => {
     expect(screen.getByText(CCA_COPY.poolOpen)).toHaveClass("hold");
     expect(screen.getByText(CCA_COPY.currentClearingPrice)).toBeInTheDocument();
     expect(screen.getByText(POOL_PRICE_LABEL)).toBeInTheDocument();
-    expect(screen.getByText("0.0000000015 ETH per token")).toBeInTheDocument();
-    expect(screen.getByText("0.000000002 ETH per token")).toBeInTheDocument();
+    expect(screen.getByText("1.5 gwei per token")).toBeInTheDocument();
+    expect(screen.getByText("2 gwei per token")).toBeInTheDocument();
     // TOKEN_A has two clearing-price points; TOKEN_B has none yet.
     expect(screen.getAllByRole("img", { name: /over time/ })).toHaveLength(1);
     expect(document.body.textContent).not.toMatch(/%/);

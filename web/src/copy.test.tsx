@@ -167,7 +167,9 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(mine).not.toContain("Return");
     expect(mine).toContain(pricePerToken(2.702024173734242e-11));
     expect(mine).toContain(pricePerToken(1.7727753707046925e-11));
-    expect(mine).not.toContain("gwei");
+    // Sub-1e-6 ETH prices read in gwei instead of a run of zeros.
+    expect(mine).toContain("0.02702 gwei per token");
+    expect(mine).not.toContain("0.00000");
     assertRemoved(mine);
   });
 

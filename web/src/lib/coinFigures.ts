@@ -25,19 +25,34 @@ export function coinProgress(coin: Coin): number {
   return curveProgress(coin);
 }
 
-/** Market stage read from the chain. Null when the auction has not been read. */
+/**
+ * Market stage. Chain rows: read from the auction's end block, the goal and
+ * the pool. Null when the auction has not been read, so no stage is guessed.
+ * Demo rows: from the demo curve.
+ */
 export type CoinStage = "live" | "ended" | "market_open";
 
 export function coinStage(coin: Coin): CoinStage | null {
   if (coin.marketOpen) return "market_open";
+  if (!coin.fromChain) return curveGraduated(coin) ? "market_open" : "live";
   if (coin.endBlock == null || coin.readBlock == null) return null;
-  return coin.readBlock < coin.endBlock ? "live" : "ended";
+  // A goal met before the end block still takes bids until the end block.
+  if (coin.readBlock < coin.endBlock) return "live";
+  return coin.complete || coinRaisedWei(coin) >= GRADUATION_ETH_WEI ? "market_open" : "ended";
 }
 
+/** Badge text. Every stage shows it, so the card never relies on color alone. */
 export const STAGE_BADGE: Record<CoinStage, string> = {
   live: "Auction live",
-  ended: "Ended",
+  ended: "Ended · refunded",
   market_open: "Market open",
+};
+
+/** Card class for a stage; the colors live in styles.css. */
+export const STAGE_CLASS: Record<CoinStage, string> = {
+  live: "stage-live",
+  ended: "stage-ended",
+  market_open: "stage-market",
 };
 
 /** Newest launch first. Chain rows sort by Launched block, demo rows by creation time. */
@@ -48,12 +63,14 @@ export function newestFirst(coins: readonly Coin[]): Coin[] {
 }
 
 /**
- * The home page's featured card. Chain mode: the newest auction whose end
- * block has not passed; an ended auction is never featured. Demo mode keeps
- * the open auction closest to its goal.
+ * The home page's featured card: the newest auction still before its end
+ * block. With none, the market that opened last. With neither, no card.
  */
-export function pickFeatured(coins: readonly Coin[], chain: boolean): Coin | null {
-  if (chain) return newestFirst(coins.filter((c) => coinStage(c) === "live"))[0] ?? null;
-  const open = coins.filter((c) => !curveGraduated(c));
-  return [...open].sort((a, b) => coinProgress(b) - coinProgress(a))[0] ?? null;
+export function pickFeatured(coins: readonly Coin[]): Coin | null {
+  const newest = newestFirst(coins);
+  const live = newest.find((c) => coinStage(c) === "live");
+  if (live) return live;
+  // A market opens right after its auction's end block, so the latest end block opened last.
+  const markets = newest.filter((c) => coinStage(c) === "market_open");
+  return markets.sort((a, b) => (b.endBlock ?? 0) - (a.endBlock ?? 0))[0] ?? null;
 }

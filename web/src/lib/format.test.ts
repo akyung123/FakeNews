@@ -6,6 +6,7 @@ import {
   formatEth,
   formatEthAmount,
   formatPrice,
+  formatPriceAmount,
   formatTokenAmount,
   pricePerToken,
   raisedFraction,
@@ -35,9 +36,37 @@ describe("formatEth", () => {
   });
 });
 
+describe("formatPriceAmount", () => {
+  it("keeps 4 significant digits in ETH from 1e-6 ETH up", () => {
+    expect(formatPriceAmount(ethToWei(5e-4))).toBe("0.0005 ETH");
+    expect(formatPriceAmount(10n ** 12n)).toBe("0.000001 ETH");
+    expect(formatPriceAmount(12_345_678_000_000n)).toBe("0.00001235 ETH");
+  });
+
+  it("reads in gwei under 1e-6 ETH (1 gwei = 1e-9 ETH)", () => {
+    expect(formatPriceAmount(ethToWei(4e-8))).toBe("40 gwei");
+    expect(formatPriceAmount(ethToWei(1.615e-7))).toBe("161.5 gwei");
+    expect(formatPriceAmount(ethToWei(4e-11))).toBe("0.04 gwei");
+    expect(formatPriceAmount(ethToWei(1.615e-10))).toBe("0.1615 gwei");
+    expect(formatPriceAmount(40_000_000_001n)).toBe("40 gwei");
+  });
+
+  it("carries a rounded 1000 gwei into ETH", () => {
+    expect(formatPriceAmount(999_999_999_999n)).toBe("0.000001 ETH");
+  });
+
+  it("floors tiny prices and keeps zero in ETH", () => {
+    expect(formatPriceAmount(100_000n)).toBe("0.0001 gwei");
+    expect(formatPriceAmount(99_999n)).toBe("<0.0001 gwei");
+    expect(formatPriceAmount(1n)).toBe("<0.0001 gwei");
+    expect(formatPriceAmount(0n)).toBe("0 ETH");
+  });
+});
+
 describe("formatPrice", () => {
-  it("uses the ETH formatter for one whole token", () => {
-    expect(formatPrice(40_000_000_001n)).toBe("0.00000004 ETH per token");
+  it("is formatPriceAmount per whole token", () => {
+    expect(formatPrice(40_000_000_001n)).toBe("40 gwei per token");
+    expect(formatPrice(ethToWei(5e-4))).toBe("0.0005 ETH per token");
     expect(formatPrice(0n)).toBe("0 ETH per token");
     expect(pricePerToken(4e-8)).toBe(formatPrice(40_000_000_000n));
   });
