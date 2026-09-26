@@ -29,9 +29,9 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 ## 2. Contracts (`contracts/`)
 
-- [ ] `forge install ensdomains/contracts-v2`, remappings
-- [ ] `ProphecyToken`
-- [ ] `Launchpad` curve
+- [x] `forge install ensdomains/contracts-v2`, remappings @cursor
+- [x] `ProphecyToken` @cursor-agent
+- [x] `Launchpad` curve @cursor-agent
   - SPEC constants exactly
   - reserves in a struct
   - a separate fee ledger
@@ -43,8 +43,8 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] `LiquidityLocker.collect`: 24 : 76
 - [ ] `memo` on `buy` / `sell`, emitted in `Trade`, reverts above 140 bytes
 - [ ] Tests
-  - [ ] Lock tests: editing the sentence reverts, transfer reverts, swapping the resolver reverts, `hasAssignees(ROOT, UNREGISTER) == false`
-  - [ ] Three fuzz tests: solvency, a round trip never gains, graduation vs pool start price gap < 0.0068%
+  - [x] Lock tests: editing the sentence reverts, transfer reverts, swapping the resolver reverts, `hasAssignees(ROOT, UNREGISTER) == false` @cursor
+  - [ ] Three fuzz tests: solvency (done @cursor-agent), a round trip never gains (done @cursor-agent), graduation vs pool start price gap < 0.0068%
   - [ ] World: reusing a nullifier reverts, a bad signature reverts
 - [ ] Sepolia deploy script (skill `deploy-sepolia`)
 
@@ -53,7 +53,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] Replace the prototype curve constants with SPEC values (`src/lib/curve.ts`)
 - [ ] wagmi + viem, Sepolia only
 - [ ] Screen 1: prophecy list (name, sentence, price, Departed count)
-- [ ] Screen 2: issue
+- [x] Screen 2: issue @cursor
   - the issue button turns on only after World verification
   - cancelling or failing disables it
 - [ ] Screen 3: prophecy detail
@@ -62,19 +62,25 @@ Lanes follow folders. One lane = one person (or one agent session).
   - no True / False
   - optional one-line memo on buy and sell; recent trades listed with their memos
   - replace the prototype's holder talk with trade memos
-- [ ] Screen 4: prophet page. Departed prophecies next to the next buy, claimable fees, sell button
+- [x] Screen 4: prophet page. Departed prophecies next to the next buy, claimable fees, sell button @cursor
 - [ ] Every sentence is read from ENS. Nothing hardcoded
 - [ ] Republish the demo page (skill `demo-publish`)
 
 ## 4. World verification server (`world/`, new folder)
 
-- [ ] IDKit 4 rp-context, Portal v4 verify (see PactShare `apps/back/src/lib/worldid.ts`)
-- [ ] On success, sign in the format of INTERFACE section 3
+- [x] IDKit 4 rp-context, Portal v4 verify (see PactShare `apps/back/src/lib/worldid.ts`) @cursor-agent
+- [x] On success, sign in the format of INTERFACE section 3 @cursor-agent
 
 ## 5. Demo
 
-- [ ] Create a prophecy with a 2-minute deadline beforehand so it is already Departed
-- [ ] Record the five scenes in SPEC "Demo" (2–4 minutes)
+- [ ] Rehearse scene 1 (prophet name registration with World ID) end to end on a local or forked chain first. On Sepolia scene 1 is one shot: one World ID gives one name.
+- [ ] Record scene 1 on Sepolia (register `ringo.prophecy.eth`).
+  - If it fails: record it again with another person's World ID and a different name.
+  - Redeploying the contracts is the last resort only.
+- [ ] Right after scene 1, off camera: issue a prophecy under `ringo` with a 2-minute deadline so it is already Departed for the later scenes.
+- [ ] Record the remaining scenes in SPEC "Demo" (total 2–4 minutes, success and failure paths).
+- [ ] If the ENS app cannot read Sepolia ENSv2 names: use the viem lookup script in `infra/` (`getEnsAddress` and text record) output as the external lookup evidence for scenes 1 and 2.
+- [ ] `FEEDBACK.md` (Uniswap): keep notes of blockers during development; it is the fallback deliverable if Uniswap graduation is cut.
 
 ## If there is time
 
