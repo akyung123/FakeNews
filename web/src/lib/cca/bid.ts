@@ -1,15 +1,16 @@
 /**
  * Place a CCA bid: budget ETH + max price per token (encoded as Q96).
- * Uses the 4-arg `submitBid` overload, which the contract implements as
- * `submitBid(..., FLOOR_PRICE_Q96, hookData)` (v2.1.0 ContinuousClearingAuction.sol).
+ * INTERFACE_CCA §4.4 / §8: use the 5-arg `submitBid`. Do not use the
+ * 4-arg overload in the demo (it scans from the floor).
  *
- * Max price is always snapped DOWN onto `floor + k * tick` (PR #41).
+ * `maxPrice = floor + n * tick` (snapped DOWN).
+ * `prevTick = floor + (n - 1) * tick` (floor itself when n = 0).
  * A max price below the floor throws `MaxPriceBelowFloorError`.
  */
 import { zeroAddress, type Address } from "viem";
 import { ccaAbi } from "./abi/cca";
 import { CCA_CONFIG } from "./config";
-import { budgetEthToAmount, ethPerTokenToQ96, snapMaxPriceToTick } from "./price";
+import { budgetEthToAmount, ethPerTokenToQ96, prevTickHintQ96, snapMaxPriceToTick } from "./price";
 import { sendCcaWrite, type CcaWriteOptions, type CcaWriteRequest } from "./writes";
 import type { Hex } from "../world";
 
@@ -26,12 +27,10 @@ export type PlaceBidInput = {
 };
 
 export function placeBidArgs(input: PlaceBidInput) {
+  const floor = input.floorPriceQ96 ?? CCA_CONFIG.floorPriceQ96;
+  const tick = input.tickSpacingQ96 ?? CCA_CONFIG.tickSpacingQ96;
   const amount = budgetEthToAmount(input.budgetEth);
-  const maxPriceQ96 = snapMaxPriceToTick(
-    ethPerTokenToQ96(input.maxPricePerTokenEth),
-    input.floorPriceQ96 ?? CCA_CONFIG.floorPriceQ96,
-    input.tickSpacingQ96 ?? CCA_CONFIG.tickSpacingQ96,
-  );
+  const maxPriceQ96 = snapMaxPriceToTick(ethPerTokenToQ96(input.maxPricePerTokenEth), floor, tick);
   const owner = input.owner;
   if (owner === zeroAddress) {
     throw new Error("bid owner cannot be the zero address");
@@ -40,6 +39,7 @@ export function placeBidArgs(input: PlaceBidInput) {
     maxPriceQ96,
     amount,
     owner,
+    prevTickPriceQ96: prevTickHintQ96(maxPriceQ96, floor, tick),
     hookData: input.hookData ?? "0x",
   };
 }
@@ -50,7 +50,7 @@ export function placeBidWrite(input: PlaceBidInput): CcaWriteRequest {
     address: input.auction,
     abi: ccaAbi,
     functionName: "submitBid",
-    args: [args.maxPriceQ96, args.amount, args.owner, args.hookData],
+    args: [args.maxPriceQ96, args.amount, args.owner, args.prevTickPriceQ96, args.hookData],
     value: args.amount,
   };
 }

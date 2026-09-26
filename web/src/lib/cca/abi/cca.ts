@@ -218,6 +218,13 @@ export const ccaAbi = [
     outputs: [{ type: "uint256" }],
   },
   {
+    type: "function",
+    name: "lastCheckpointedBlock",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint64" }],
+  },
+  {
     type: "event",
     name: "BidSubmitted",
     inputs: [

@@ -1,17 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { decodeAbiParameters, encodePacked, parseEther, zeroAddress } from "viem";
+import { encodePacked, parseEther, zeroAddress } from "viem";
 import { wagmiConfig } from "../wagmi";
 import { ccaAbi } from "./abi/cca";
 import { ccaLensAbi } from "./abi/ccaLens";
 import { lbpStrategyAbi } from "./abi/lbpStrategy";
-import {
-  SETTLE_ALL,
-  SWAP_EXACT_IN_SINGLE,
-  TAKE_ALL,
-  V4_SWAP_COMMAND,
-  universalRouterAbi,
-} from "./abi/universalRouter";
-import { CCA_SEPOLIA } from "./addresses";
+import { launchpadCcaAbi, lockerCcaAbi } from "./abi/launchpadCca";
+import { V4_SWAP_COMMAND, universalRouterAbi } from "./abi/universalRouter";
+import { CCA_SEPOLIA, FUNDS_RECIPIENT } from "./addresses";
 import {
   auctionActionVisibility,
   auctionScheduleRequest,
@@ -26,8 +21,10 @@ import {
 } from "./auction";
 import { placeBid, placeBidArgs, placeBidWrite } from "./bid";
 import { claimTokens, claimTokensBatch, claimTokensWrite } from "./claim";
+import { checkpoint, checkpointWrite } from "./checkpoint";
 import {
   AUCTION_BLOCKS,
+  AUCTION_STEPS_MPS_TOTAL,
   CCA_CONFIG,
   FIRST_BID_ID,
   FLOOR_PRICE_Q96,
@@ -40,29 +37,37 @@ import {
   auctionClaimBlock,
   auctionEndBlock,
   auctionMigrationBlock,
+  packUniformAuctionSteps,
   resolveCcaConfig,
 } from "./config";
 import { ccaUserMessage, mapCcaError } from "./errors";
 import { exitBid, exitBidWrite, exitPartiallyFilledBid } from "./exit";
+import { CCA_FORK_PIN_BLOCK, CCA_FORK_STEPS, forkHappyPathSchedule } from "./flow";
 import {
   INTERFACE_CCA_PENDING,
   INTERFACE_CCA_TBD,
   InterfaceCcaPendingError,
-  auctionAddressForToken,
-  claimProphetFeeCcaWrite,
-  initializerAddressForToken,
+  auctionOfRead,
+  backendLaunchErrorNames,
+  collectCcaWrite,
+  hookRead,
+  initializeDistributionSalt,
+  initializerFromAuction,
   launchCcaWrite,
-  poolHooksForToken,
+  lockerCollectActionBytes,
+  lockerTokenIdBinding,
+  withdrawAccruedWrite,
 } from "./launchpadCca";
 import { openMarket, openMarketWrite } from "./migrate";
 import {
   MaxPriceBelowFloorError,
   ethPerTokenToQ96,
+  prevTickHintQ96,
   q96ToWeiPerToken,
   snapMaxPriceToTick,
   weiPerTokenToQ96,
 } from "./price";
-import { encodeV4ExactInSingle, swapExactInSingle, swapExactInSingleWrite } from "./swap";
+import { encodeV4ExactInSingle, ethTokenPoolKey } from "./swap";
 import {
   bidExitedLogsQuery,
   bidSubmittedLogsQuery,
@@ -125,6 +130,8 @@ describe("verified external ABIs", () => {
         "floorPrice",
         "tickSpacing",
         "bids",
+        "lastCheckpointedBlock",
+        "nextBidId",
       ]),
     );
     expect(names(ccaAbi, "function")).not.toContain("buy");
@@ -159,12 +166,9 @@ describe("verified external ABIs", () => {
     );
   });
 
-  it("Universal Router ABI is execute from tag 2.0.0", () => {
+  it("Universal Router ABI is execute; 2.1.2 command bytes stay TBD", () => {
     expect(names(universalRouterAbi, "function")).toEqual(["execute"]);
     expect(V4_SWAP_COMMAND).toBe(0x10);
-    expect(SWAP_EXACT_IN_SINGLE).toBe(0x06);
-    expect(SETTLE_ALL).toBe(0x0c);
-    expect(TAKE_ALL).toBe(0x0f);
   });
 
   it("records BidSubmitted / BidExited / TokensClaimed with indexed owner", () => {
@@ -198,7 +202,10 @@ describe("verified external ABIs", () => {
     expect(CCA_SEPOLIA.ccaFactory).toBe("0x000000001F26a0044BaA66024e7b6599c61963F8");
     expect(CCA_SEPOLIA.initializerHook).toBe("0x1600059B95A80d500fC42400ea9a88A9C29D2000");
     expect(CCA_SEPOLIA.ccaLens).toBe("0xc3C65F5453A3674aDb693cbdA3C842545cD30f53");
-    expect(CCA_SEPOLIA.universalRouter).toBe("0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b");
+    expect(CCA_SEPOLIA.universalRouter).toBe("0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3");
+    expect(CCA_SEPOLIA.poolManager).toBe("0xE03A1074c86CFeDd5C142C4F04F1a1536e203543");
+    expect(CCA_SEPOLIA.positionManager).toBe("0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4");
+    expect(FUNDS_RECIPIENT).toBe(CCA_SEPOLIA.lbpStrategy);
   });
 });
 
@@ -221,8 +228,13 @@ describe("confirmed CCA config (PR #41 head d84aed4)", () => {
     expect(CCA_CONFIG.firstBidId).toBe(0n);
     expect(FIRST_BID_ID).toBe(0n);
     expect(CCA_CONFIG.sepoliaForkBlock).toBe(11_784_960n);
+    expect(CCA_FORK_PIN_BLOCK).toBe(11_784_960n);
     expect(CCA_CONFIG.prophetFeeShare).toBe(24);
     expect(CCA_CONFIG.protocolFeeShare).toBe(76);
+    expect(CCA_CONFIG.auctionStepsMpsTotal).toBe(10_000_000);
+    expect(AUCTION_STEPS_MPS_TOTAL).toBe(10_000_000);
+    expect(packUniformAuctionSteps(25)).toBe(encodePacked(["uint24", "uint40"], [400_000, 25]));
+    expect(packUniformAuctionSteps(10)).toBe(encodePacked(["uint24", "uint40"], [1_000_000, 10]));
   });
 
   it("lets INTERFACE_CCA override fields without rewriting defaults", () => {
@@ -258,6 +270,9 @@ describe("Q96 price encoding", () => {
     expect(snapMaxPriceToTick(ethPerTokenToQ96("1150"))).toBe(1100n * Q96);
     expect(snapMaxPriceToTick(ethPerTokenToQ96("1199"))).toBe(1100n * Q96);
     expect(snapMaxPriceToTick(ethPerTokenToQ96("1200"))).toBe(1200n * Q96);
+    expect(prevTickHintQ96(ethPerTokenToQ96("1100"))).toBe(FLOOR_PRICE_Q96);
+    expect(prevTickHintQ96(ethPerTokenToQ96("1200"))).toBe(1100n * Q96);
+    expect(prevTickHintQ96(FLOOR_PRICE_Q96)).toBe(FLOOR_PRICE_Q96);
     expect(() => snapMaxPriceToTick(ethPerTokenToQ96("999"))).toThrow(MaxPriceBelowFloorError);
     expect(() => snapMaxPriceToTick(ethPerTokenToQ96("0.001"))).toThrow(/below the auction floor/);
   });
@@ -427,8 +442,16 @@ describe("bid encoding", () => {
     expect(request.address).toBe(AUCTION);
     expect(request.abi).toBe(ccaAbi);
     expect(request.functionName).toBe("submitBid");
-    expect(request.args).toEqual([args.maxPriceQ96, args.amount, OWNER, "0x"]);
+    expect(args.prevTickPriceQ96).toBe(FLOOR_PRICE_Q96);
+    expect(request.args).toEqual([
+      args.maxPriceQ96,
+      args.amount,
+      OWNER,
+      args.prevTickPriceQ96,
+      "0x",
+    ]);
     expect(request.value).toBe(args.amount);
+    expect(request.args).toHaveLength(5);
   });
 
   it("keeps a max price that already sits on a valid tick", () => {
@@ -520,18 +543,10 @@ describe("chain writes: simulate then write then require success", () => {
     expect(openMarketWrite(AUCTION).args).toEqual([AUCTION]);
   });
 
-  it("v4 execute throws when the receipt is not success", async () => {
+  it("checkpoint throws when the receipt is not success", async () => {
     const fns = revertedWrite();
-    const input = {
-      token: TOKEN,
-      hooks: HOOKS,
-      zeroForOne: true,
-      amountIn: parseEther("0.001"),
-      amountOutMinimum: 1n,
-      deadline: 1_800_000_000n,
-    };
-    await expect(swapExactInSingle(input, optionsOf(fns))).rejects.toThrow(/execute did not succeed/);
-    expect(fns.write).toHaveBeenCalledWith(wagmiConfig, swapExactInSingleWrite(input));
+    await expect(checkpoint(AUCTION, optionsOf(fns))).rejects.toThrow(/checkpoint did not succeed/);
+    expect(fns.write).toHaveBeenCalledWith(wagmiConfig, checkpointWrite(AUCTION));
   });
 
   it("successful path simulates, writes, then waits", async () => {
@@ -544,33 +559,25 @@ describe("chain writes: simulate then write then require success", () => {
 });
 
 describe("v4 swap encoding", () => {
-  it("encodes UR 2.0 V4_SWAP exact-in single with ETH as currency0", () => {
-    const encoded = encodeV4ExactInSingle({
-      token: TOKEN,
-      hooks: HOOKS,
-      zeroForOne: true,
-      amountIn: parseEther("0.001"),
-      amountOutMinimum: 2n,
-      deadline: 1n,
-    });
-    expect(encoded.commands).toBe(encodePacked(["uint8"], [V4_SWAP_COMMAND]));
-    expect(encoded.value).toBe(parseEther("0.001"));
-    expect(encoded.poolKey).toEqual({
+  it("keeps the ETH/token pool key and leaves 2.1.2 command bytes TBD", () => {
+    expect(ethTokenPoolKey(TOKEN, HOOKS)).toEqual({
       currency0: zeroAddress,
       currency1: TOKEN,
       fee: POOL_FEE,
       tickSpacing: POOL_TICK_SPACING,
       hooks: HOOKS,
     });
-    const [actions, params] = decodeAbiParameters(
-      [
-        { name: "actions", type: "bytes" },
-        { name: "params", type: "bytes[]" },
-      ],
-      encoded.inputs[0],
-    );
-    expect(actions).toBe(encodePacked(["uint8", "uint8", "uint8"], [SWAP_EXACT_IN_SINGLE, SETTLE_ALL, TAKE_ALL]));
-    expect(params).toHaveLength(3);
+    const input = {
+      token: TOKEN,
+      hooks: HOOKS,
+      zeroForOne: true,
+      amountIn: parseEther("0.001"),
+      amountOutMinimum: 2n,
+      deadline: 1n,
+    };
+    expect(() => encodeV4ExactInSingle(input)).toThrow(InterfaceCcaPendingError);
+    expect(() => encodeV4ExactInSingle(input)).toThrow(/V4_SWAP command/);
+    expect(V4_SWAP_COMMAND).toBe(0x10);
   });
 });
 
@@ -580,6 +587,10 @@ describe("error mapper", () => {
     expect(mapCcaError(new Error("AuctionIsOver"))).toBe("auction_not_live");
     expect(mapCcaError(new Error("NotGraduated"))).toBe("goal_not_reached");
     expect(mapCcaError(new Error("MigrationNotYetAllowed"))).toBe("market_not_ready");
+    expect(mapCcaError(new Error("TickPreviousPriceInvalid"))).toBe("bid_rejected");
+    expect(mapCcaError(new Error("CannotPartiallyExitBidBeforeEndBlock"))).toBe("cannot_exit");
+    expect(mapCcaError(new Error("BatchClaimDifferentOwner"))).toBe("cannot_claim");
+    expect(mapCcaError(new Error("InvalidFundsRecipient"))).toBe("launch_rejected");
     expect(mapCcaError(new Error("User rejected the request"))).toBe("user_rejected");
     expect(mapCcaError(new MaxPriceBelowFloorError())).toBe("bid_rejected");
     expect(ccaUserMessage("bid_rejected")).not.toMatch(/BidMustBeAboveClearingPrice/);
@@ -590,14 +601,63 @@ describe("error mapper", () => {
   });
 });
 
-describe("TBD(INTERFACE_CCA) isolation", () => {
-  it("does not guess our Launchpad / hook / locker names", () => {
-    expect(() => auctionAddressForToken(TOKEN)).toThrow(InterfaceCcaPendingError);
-    expect(() => initializerAddressForToken(TOKEN)).toThrow(/TBD\(INTERFACE_CCA\)/);
-    expect(() => poolHooksForToken(TOKEN)).toThrow(INTERFACE_CCA_TBD);
-    expect(() => launchCcaWrite()).toThrow(/launch on the CCA line/);
-    expect(() => claimProphetFeeCcaWrite()).toThrow(/prophet fee claim/);
-    expect(INTERFACE_CCA_PENDING).not.toContain("goal-not-reached sub-line (copy.goalNotReachedSub)");
+describe("INTERFACE_CCA specified Launchpad names", () => {
+  const launchpad = "0x3333333333333333333333333333333333333333" as const;
+  const locker = "0x4444444444444444444444444444444444444444" as const;
+
+  it("uses auctionOf / launch / collect / withdrawAccrued with the documented args", () => {
+    expect(auctionOfRead(launchpad, TOKEN)).toMatchObject({
+      address: launchpad,
+      abi: launchpadCcaAbi,
+      functionName: "auctionOf",
+      args: [TOKEN],
+    });
+    expect(initializerFromAuction(AUCTION)).toBe(AUCTION);
+    expect(hookRead(launchpad).functionName).toBe("hook");
+    const launched = launchCcaWrite(launchpad, "lingo-2028", "hello", 1_800_000_000n);
+    expect(launched.functionName).toBe("launch");
+    expect(launched.args).toEqual(["lingo-2028", "hello", 1_800_000_000n]);
+    expect(collectCcaWrite(locker, TOKEN)).toMatchObject({
+      abi: lockerCcaAbi,
+      functionName: "collect",
+      args: [TOKEN],
+    });
+    expect(withdrawAccruedWrite(locker).functionName).toBe("withdrawAccrued");
+  });
+
+  it("keeps salt, locker tokenId binding, collect action bytes, and backend errors TBD", () => {
+    expect(() => initializeDistributionSalt()).toThrow(InterfaceCcaPendingError);
+    expect(() => lockerTokenIdBinding()).toThrow(/tokenId/);
+    expect(() => lockerCollectActionBytes()).toThrow(/collect action bytes/);
+    expect(() => backendLaunchErrorNames()).toThrow(/LbpNotSet/);
+    expect(INTERFACE_CCA_PENDING).toEqual(
+      expect.arrayContaining([
+        "initializeDistribution salt",
+        "Universal Router 2.1.2 V4_SWAP command + inputs encoding",
+        "LiquidityLocker tokenId → token / prophet binding",
+        "Launchpad custom-error names (LbpNotSet and the like)",
+      ]),
+    );
+    expect(INTERFACE_CCA_TBD).toBe("TBD(INTERFACE_CCA)");
+  });
+
+  it("records the four fork-test steps from INTERFACE_CCA §8", () => {
+    expect(CCA_FORK_STEPS.map((step) => step.id)).toEqual([1, 2, 3, 4]);
+    expect(CCA_FORK_STEPS[1]).toMatchObject({
+      name: "bid",
+      functionName: "submitBid",
+      arity: 5,
+      firstBidId: 0n,
+    });
+    expect(CCA_FORK_STEPS[2].calls).toEqual(["checkpoint", "exitBid", "claimTokens", "migrate"]);
+    expect(CCA_FORK_STEPS[3].encoding).toBe(INTERFACE_CCA_TBD);
+    const schedule = forkHappyPathSchedule(11_784_960n);
+    expect(schedule.endBlock).toBe(11_784_985n);
+    expect(schedule.claimBlock).toBe(11_784_985n);
+    expect(schedule.migrationBlock).toBe(11_784_986n);
+    expect(schedule.submitBidArity).toBe(5);
+    expect(schedule.firstBidId).toBe(0n);
+    expect(schedule.swapEncoding).toBe(INTERFACE_CCA_TBD);
   });
 });
 

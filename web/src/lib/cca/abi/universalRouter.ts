@@ -1,22 +1,12 @@
 /**
- * Source: Uniswap/universal-router + official v4 swap routing guide
- * Tag: 2.0.0
- * URLs:
- *   https://github.com/Uniswap/universal-router/blob/2.0.0/contracts/interfaces/IUniversalRouter.sol
- *   https://github.com/Uniswap/universal-router/blob/main/contracts/libraries/Commands.sol
- *   https://github.com/Uniswap/v4-periphery/blob/main/src/libraries/Actions.sol
- *   https://developers.uniswap.org/docs/protocols/v4/guides/swapping/routing
- *   https://developers.uniswap.org/docs/protocols/v4/deployments
+ * Source: INTERFACE_CCA.md §4.7 (PR #40 head 3e128b5).
+ * `execute(commands, inputs, deadline)` plus the listed errors are specified.
+ * Universal Router **2.1.2** Sepolia: `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`.
  *
- * Sepolia path used here: Universal Router 2.0 `execute(commands, inputs, deadline)`
- * with command `V4_SWAP` (0x10) and actions
- * `SWAP_EXACT_IN_SINGLE` (0x06) + `SETTLE_ALL` (0x0c) + `TAKE_ALL` (0x0f).
+ * V4_SWAP command + inputs encoding is TBD(INTERFACE_CCA). Do not use the
+ * 2.0 research constants below on the product path.
  *
- * ExactInputSingleParams encoding matches the official routing guide
- * (poolKey, zeroForOne, amountIn, amountOutMinimum, hookData) — UR 2.0
- * does not take `minHopPriceX36` (that field is UR 2.1.1+).
- *
- * Only functions / errors verified in those sources. No invented names.
+ * https://github.com/Uniswap/universal-router/blob/main/contracts/interfaces/IUniversalRouter.sol
  */
 export const universalRouterAbi = [
   {
@@ -44,10 +34,11 @@ export const universalRouterAbi = [
   { type: "error", name: "InvalidEthSender", inputs: [] },
 ] as const;
 
-/** Commands.V4_SWAP — Uniswap/universal-router `contracts/libraries/Commands.sol`. */
+/**
+ * UR 2.0 research constants. INTERFACE_CCA §4.7 / §10.14 marks 2.1.2
+ * command bytes TBD(INTERFACE_CCA). Do not send these on the product path.
+ */
 export const V4_SWAP_COMMAND = 0x10;
-
-/** Actions — Uniswap/v4-periphery `src/libraries/Actions.sol`. */
 export const SWAP_EXACT_IN_SINGLE = 0x06;
 export const SETTLE_ALL = 0x0c;
 export const TAKE_ALL = 0x0f;

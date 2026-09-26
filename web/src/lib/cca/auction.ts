@@ -27,6 +27,20 @@ export type CcaLensState = {
   isGraduated: boolean;
 };
 
+/** INTERFACE_CCA §4.3 names. */
+export type AuctionState = CcaLensState;
+export type Checkpoint = CcaCheckpoint;
+
+export type CcaBid = {
+  startBlock: bigint;
+  startCumulativeMps: number;
+  exitedBlock: bigint;
+  maxPrice: bigint;
+  owner: Address;
+  amountQ96: bigint;
+  tokensFilled: bigint;
+};
+
 export type AuctionPhase = "not_started" | "live" | "ended_goal_reached" | "ended_goal_not_reached";
 
 export type AuctionView = {
@@ -137,6 +151,18 @@ export function auctionScheduleRequest(auction: Address) {
       address: auction,
       abi: ccaAbi,
       functionName: "tickSpacing" as const,
+      args: [] as const,
+    },
+    lastCheckpointedBlock: {
+      address: auction,
+      abi: ccaAbi,
+      functionName: "lastCheckpointedBlock" as const,
+      args: [] as const,
+    },
+    nextBidId: {
+      address: auction,
+      abi: ccaAbi,
+      functionName: "nextBidId" as const,
       args: [] as const,
     },
   };

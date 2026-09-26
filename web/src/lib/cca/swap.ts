@@ -1,30 +1,18 @@
 /**
- * Uniswap v4 exact-in single-hop via Universal Router 2.0.
- * Encoding follows the official routing guide:
- *   V4_SWAP + SWAP_EXACT_IN_SINGLE + SETTLE_ALL + TAKE_ALL
- *   https://developers.uniswap.org/docs/protocols/v4/guides/swapping/routing
+ * v4 swap after migrate. INTERFACE_CCA §4.7:
+ *   Address = Universal Router 2.1.2 `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`
+ *   `execute(commands, inputs, deadline)` is specified.
+ *   V4_SWAP command + inputs encoding is TBD(INTERFACE_CCA) — do not invent ids.
  *
- * ExactInputSingleParams is the UR 2.0 five-field struct (no minHopPriceX36).
- * ETH in is `msg.value`. ERC20 in needs a Permit2 allowance on the router
- * (not invented here — caller supplies it).
+ * Pool key after a successful migrate: native ETH, token, fee 10000,
+ * tickSpacing 200, hooks = ProphecyHook.
  */
-import {
-  encodeAbiParameters,
-  encodePacked,
-  zeroAddress,
-  type Address,
-  type Hex,
-} from "viem";
+import { zeroAddress, type Address, type Hex } from "viem";
 import { CCA_SEPOLIA } from "./addresses";
-import { POOL_FEE, POOL_TICK_SPACING } from "./constants";
-import {
-  SETTLE_ALL,
-  SWAP_EXACT_IN_SINGLE,
-  TAKE_ALL,
-  V4_SWAP_COMMAND,
-  universalRouterAbi,
-} from "./abi/universalRouter";
-import { sendCcaWrite, type CcaWriteOptions, type CcaWriteRequest } from "./writes";
+import { POOL_FEE, POOL_TICK_SPACING } from "./config";
+import { InterfaceCcaPendingError } from "./launchpadCca";
+import { universalRouterAbi } from "./abi/universalRouter";
+import type { CcaWriteRequest } from "./writes";
 
 export type V4PoolKey = {
   currency0: Address;
@@ -48,7 +36,12 @@ export type ExactInSingleInput = {
   router?: Address;
 };
 
-export function ethTokenPoolKey(token: Address, hooks: Address, fee = POOL_FEE, tickSpacing = POOL_TICK_SPACING): V4PoolKey {
+export function ethTokenPoolKey(
+  token: Address,
+  hooks: Address,
+  fee = POOL_FEE,
+  tickSpacing = POOL_TICK_SPACING,
+): V4PoolKey {
   if (token === zeroAddress) {
     throw new Error("token cannot be native ETH");
   }
@@ -61,103 +54,19 @@ export function ethTokenPoolKey(token: Address, hooks: Address, fee = POOL_FEE, 
   };
 }
 
-export function encodeV4ExactInSingle(input: ExactInSingleInput): {
-  commands: Hex;
-  inputs: Hex[];
-  value: bigint;
-  poolKey: V4PoolKey;
-} {
-  const poolKey = ethTokenPoolKey(
-    input.token,
-    input.hooks,
-    input.fee ?? POOL_FEE,
-    input.tickSpacing ?? POOL_TICK_SPACING,
-  );
-  const hookData = input.hookData ?? "0x";
-  const currencyIn = input.zeroForOne ? poolKey.currency0 : poolKey.currency1;
-  const currencyOut = input.zeroForOne ? poolKey.currency1 : poolKey.currency0;
-
-  const swapParams = encodeAbiParameters(
-    [
-      {
-        type: "tuple",
-        components: [
-          {
-            name: "poolKey",
-            type: "tuple",
-            components: [
-              { name: "currency0", type: "address" },
-              { name: "currency1", type: "address" },
-              { name: "fee", type: "uint24" },
-              { name: "tickSpacing", type: "int24" },
-              { name: "hooks", type: "address" },
-            ],
-          },
-          { name: "zeroForOne", type: "bool" },
-          { name: "amountIn", type: "uint128" },
-          { name: "amountOutMinimum", type: "uint128" },
-          { name: "hookData", type: "bytes" },
-        ],
-      },
-    ],
-    [
-      {
-        poolKey,
-        zeroForOne: input.zeroForOne,
-        amountIn: input.amountIn,
-        amountOutMinimum: input.amountOutMinimum,
-        hookData,
-      },
-    ],
-  );
-
-  const settle = encodeAbiParameters(
-    [
-      { name: "currency", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    [currencyIn, input.amountIn],
-  );
-  const take = encodeAbiParameters(
-    [
-      { name: "currency", type: "address" },
-      { name: "minAmount", type: "uint256" },
-    ],
-    [currencyOut, input.amountOutMinimum],
-  );
-
-  const actions = encodePacked(
-    ["uint8", "uint8", "uint8"],
-    [SWAP_EXACT_IN_SINGLE, SETTLE_ALL, TAKE_ALL],
-  );
-  const commands = encodePacked(["uint8"], [V4_SWAP_COMMAND]);
-  const packed = encodeAbiParameters(
-    [
-      { name: "actions", type: "bytes" },
-      { name: "params", type: "bytes[]" },
-    ],
-    [actions, [swapParams, settle, take]],
-  );
-
-  return {
-    commands,
-    inputs: [packed],
-    value: input.zeroForOne ? input.amountIn : 0n,
-    poolKey,
-  };
+/** TBD(INTERFACE_CCA) §10.14 — do not invent Universal Router 2.1.2 command bytes. */
+export function encodeV4ExactInSingle(_input: ExactInSingleInput): never {
+  throw new InterfaceCcaPendingError("Universal Router 2.1.2 V4_SWAP command + inputs encoding");
 }
 
-export function swapExactInSingleWrite(input: ExactInSingleInput): CcaWriteRequest {
-  const encoded = encodeV4ExactInSingle(input);
-  return {
-    address: input.router ?? CCA_SEPOLIA.universalRouter,
-    abi: universalRouterAbi,
-    functionName: "execute",
-    args: [encoded.commands, encoded.inputs, input.deadline],
-    value: encoded.value,
-  };
+/** TBD until command bytes are copied from the 2.1.2 pin. */
+export function swapExactInSingleWrite(_input: ExactInSingleInput): CcaWriteRequest {
+  return encodeV4ExactInSingle(_input);
 }
 
-export async function swapExactInSingle(input: ExactInSingleInput, options: CcaWriteOptions = {}): Promise<Hex> {
-  return sendCcaWrite(swapExactInSingleWrite(input), "execute", options);
+export async function swapExactInSingle(_input: ExactInSingleInput): Promise<Hex> {
+  return encodeV4ExactInSingle(_input);
 }
+
+export const universalRouterExecuteAbi = universalRouterAbi;
+export const UNIVERSAL_ROUTER = CCA_SEPOLIA.universalRouter;

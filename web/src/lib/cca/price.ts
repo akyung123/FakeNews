@@ -56,6 +56,22 @@ export function snapMaxPriceToTick(
   return floorPriceQ96 + k * tickSpacingQ96;
 }
 
+/**
+ * #41 / INTERFACE_CCA §4.4: `maxPrice = floor + n * tick`,
+ * `prevTick = floor + (n - 1) * tick`. A bid sitting on the floor uses
+ * the floor itself as the hint (same as the 4-arg overload).
+ */
+export function prevTickHintQ96(
+  maxPriceQ96: bigint,
+  floorPriceQ96 = CCA_CONFIG.floorPriceQ96,
+  tickSpacingQ96 = CCA_CONFIG.tickSpacingQ96,
+): bigint {
+  const snapped = snapMaxPriceToTick(maxPriceQ96, floorPriceQ96, tickSpacingQ96);
+  const n = (snapped - floorPriceQ96) / tickSpacingQ96;
+  if (n === 0n) return floorPriceQ96;
+  return floorPriceQ96 + (n - 1n) * tickSpacingQ96;
+}
+
 /** @deprecated Use snapMaxPriceToTick — same grid, with floor. */
 export function alignPriceToTick(
   priceQ96: bigint,

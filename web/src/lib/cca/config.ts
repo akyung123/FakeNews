@@ -1,11 +1,11 @@
 /**
- * Confirmed CCA / LBP values from the backend fork test
- * (PR #41 head d84aed4, Sepolia pin block 11_784_960).
+ * Confirmed CCA / LBP values — INTERFACE_CCA.md §0.1
+ * (PR #40 head 3e128b5, source PR #41 head d84aed4, Sepolia pin 11_784_960).
  *
- * Keep every product number here so `docs/INTERFACE_CCA.md` can override
- * this object later. Do not scatter these values across the CCA lib.
+ * Keep every product number here so INTERFACE_CCA can override via
+ * `resolveCcaConfig`. Do not scatter these values across the CCA lib.
  */
-import { parseEther, zeroAddress, type Address } from "viem";
+import { encodePacked, parseEther, zeroAddress, type Address, type Hex } from "viem";
 
 export const Q96 = 0x1000000000000000000000000n;
 export const WAD = 10n ** 18n;
@@ -23,6 +23,8 @@ export type CcaConfig = {
   protocolFeeShare: number;
   sepoliaBlockSeconds: number;
   sepoliaForkBlock: bigint;
+  /** `1e7` millibips. `packUniformAuctionSteps` requires `1e7 % N === 0`. */
+  auctionStepsMpsTotal: number;
 };
 
 /** Default config. INTERFACE_CCA may replace fields via `resolveCcaConfig`. */
@@ -39,6 +41,7 @@ export const CCA_CONFIG: CcaConfig = {
   protocolFeeShare: 76,
   sepoliaBlockSeconds: 12,
   sepoliaForkBlock: 11_784_960n,
+  auctionStepsMpsTotal: 10_000_000,
 };
 
 export function resolveCcaConfig(overrides: Partial<CcaConfig> = {}): CcaConfig {
@@ -71,3 +74,15 @@ export const SEPOLIA_BLOCK_SECONDS = CCA_CONFIG.sepoliaBlockSeconds;
 export const FIRST_BID_ID = CCA_CONFIG.firstBidId;
 export const FLOOR_PRICE_Q96 = CCA_CONFIG.floorPriceQ96;
 export const TICK_SPACING_Q96 = CCA_CONFIG.tickSpacingQ96;
+export const AUCTION_STEPS_MPS_TOTAL = CCA_CONFIG.auctionStepsMpsTotal;
+
+/**
+ * `AuctionParameters.auctionStepsData` = `abi.encodePacked(uint24(1e7/N), uint40(N))`.
+ * N=25 → (400_000, 25); N=10 → (1_000_000, 10).
+ */
+export function packUniformAuctionSteps(n = CCA_CONFIG.auctionBlocks): Hex {
+  if (n <= 0 || AUCTION_STEPS_MPS_TOTAL % n !== 0) {
+    throw new Error("auction steps require 1e7 / N to be an integer");
+  }
+  return encodePacked(["uint24", "uint40"], [AUCTION_STEPS_MPS_TOTAL / n, n]);
+}

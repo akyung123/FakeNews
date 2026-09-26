@@ -10,6 +10,7 @@ export type CcaErrorKind =
   | "cannot_claim"
   | "goal_not_reached"
   | "market_not_ready"
+  | "launch_rejected"
   | "swap_failed"
   | "user_rejected"
   | "reverted"
@@ -23,27 +24,40 @@ export function errorText(error: unknown): string {
 export function mapCcaError(error: unknown): CcaErrorKind {
   const text = errorText(error);
   if (/user rejected|user denied|action_rejected|user_rejected/i.test(text)) return "user_rejected";
-  if (/AuctionNotStarted|AuctionIsOver|TokensNotReceived|AuctionSoldOut/i.test(text)) {
+  if (/AuctionNotStarted|AuctionIsOver|TokensNotReceived|AuctionSoldOut|CurrencyIsNotNative/i.test(text)) {
     return "auction_not_live";
   }
   if (
-    /BidMustBeAboveClearingPrice|InvalidBidPriceTooHigh|BidAmountTooSmall|InvalidAmount|TickPriceNotAtBoundary|BidOwnerCannotBeZeroAddress|InvalidBidUnableToClear|MaxPriceBelowFloor|below the auction floor/i.test(
+    /BidMustBeAboveClearingPrice|InvalidBidPriceTooHigh|BidAmountTooSmall|InvalidAmount|TickPriceNotAtBoundary|BidOwnerCannotBeZeroAddress|InvalidBidUnableToClear|TickPreviousPriceInvalid|TickPriceNotIncreasing|TickNotInitialized|InvalidTickPrice|TickHintMustBeGreaterThanNextActiveTickPrice|MaxPriceBelowFloor|below the auction floor/i.test(
       text,
     )
   ) {
     return "bid_rejected";
   }
   if (
-    /CannotExitBid|BidAlreadyExited|CannotPartiallyExitBid|InvalidLastFullyFilledCheckpointHint|InvalidOutbidBlockCheckpointHint|AuctionIsNotOver/i.test(
+    /CannotExitBid|BidAlreadyExited|CannotPartiallyExitBidBeforeGraduation|CannotPartiallyExitBidBeforeEndBlock|InvalidLastFullyFilledCheckpointHint|InvalidOutbidBlockCheckpointHint|AuctionIsNotOver|BidIdDoesNotExist/i.test(
       text,
     )
   ) {
     return "cannot_exit";
   }
-  if (/BidNotExited|NotClaimable|AuctionIsNotFinalized/i.test(text)) return "cannot_claim";
+  if (/BidNotExited|NotClaimable|AuctionIsNotFinalized|BatchClaimDifferentOwner/i.test(text)) {
+    return "cannot_claim";
+  }
   if (/NotGraduated/i.test(text)) return "goal_not_reached";
-  if (/MigrationNotYetAllowed|InitializerNotRegistered|PoolManagerAlreadyUnlocked/i.test(text)) {
+  if (
+    /MigrationNotYetAllowed|InitializerNotRegistered|PoolManagerAlreadyUnlocked|CurrencyRaisedMismatch|NoPositionsCreated|OnlySelfCall/i.test(
+      text,
+    )
+  ) {
     return "market_not_ready";
+  }
+  if (
+    /ZeroAddressToken|InitializerAlreadyCreated|InvalidFundsRecipient|InvalidTokensRecipient|InvalidEndBlock|InvalidRecipient|InvalidPositionRecipient|InvalidTickSpacing|InvalidFee|InvalidHook|ClaimBlockIsBeforeEndBlock|FloorPriceIsZero|FloorPriceTooLow|TickSpacingTooSmall|TotalSupplyIsZero|TokenIsAddressZero/i.test(
+      text,
+    )
+  ) {
+    return "launch_rejected";
   }
   if (/ExecutionFailed|TransactionDeadlinePassed|V4TooLittleReceived|LengthMismatch/i.test(text)) {
     return "swap_failed";
@@ -67,6 +81,8 @@ export function ccaUserMessage(kind: CcaErrorKind): string {
       return "The goal wasn't reached, so there are no tokens to claim.";
     case "market_not_ready":
       return "The market cannot be opened yet.";
+    case "launch_rejected":
+      return "This prophecy could not be issued.";
     case "swap_failed":
       return "The pool swap did not go through.";
     case "user_rejected":
