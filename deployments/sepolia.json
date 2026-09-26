@@ -1,10 +1,10 @@
 {
   "chainId": 11155111,
-  "launchpad": null,
-  "ensAdapter": null,
-  "hook": null,
+  "launchpad": "0x0b4BF5C6f73A1204CCe07f2522db9142d2BcB4Aa",
+  "ensAdapter": "0x90258b09Ea17fBdEED808889c6b96E6000E7B5FD",
+  "hook": "0x5f7Ba2Fa7e57873D9E57575e2Fc30F71897ea000",
   "hookSalt": null,
-  "locker": null,
+  "locker": "0x3c2642CDDB4CEE7fC65568240fD5c1C98Be70ff6",
   "poolManager": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
   "positionManager": "0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4",
   "lbpStrategy": "0x95434E898Af471945Cab33D5064d2aC1A6Ba2000",
@@ -12,5 +12,10 @@
   "initializerHook": "0x1600059B95A80d500fC42400ea9a88A9C29D2000",
   "universalRouter": "0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3",
   "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
-  "deployBlock": null
+  "deployBlock": 11785558,
+  "launchpadBlock": 11785558,
+  "adapter": "0x90258b09Ea17fBdEED808889c6b96E6000E7B5FD",
+  "parentUserRegistry": "0xc25C7F51133Ec2c6b9BC04317e1405e3CD45E418",
+  "deployer": "0x9Fb765ba848ec78616ECC277A5a61Fdc380eCA6F",
+  "commit": "58514dd4f4503962d882f98bb869f79eacf651b5"
 }
