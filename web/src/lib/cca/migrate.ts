@@ -55,11 +55,11 @@ export async function openMarketResult(
   initializer: Address,
   options: CcaWriteOptions = {},
   strategy = CCA_SEPOLIA.lbpStrategy,
-): Promise<{ hash: Hex; outcome: MigrateOutcome }> {
+): Promise<{ hash: Hex; outcome: MigrateOutcome; receipt: CcaReceipt }> {
   const { hash, receipt } = await sendCcaWriteResult(
     openMarketWrite(initializer, strategy),
     "migrate",
     options,
   );
-  return { hash, outcome: migrateOutcomeFromReceipt(receipt) };
+  return { hash, outcome: migrateOutcomeFromReceipt(receipt), receipt };
 }

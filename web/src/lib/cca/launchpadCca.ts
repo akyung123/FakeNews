@@ -1,6 +1,7 @@
 /**
  * Our Launchpad / LiquidityLocker surface on the CCA line.
- * Names and arg order come from INTERFACE_CCA.md PR #44 and PR #42 (latest head).
+ * Names and arg order come from INTERFACE_CCA.md PR #44 and PR #42 `b71c64e`
+ * (backend: that interface is frozen; only floor/tick values and tests change).
  */
 import type { Address, Hex } from "viem";
 import { encodePacked } from "viem";

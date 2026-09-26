@@ -8,7 +8,7 @@ import { contracts } from "../contracts";
 import { v4PoolId } from "../graduation";
 import { wagmiConfig } from "../wagmi";
 import { lbpStrategyAbi } from "./abi/lbpStrategy";
-import { lockerCcaAbi, poolManagerAbi, positionManagerAbi } from "./abi/launchpadCca";
+import { lockerCcaAbi, poolManagerAbi } from "./abi/launchpadCca";
 import { CCA_SEPOLIA, resolveCcaProductAddresses } from "./addresses";
 import {
   auctionScheduleRequest,
@@ -24,12 +24,7 @@ import type { AuctionCopyStatus } from "./copy";
 import { auctionOfRead, hookRead, lockerRead, lbpStrategyRead, positionManagerRead } from "./launchpadCca";
 import { ccaLogsFromBlock } from "./logs";
 import { bidAmountQ96ToWei } from "./price";
-import {
-  findLockerTokenId,
-  matchLockerTokenId,
-  positionManagerTransferAbi,
-  tokenIdsMintedToLocker,
-} from "./register";
+import { findLockerTokenId } from "./register";
 
 export type LoadedBid = {
   id: bigint;
@@ -223,55 +218,22 @@ export async function loadCcaAuction(token: Address): Promise<CcaAuctionSnapshot
       const text = err instanceof Error ? err.message : String(err);
       if (/UnknownLock/i.test(text) && positionManager && hook) {
         needsRegister = true;
-        try {
-          const minted = await getContractEvents(wagmiConfig, {
-            address: positionManager,
-            abi: positionManagerTransferAbi,
-            eventName: "Transfer",
-            args: { from: zeroAddress, to: locker },
+        tokenId = await findLockerTokenId(
+          {
+            readContract: (req) => readContract(wagmiConfig, req as never),
+            getBlockNumber: async () => currentBlock,
+            getContractEvents: (query) => getContractEvents(wagmiConfig, query as never),
+          },
+          {
+            positionManager,
+            locker,
+            token,
+            hooks: hook,
             fromBlock,
-            toBlock: currentBlock,
-          });
-          const ids = tokenIdsMintedToLocker(minted, locker);
-          for (const id of ids) {
-            try {
-              const [key] = (await readContract(wagmiConfig, {
-                address: positionManager,
-                abi: positionManagerAbi,
-                functionName: "getPoolAndPositionInfo",
-                args: [id],
-              })) as unknown as [
-                { currency0: Address; currency1: Address; fee: number; tickSpacing: number; hooks: Address },
-              ];
-              if (
-                matchLockerTokenId({
-                  owner: locker,
-                  locker,
-                  token,
-                  hooks: hook,
-                  keyHooks: key.hooks,
-                  currency0: key.currency0,
-                  currency1: key.currency1,
-                  fee: Number(key.fee),
-                  tickSpacing: Number(key.tickSpacing),
-                })
-              ) {
-                tokenId = id;
-                break;
-              }
-            } catch {
-              // try next mint
-            }
-          }
-        } catch {
-          // fall through to nextTokenId walk
-        }
-        if (tokenId == null) {
-          tokenId = await findLockerTokenId(
-            { readContract: (req) => readContract(wagmiConfig, req as never) },
-            { positionManager, locker, token, hooks: hook },
-          );
-        }
+            auctionStartBlock: startBlock,
+            latestBlock: currentBlock,
+          },
+        );
       }
     }
   }

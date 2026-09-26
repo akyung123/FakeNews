@@ -20,6 +20,7 @@ import {
   raisedProgressCopy,
   registerLocker,
   sendCcaWrite,
+  tokenIdFromMigrateReceipt,
   swapExactInSingle,
   swapTokenLine,
   tokenApprovePermit2Write,
@@ -270,8 +271,18 @@ export function CcaTrade({
             disabled={Boolean(pending) || (view ? !view.canOpenMarket : false)}
             onClick={() => {
               void run(CCA_COPY.openingMarket, async () => {
-                const { outcome } = await openMarketResult(snap.auction!, writes, snap.lbpStrategy);
+                const { outcome, receipt } = await openMarketResult(snap.auction!, writes, snap.lbpStrategy);
                 if (outcome === "failed") return CCA_COPY.marketFailedToast;
+                if (snap.locker) {
+                  const tokenId = tokenIdFromMigrateReceipt(receipt, snap.locker, snap.positionManager);
+                  if (tokenId != null) {
+                    setSnap((current) =>
+                      current
+                        ? { ...current, tokenId, needsRegister: true, poolOpen: true }
+                        : current,
+                    );
+                  }
+                }
                 return CCA_COPY.marketOpen;
               }, CCA_COPY.marketOpen);
             }}

@@ -579,6 +579,7 @@ describe("chain writes: simulate then write then require success", () => {
     await expect(openMarketResult(AUCTION, optionsOf(fns))).resolves.toEqual({
       hash: HASH,
       outcome: "failed",
+      receipt,
     });
   });
 
