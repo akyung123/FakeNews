@@ -20,8 +20,6 @@ address constant SEPOLIA_POSITION_MANAGER = 0x429ba70129df741B2Ca2a85BC3A2a3328e
 address constant SEPOLIA_UNIVERSAL_ROUTER = 0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3;
 address constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
-// Same pin as PR #41 CCAForkTest.
-uint256 constant CCA_FORK_BLOCK = 11_784_960;
 string constant PUBLIC_SEPOLIA_RPC = "https://ethereum-sepolia-rpc.publicnode.com";
 
 interface ILbpStrategyFork {
@@ -73,10 +71,6 @@ interface IPermit2 {
     function approve(address token, address spender, uint160 amount, uint48 expiration) external;
 }
 
-interface IPositionManagerFork {
-    function nextTokenId() external view returns (uint256);
-}
-
 /// Official LBP/CCA on a Sepolia fork, using Launchpad CcaLib 50/50 constants.
 abstract contract CcaSepoliaForkBase is Test {
     ILbpStrategyFork internal strategy = ILbpStrategyFork(LBP_STRATEGY);
@@ -96,27 +90,43 @@ abstract contract CcaSepoliaForkBase is Test {
     }
 
     function _pinBlock() internal view returns (uint256) {
-        return vm.envOr("SEPOLIA_FORK_BLOCK", CCA_FORK_BLOCK);
+        return vm.envOr("SEPOLIA_FORK_BLOCK", uint256(0));
     }
 
     function _forkAt(string memory rpc, uint256 pin) external {
         vm.createSelectFork(rpc, pin);
     }
 
+    function _forkLatest(string memory rpc) external {
+        vm.createSelectFork(rpc);
+    }
+
+    function _forkHasCode() internal view returns (bool) {
+        return CCA_FACTORY.code.length > 0 && LBP_STRATEGY.code.length > 0 && INITIALIZER_HOOK.code.length > 0;
+    }
+
+    /// Pin `SEPOLIA_FORK_BLOCK` when set; otherwise latest. Public RPCs drop old
+    /// historical state, so a stale pin must not fail the suite.
     function _maybeFork() internal returns (bool) {
         string memory rpc = _rpcUrl();
         uint256 pin = _pinBlock();
-        try this._forkAt(rpc, pin) {
-            forked = true;
-            forkBlock = pin;
-        } catch {
-            return false;
+        if (pin != 0) {
+            try this._forkAt(rpc, pin) {
+                if (_forkHasCode()) {
+                    forked = true;
+                    forkBlock = pin;
+                    return true;
+                }
+            } catch {}
         }
-        if (CCA_FACTORY.code.length == 0 || LBP_STRATEGY.code.length == 0 || INITIALIZER_HOOK.code.length == 0) {
-            forked = false;
-            return false;
-        }
-        return true;
+        try this._forkLatest(rpc) {
+            if (_forkHasCode()) {
+                forked = true;
+                forkBlock = block.number;
+                return true;
+            }
+        } catch {}
+        return false;
     }
 
     modifier onFork() {

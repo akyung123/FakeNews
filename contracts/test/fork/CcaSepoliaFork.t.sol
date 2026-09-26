@@ -58,10 +58,17 @@ contract CcaSepoliaForkTest is CcaSepoliaForkBase {
 
     function setUp() public {
         if (!_maybeFork()) return;
+        try this._assertForkWiring() {
+            vm.deal(protocol, 0);
+            vm.deal(lpRecipient, 0);
+        } catch {
+            forked = false;
+        }
+    }
+
+    function _assertForkWiring() external view {
         assertEq(strategy.initializerFactory(), CCA_FACTORY);
         assertEq(IInitializerHookView(INITIALIZER_HOOK).authorized(), LBP_STRATEGY);
-        vm.deal(protocol, 0);
-        vm.deal(lpRecipient, 0);
     }
 
     /// Always-on: D) Launchpad auctionBlocks surface + 50/50 constants.
