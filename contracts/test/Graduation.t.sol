@@ -3,41 +3,26 @@ pragma solidity ^0.8.24;
 
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
-import {PoolManager} from "v4-core/src/PoolManager.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 
-import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
-import {ProphecyHook} from "../src/uniswap/ProphecyHook.sol";
-import {HookMiner} from "../src/uniswap/HookMiner.sol";
 import {Graduation} from "../src/uniswap/Graduation.sol";
-import {LiquidityLocker} from "../src/uniswap/LiquidityLocker.sol";
-import {LaunchpadTestBase} from "./LaunchpadHelpers.sol";
+import {LaunchpadStack} from "./LaunchpadStack.sol";
 
-contract GraduationTest is LaunchpadTestBase {
+contract GraduationTest is LaunchpadStack {
     using StateLibrary for IPoolManager;
     using PoolIdLibrary for PoolKey;
-
-    IPoolManager internal manager;
-    ProphecyHook internal hook;
-    LiquidityLocker internal locker;
 
     receive() external payable {}
 
     function setUp() public {
-        manager = new PoolManager(address(this));
-        _deployLaunchpad();
+        _deployStack();
         vm.deal(prophet, 10 ether);
-
-        bytes memory ctorArgs = abi.encode(manager, address(this));
-        (, bytes32 salt) =
-            HookMiner.find(address(this), HookMiner.prophecyFlags(), type(ProphecyHook).creationCode, ctorArgs);
-        hook = new ProphecyHook{salt: salt}(manager, address(this));
-        locker = new LiquidityLocker(manager, address(this), IHooks(address(hook)));
+        vm.deal(buyer, 10 ether);
     }
 
     function test_fullRangeTicksMatchSpacing200() public pure {
@@ -61,8 +46,7 @@ contract GraduationTest is LaunchpadTestBase {
 
     function test_specGraduationReservesGapUnderLimit() public {
         address token = _registerAndLaunch();
-        vm.prank(prophet);
-        launchpad.buy{value: 1 ether}(token, 0, "");
+        _sellOut(token);
 
         (uint256 vEth, uint256 vToken, uint256 realEth, uint256 sold, bool complete) = launchpad.curve(token);
         assertTrue(complete);
@@ -77,22 +61,15 @@ contract GraduationTest is LaunchpadTestBase {
 
     function test_seedFullRangeAtVirtualReservePrice() public {
         address token = _registerAndLaunch();
-        vm.prank(prophet);
-        launchpad.buy{value: 1 ether}(token, 0, "");
-        (uint256 vEth, uint256 vToken, uint256 realEth,, bool complete) = launchpad.curve(token);
+        _sellOut(token);
+        (uint256 vEth, uint256 vToken,,, bool complete) = launchpad.curve(token);
         assertTrue(complete);
 
         PoolKey memory key = Graduation.poolKey(token, IHooks(address(hook)));
-        uint160 sqrtP = Graduation.initializePool(manager, key, vEth, vToken);
         (uint160 stored,,,) = manager.getSlot0(key.toId());
-        assertEq(stored, sqrtP);
+        uint160 expected = Graduation.sqrtPriceX96FromVirtualReserves(vEth, vToken);
+        assertEq(stored, expected);
         assertLt(Graduation.priceGapPpm(vEth, vToken, stored), Graduation.MAX_PRICE_GAP_PPM);
-
-        uint256 seedToken = launchpad.LP_SUPPLY();
-        vm.prank(address(launchpad));
-        ProphecyToken(token).transfer(address(this), seedToken);
-        ProphecyToken(token).approve(address(locker), seedToken);
-        locker.lock{value: realEth}(token, prophet, protocol, key, seedToken);
 
         (uint128 liquidity,,) = manager.getPositionInfo(
             key.toId(), address(locker), Graduation.tickLower(), Graduation.tickUpper(), bytes32(0)
