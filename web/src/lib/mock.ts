@@ -7,10 +7,60 @@
  */
 
 // ---------------------------------------------------------------------------
+// Screen 1 — home list (prototype store seed)
+// ---------------------------------------------------------------------------
+
+export const SEED_COINS = [
+  { id: "wifi", ticker: "WIFI", name: "Wifi Dies", prophecy: "The venue Wi-Fi dies at 3am on Saturday", creator: "yuki.eth", min: 180 },
+  { id: "oops", ticker: "OOPS", name: "Mainnet Oops", prophecy: "Someone deploys to mainnet by accident before Sunday", creator: "0xHana", min: 140 },
+  { id: "coffee", ticker: "COFFEE", name: "No Coffee", prophecy: "Coffee runs out before Sunday breakfast", creator: "tokyo_bob", min: 95 },
+  { id: "yolo", ticker: "YOLO", name: "Zero Tests", prophecy: "A team with zero tests ships on time", creator: "degen_kim", min: 60 },
+  { id: "why", ticker: "WHY", name: "Why Blockchain", prophecy: "Someone asks “why blockchain?” more than 10 times today", creator: "wagmi_lee", min: 25 },
+  { id: "sleep", ticker: "SLEEP", name: "No Sleep", prophecy: "Nobody on our team sleeps before 5am", creator: "june_kim", min: 6 },
+];
+
+// ---------------------------------------------------------------------------
 // Screen 2 — issue
 // Another frontend agent owns this section. Add issue-screen mocks below.
 // Do not mix those exports with the Screen 4 block.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Screen 3 — trade memos (prototype store seed)
+// ---------------------------------------------------------------------------
+
+export type SeedEvent =
+  | { min: number; coin: string; user: string; buy: number; say?: string }
+  | { min: number; coin: string; user: string; sellShare: number; say?: string }
+  | { min: number; coin: string; user: string; say: string };
+
+export const SEED_EVENTS: readonly SeedEvent[] = [
+  { min: 178, coin: "wifi", user: "yuki.eth", buy: 0.3, say: "I've met this router before. It's coming." },
+  { min: 170, coin: "wifi", user: "tokyo_bob", buy: 0.5 },
+  { min: 150, coin: "wifi", user: "degen_kim", buy: 0.4, say: "LFG 📡" },
+  { min: 138, coin: "oops", user: "0xHana", buy: 0.2, say: "trust me, I know my teammates" },
+  { min: 120, coin: "wifi", user: "0xHana", buy: 0.2 },
+  { min: 110, coin: "oops", user: "satoshi_jr", buy: 0.6, say: "someone always does it" },
+  { min: 100, coin: "wifi", user: "you", buy: 0.1 },
+  { min: 93, coin: "coffee", user: "tokyo_bob", buy: 0.15 },
+  { min: 80, coin: "wifi", user: "tokyo_bob", sellShare: 0.8 },
+  { min: 75, coin: "wifi", user: "degen_kim", say: "ugh, why is it dropping AGAIN" },
+  { min: 70, coin: "oops", user: "june_kim", buy: 0.3 },
+  { min: 60, coin: "coffee", user: "yuki.eth", buy: 0.2, say: "there is no more coffee…" },
+  { min: 58, coin: "yolo", user: "degen_kim", buy: 0.8, say: "tests are for people who doubt" },
+  { min: 50, coin: "yolo", user: "wagmi_lee", buy: 0.4 },
+  { min: 40, coin: "wifi", user: "wagmi_lee", buy: 0.1, say: "wifi still up. buying the dip anyway" },
+  { min: 35, coin: "yolo", user: "june_kim", buy: 0.6, say: "this is literally us" },
+  { min: 30, coin: "oops", user: "satoshi_jr", say: "just saw a PRIVATE_KEY on the big screen 👀" },
+  { min: 24, coin: "why", user: "wagmi_lee", buy: 0.1 },
+  { min: 20, coin: "coffee", user: "degen_kim", buy: 0.05 },
+  { min: 18, coin: "why", user: "yuki.eth", buy: 0.05, say: "count is at 3 already" },
+  { min: 15, coin: "yolo", user: "0xHana", buy: 0.3 },
+  { min: 12, coin: "coffee", user: "tokyo_bob", sellShare: 0.6 },
+  { min: 10, coin: "coffee", user: "tokyo_bob", say: "they refilled it. I panic sold. classic" },
+  { min: 5, coin: "yolo", user: "wagmi_lee", say: "up big and I still haven't written a test" },
+  { min: 5, coin: "sleep", user: "june_kim", buy: 0.02, say: "we're cooked" },
+];
 
 // ---------------------------------------------------------------------------
 // Screen 4 — prophet page
