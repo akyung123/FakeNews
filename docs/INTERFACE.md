@@ -1,5 +1,7 @@
 # Interface
 
+CCA version on branch `cca`: see [`INTERFACE_CCA.md`](INTERFACE_CCA.md).
+
 What `contracts/`, `web/` and `world/` rely on from each other. Only the contract between folders, not how to implement it.
 
 - **Changing it:** edit this file first, in **the same PR** as the code change, and write "INTERFACE change" in the PR description.
