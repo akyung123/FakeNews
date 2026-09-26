@@ -1,11 +1,14 @@
 /**
  * Read auction state through CCALens (`state`) plus auction start/end blocks.
  * Status, clearing price, raised vs 0.02 ETH, and blocks remaining are derived here.
+ *
+ * Schedule (PR #41): end = start + N, claim = end, migration = end + 1.
+ * Open market is only enabled at block >= end + 1 and when graduated.
  */
 import { CCA_SEPOLIA } from "./addresses";
 import { ccaAbi } from "./abi/cca";
 import { ccaLensAbi } from "./abi/ccaLens";
-import { GRADUATION_ETH_WEI } from "./constants";
+import { GRADUATION_ETH_WEI } from "./config";
 import type { Address } from "viem";
 
 export type CcaCheckpoint = {
@@ -35,8 +38,65 @@ export type AuctionView = {
   blocksRemaining: number;
   startBlock: bigint;
   endBlock: bigint;
+  /** claim block = end */
+  claimBlock: bigint;
+  /** migration block = end + 1 */
+  migrationBlock: bigint;
   isGraduated: boolean;
+  /** Open market only when graduated and current block >= end + 1. */
+  canOpenMarket: boolean;
 };
+
+export type AuctionActionVisibility = {
+  claim: boolean;
+  openMarket: boolean;
+  exit: boolean;
+};
+
+/** Open market only at block >= end + 1 and when graduated. */
+export function canOpenMarket(input: {
+  isGraduated: boolean;
+  endBlock: bigint;
+  currentBlock: bigint;
+}): boolean {
+  return input.isGraduated && input.currentBlock >= input.endBlock + 1n;
+}
+
+/**
+ * Hide claim and open-market when the goal was missed.
+ * Exit stays available so every bid can be refunded in full.
+ */
+export function auctionActionVisibility(input: {
+  phase: AuctionPhase;
+  isGraduated: boolean;
+  endBlock: bigint;
+  currentBlock: bigint;
+}): AuctionActionVisibility {
+  if (input.phase === "ended_goal_not_reached") {
+    return { claim: false, openMarket: false, exit: true };
+  }
+  if (input.phase === "ended_goal_reached") {
+    return {
+      claim: true,
+      openMarket: canOpenMarket(input),
+      exit: true,
+    };
+  }
+  return { claim: false, openMarket: false, exit: false };
+}
+
+/**
+ * Product rules when the auction ends below the graduation goal
+ * (PR #41 fork: exitBid refunds all ETH, claimTokens reverts NotGraduated,
+ * LBPStrategy.migrate never opens a pool).
+ */
+export function goalNotReachedEffects() {
+  return {
+    exitBidRefundsAllEth: true,
+    claimTokensReverts: "NotGraduated" as const,
+    poolOpens: false,
+  };
+}
 
 export function ccaLensStateRequest(auction: Address, lens = CCA_SEPOLIA.ccaLens) {
   return {
@@ -119,7 +179,14 @@ export function deriveAuctionView(input: {
     blocksRemaining: remaining,
     startBlock: input.startBlock,
     endBlock: input.endBlock,
+    claimBlock: input.endBlock,
+    migrationBlock: input.endBlock + 1n,
     isGraduated: input.lens.isGraduated,
+    canOpenMarket: canOpenMarket({
+      isGraduated: input.lens.isGraduated,
+      endBlock: input.endBlock,
+      currentBlock: input.currentBlock,
+    }),
   };
 }
 

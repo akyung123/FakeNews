@@ -13,20 +13,39 @@ import {
 } from "./abi/universalRouter";
 import { CCA_SEPOLIA } from "./addresses";
 import {
+  auctionActionVisibility,
   auctionScheduleRequest,
   bidRead,
   blocksRemaining,
+  canOpenMarket,
   ccaLensStateRequest,
   deriveAuctionView,
+  goalNotReachedEffects,
   readAuctionView,
   type CcaLensState,
 } from "./auction";
 import { placeBid, placeBidArgs, placeBidWrite } from "./bid";
 import { claimTokens, claimTokensBatch, claimTokensWrite } from "./claim";
-import { GRADUATION_ETH_WEI, POOL_FEE, POOL_TICK_SPACING, Q96 } from "./constants";
+import {
+  AUCTION_BLOCKS,
+  CCA_CONFIG,
+  FIRST_BID_ID,
+  FLOOR_PRICE_Q96,
+  GRADUATION_ETH_WEI,
+  NATIVE_ETH,
+  POOL_FEE,
+  POOL_TICK_SPACING,
+  Q96,
+  TICK_SPACING_Q96,
+  auctionClaimBlock,
+  auctionEndBlock,
+  auctionMigrationBlock,
+  resolveCcaConfig,
+} from "./config";
 import { ccaUserMessage, mapCcaError } from "./errors";
 import { exitBid, exitBidWrite, exitPartiallyFilledBid } from "./exit";
 import {
+  INTERFACE_CCA_PENDING,
   INTERFACE_CCA_TBD,
   InterfaceCcaPendingError,
   auctionAddressForToken,
@@ -36,7 +55,13 @@ import {
   poolHooksForToken,
 } from "./launchpadCca";
 import { openMarket, openMarketWrite } from "./migrate";
-import { alignPriceToTick, ethPerTokenToQ96, q96ToWeiPerToken, weiPerTokenToQ96 } from "./price";
+import {
+  MaxPriceBelowFloorError,
+  ethPerTokenToQ96,
+  q96ToWeiPerToken,
+  snapMaxPriceToTick,
+  weiPerTokenToQ96,
+} from "./price";
 import { encodeV4ExactInSingle, swapExactInSingle, swapExactInSingleWrite } from "./swap";
 import {
   bidExitedLogsQuery,
@@ -177,6 +202,46 @@ describe("verified external ABIs", () => {
   });
 });
 
+describe("confirmed CCA config (PR #41 head d84aed4)", () => {
+  it("keeps the fork-test values in one overrideable object", () => {
+    expect(CCA_CONFIG.currency).toBe(zeroAddress);
+    expect(NATIVE_ETH).toBe(zeroAddress);
+    expect(CCA_CONFIG.floorPriceQ96).toBe(1000n << 96n);
+    expect(CCA_CONFIG.tickSpacingQ96).toBe(100n << 96n);
+    expect(FLOOR_PRICE_Q96).toBe(1000n * Q96);
+    expect(TICK_SPACING_Q96).toBe(100n * Q96);
+    expect(CCA_CONFIG.graduationWei).toBe(parseEther("0.02"));
+    expect(GRADUATION_ETH_WEI).toBe(parseEther("0.02"));
+    expect(CCA_CONFIG.poolFee).toBe(10_000);
+    expect(CCA_CONFIG.poolTickSpacing).toBe(200);
+    expect(POOL_FEE).toBe(10_000);
+    expect(POOL_TICK_SPACING).toBe(200);
+    expect(CCA_CONFIG.auctionBlocks).toBe(25);
+    expect(AUCTION_BLOCKS).toBe(25);
+    expect(CCA_CONFIG.firstBidId).toBe(0n);
+    expect(FIRST_BID_ID).toBe(0n);
+    expect(CCA_CONFIG.sepoliaForkBlock).toBe(11_784_960n);
+    expect(CCA_CONFIG.prophetFeeShare).toBe(24);
+    expect(CCA_CONFIG.protocolFeeShare).toBe(76);
+  });
+
+  it("lets INTERFACE_CCA override fields without rewriting defaults", () => {
+    const next = resolveCcaConfig({ auctionBlocks: 10, graduationWei: parseEther("0.05") });
+    expect(next.auctionBlocks).toBe(10);
+    expect(next.graduationWei).toBe(parseEther("0.05"));
+    expect(next.floorPriceQ96).toBe(CCA_CONFIG.floorPriceQ96);
+    expect(CCA_CONFIG.auctionBlocks).toBe(25);
+  });
+
+  it("derives end = start+N, claim = end, migration = end+1", () => {
+    expect(auctionEndBlock(11_784_960n)).toBe(11_784_985n);
+    expect(auctionClaimBlock(11_784_960n)).toBe(11_784_985n);
+    expect(auctionMigrationBlock(11_784_960n)).toBe(11_784_986n);
+    expect(auctionEndBlock(100n, 10)).toBe(110n);
+    expect(auctionMigrationBlock(100n, 10)).toBe(111n);
+  });
+});
+
 describe("Q96 price encoding", () => {
   it("encodes ETH per token as (wei * Q96) / 1e18", () => {
     expect(Q96).toBe(2n ** 96n);
@@ -187,10 +252,14 @@ describe("Q96 price encoding", () => {
     expect(q96ToWeiPerToken(encoded)).toBe((encoded * 10n ** 18n) / Q96);
   });
 
-  it("snaps a bid price onto the CCA tick grid", () => {
-    const spacing = Q96 / 100n;
-    expect(alignPriceToTick((Q96 / 1000n) * 15n, spacing)).toBe((Q96 / 100n) * 1n);
-    expect(alignPriceToTick(spacing, spacing)).toBe(spacing);
+  it("snaps max price DOWN onto floor + k*tick and rejects below the floor", () => {
+    expect(snapMaxPriceToTick(FLOOR_PRICE_Q96)).toBe(FLOOR_PRICE_Q96);
+    expect(snapMaxPriceToTick(ethPerTokenToQ96("1100"))).toBe(1100n * Q96);
+    expect(snapMaxPriceToTick(ethPerTokenToQ96("1150"))).toBe(1100n * Q96);
+    expect(snapMaxPriceToTick(ethPerTokenToQ96("1199"))).toBe(1100n * Q96);
+    expect(snapMaxPriceToTick(ethPerTokenToQ96("1200"))).toBe(1200n * Q96);
+    expect(() => snapMaxPriceToTick(ethPerTokenToQ96("999"))).toThrow(MaxPriceBelowFloorError);
+    expect(() => snapMaxPriceToTick(ethPerTokenToQ96("0.001"))).toThrow(/below the auction floor/);
   });
 });
 
@@ -221,6 +290,9 @@ describe("CCALens auction view", () => {
     expect(view.goalReached).toBe(false);
     expect(view.clearingPriceQ96).toBe(Q96 / 1000n);
     expect(view.graduationWei).toBe(GRADUATION_ETH_WEI);
+    expect(view.canOpenMarket).toBe(false);
+    expect(view.claimBlock).toBe(125n);
+    expect(view.migrationBlock).toBe(126n);
   });
 
   it("marks the goal reached at 0.02 ETH", () => {
@@ -233,7 +305,31 @@ describe("CCALens auction view", () => {
     expect(view.phase).toBe("ended_goal_reached");
     expect(view.goalReached).toBe(true);
     expect(view.blocksRemaining).toBe(0);
+    expect(view.claimBlock).toBe(125n);
+    expect(view.migrationBlock).toBe(126n);
+    expect(view.canOpenMarket).toBe(false);
     expect(blocksRemaining(125n, 200n)).toBe(0);
+  });
+
+  it("enables open market only at block >= end+1 when graduated", () => {
+    const atEnd = deriveAuctionView({
+      lens: lens(parseEther("0.02"), true),
+      startBlock: 100n,
+      endBlock: 125n,
+      currentBlock: 125n,
+    });
+    expect(atEnd.canOpenMarket).toBe(false);
+    expect(canOpenMarket({ isGraduated: true, endBlock: 125n, currentBlock: 125n })).toBe(false);
+
+    const afterEnd = deriveAuctionView({
+      lens: lens(parseEther("0.02"), true),
+      startBlock: 100n,
+      endBlock: 125n,
+      currentBlock: 126n,
+    });
+    expect(afterEnd.canOpenMarket).toBe(true);
+    expect(canOpenMarket({ isGraduated: true, endBlock: 125n, currentBlock: 126n })).toBe(true);
+    expect(canOpenMarket({ isGraduated: false, endBlock: 125n, currentBlock: 200n })).toBe(false);
   });
 
   it("marks the goal missed after the last block", () => {
@@ -245,6 +341,43 @@ describe("CCALens auction view", () => {
     });
     expect(view.phase).toBe("ended_goal_not_reached");
     expect(view.goalReached).toBe(false);
+    expect(view.canOpenMarket).toBe(false);
+    expect(view.claimBlock).toBe(125n);
+    expect(view.migrationBlock).toBe(126n);
+  });
+
+  it("hides claim and open-market when the goal was missed", () => {
+    const missed = auctionActionVisibility({
+      phase: "ended_goal_not_reached",
+      isGraduated: false,
+      endBlock: 125n,
+      currentBlock: 130n,
+    });
+    expect(missed).toEqual({ claim: false, openMarket: false, exit: true });
+
+    const atClaimBlock = auctionActionVisibility({
+      phase: "ended_goal_reached",
+      isGraduated: true,
+      endBlock: 125n,
+      currentBlock: 125n,
+    });
+    expect(atClaimBlock).toEqual({ claim: true, openMarket: false, exit: true });
+
+    const afterMigration = auctionActionVisibility({
+      phase: "ended_goal_reached",
+      isGraduated: true,
+      endBlock: 125n,
+      currentBlock: 126n,
+    });
+    expect(afterMigration).toEqual({ claim: true, openMarket: true, exit: true });
+  });
+
+  it("records goal-not-reached effects: full ETH refund, NotGraduated, no pool", () => {
+    expect(goalNotReachedEffects()).toEqual({
+      exitBidRefundsAllEth: true,
+      claimTokensReverts: "NotGraduated",
+      poolOpens: false,
+    });
   });
 
   it("reads state through CCALens then start/end blocks on the auction", async () => {
@@ -254,7 +387,8 @@ describe("CCALens auction view", () => {
     expect(request.functionName).toBe("state");
     expect(request.args).toEqual([AUCTION]);
     expect(auctionScheduleRequest(AUCTION).endBlock.functionName).toBe("endBlock");
-    expect(bidRead(AUCTION, 1n).functionName).toBe("bids");
+    expect(bidRead(AUCTION, FIRST_BID_ID).functionName).toBe("bids");
+    expect(bidRead(AUCTION, FIRST_BID_ID).args).toEqual([0n]);
 
     const view = await readAuctionView(
       {
@@ -279,22 +413,42 @@ describe("CCALens auction view", () => {
 });
 
 describe("bid encoding", () => {
-  it("sends budget as msg.value and max price as Q96 on the 4-arg submitBid", () => {
+  it("sends budget as msg.value and snaps max price DOWN onto floor + k*tick", () => {
     const input = {
       auction: AUCTION,
       owner: OWNER,
       budgetEth: "0.01",
-      maxPricePerTokenEth: "0.001",
+      maxPricePerTokenEth: "1150",
     };
     const args = placeBidArgs(input);
     expect(args.amount).toBe(parseEther("0.01"));
-    expect(args.maxPriceQ96).toBe(Q96 / 1000n);
+    expect(args.maxPriceQ96).toBe(1100n * Q96);
     const request = placeBidWrite(input);
     expect(request.address).toBe(AUCTION);
     expect(request.abi).toBe(ccaAbi);
     expect(request.functionName).toBe("submitBid");
     expect(request.args).toEqual([args.maxPriceQ96, args.amount, OWNER, "0x"]);
     expect(request.value).toBe(args.amount);
+  });
+
+  it("keeps a max price that already sits on a valid tick", () => {
+    expect(placeBidArgs({
+      auction: AUCTION,
+      owner: OWNER,
+      budgetEth: "0.01",
+      maxPricePerTokenEth: "1000",
+    }).maxPriceQ96).toBe(FLOOR_PRICE_Q96);
+  });
+
+  it("rejects a max price below the floor", () => {
+    expect(() =>
+      placeBidArgs({
+        auction: AUCTION,
+        owner: OWNER,
+        budgetEth: "0.01",
+        maxPricePerTokenEth: "0.001",
+      }),
+    ).toThrow(MaxPriceBelowFloorError);
   });
 });
 
@@ -303,7 +457,7 @@ describe("chain writes: simulate then write then require success", () => {
     auction: AUCTION,
     owner: OWNER,
     budgetEth: "0.01",
-    maxPricePerTokenEth: "0.001",
+    maxPricePerTokenEth: "1100",
   };
 
   it("does not call writeContract when simulateContract throws", async () => {
@@ -427,7 +581,11 @@ describe("error mapper", () => {
     expect(mapCcaError(new Error("NotGraduated"))).toBe("goal_not_reached");
     expect(mapCcaError(new Error("MigrationNotYetAllowed"))).toBe("market_not_ready");
     expect(mapCcaError(new Error("User rejected the request"))).toBe("user_rejected");
+    expect(mapCcaError(new MaxPriceBelowFloorError())).toBe("bid_rejected");
     expect(ccaUserMessage("bid_rejected")).not.toMatch(/BidMustBeAboveClearingPrice/);
+    expect(ccaUserMessage("goal_not_reached")).toBe(
+      "The goal wasn't reached, so there are no tokens to claim.",
+    );
     expect(ccaUserMessage("goal_not_reached")).not.toMatch(/NotGraduated/);
   });
 });
@@ -439,6 +597,7 @@ describe("TBD(INTERFACE_CCA) isolation", () => {
     expect(() => poolHooksForToken(TOKEN)).toThrow(INTERFACE_CCA_TBD);
     expect(() => launchCcaWrite()).toThrow(/launch on the CCA line/);
     expect(() => claimProphetFeeCcaWrite()).toThrow(/prophet fee claim/);
+    expect(INTERFACE_CCA_PENDING).not.toContain("goal-not-reached sub-line (copy.goalNotReachedSub)");
   });
 });
 

@@ -1,23 +1,20 @@
 /**
- * Product-fixed CCA / LBP values on Sepolia.
- * Currency is native ETH (address(0)). Pool fee 1% = 10_000 hundredths of a bip.
+ * Re-exports of `CCA_CONFIG`. Prefer importing from `./config` for new code.
+ * INTERFACE_CCA overrides belong on `resolveCcaConfig`, not here.
  */
-import { parseEther, zeroAddress, type Address } from "viem";
-
-/** Q96 = 2^96. CCA stores prices as currency/token in this encoding. */
-export const Q96 = 0x1000000000000000000000000n;
-
-export const NATIVE_ETH = zeroAddress;
-export const AUCTION_BLOCKS = 25;
-export const GRADUATION_ETH_WEI = parseEther("0.02");
-export const POOL_FEE = 10_000;
-export const POOL_TICK_SPACING = 200;
-export const PROPHET_FEE_SHARE = 24;
-export const PROTOCOL_FEE_SHARE = 76;
-
-/** Sepolia / Ethereum slot time used only to render (~mm:ss). Not an on-chain value. */
-export const SEPOLIA_BLOCK_SECONDS = 12;
-
-export const WAD = 10n ** 18n;
-
-export type CcaAddress = Address;
+export {
+  AUCTION_BLOCKS,
+  FIRST_BID_ID,
+  FLOOR_PRICE_Q96,
+  GRADUATION_ETH_WEI,
+  NATIVE_ETH,
+  POOL_FEE,
+  POOL_TICK_SPACING,
+  PROPHET_FEE_SHARE,
+  PROTOCOL_FEE_SHARE,
+  Q96,
+  SEPOLIA_BLOCK_SECONDS,
+  TICK_SPACING_Q96,
+  WAD,
+} from "./config";
+export type { Address as CcaAddress } from "viem";

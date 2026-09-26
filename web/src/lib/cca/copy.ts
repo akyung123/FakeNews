@@ -1,9 +1,9 @@
 /**
- * Designer v1 auction copy. English only. No wording about returns or price predictions.
+ * Designer v1 auction copy. English only. No wording about profit, yield, or price predictions.
  * `{blocks}`, `{mm:ss}`, `{raised}`, `{amount}` are interpolated by the helpers below.
  */
 import { formatEther } from "viem";
-import { GRADUATION_ETH_WEI, SEPOLIA_BLOCK_SECONDS } from "./constants";
+import { GRADUATION_ETH_WEI, SEPOLIA_BLOCK_SECONDS } from "./config";
 
 export const CCA_COPY = {
   auctionLive: "Auction live · ends in {blocks} blocks (~{mm:ss})",
@@ -25,8 +25,10 @@ export const CCA_COPY = {
   poolFeeSplit:
     "Pool fee 1%. Fees are split 24% to the prophet and 76% to the protocol.",
   goalNotReached: "Auction ended · goal not reached",
-  /** TBD(INTERFACE_CCA): designer has not written the goal-not-reached sub-line. */
-  goalNotReachedSub: "TBD(INTERFACE_CCA)",
+  goalNotReachedSub:
+    "The goal wasn't reached, so no tokens were issued and the market won't open. Every bid is returned in full.",
+  getEthBack: "Get your ETH back ({amount} ETH)",
+  ethReturned: "ETH returned",
 } as const;
 
 export function formatMmSs(totalSeconds: number): string {
@@ -52,6 +54,10 @@ export function raisedProgressCopy(raisedWei: bigint): string {
 
 export function refundUnusedCopy(amountWei: bigint): string {
   return CCA_COPY.refundUnused.replace("{amount}", formatEther(amountWei));
+}
+
+export function getEthBackCopy(amountWei: bigint): string {
+  return CCA_COPY.getEthBack.replace("{amount}", formatEther(amountWei));
 }
 
 export function graduationGoalWei(): bigint {

@@ -15,6 +15,9 @@ export {
 export { CCA_SEPOLIA } from "./addresses";
 export {
   AUCTION_BLOCKS,
+  CCA_CONFIG,
+  FIRST_BID_ID,
+  FLOOR_PRICE_Q96,
   GRADUATION_ETH_WEI,
   NATIVE_ETH,
   POOL_FEE,
@@ -23,26 +26,37 @@ export {
   PROTOCOL_FEE_SHARE,
   Q96,
   SEPOLIA_BLOCK_SECONDS,
+  TICK_SPACING_Q96,
   WAD,
-} from "./constants";
+  auctionClaimBlock,
+  auctionEndBlock,
+  auctionMigrationBlock,
+  resolveCcaConfig,
+  type CcaConfig,
+} from "./config";
 export {
   CCA_COPY,
   auctionLiveCopy,
   blocksToMmSs,
   formatMmSs,
+  getEthBackCopy,
   graduationGoalWei,
   raisedProgressCopy,
   refundUnusedCopy,
 } from "./copy";
 export { ccaUserMessage, errorText, mapCcaError, type CcaErrorKind } from "./errors";
 export {
+  auctionActionVisibility,
   auctionScheduleRequest,
   bidRead,
   blocksRemaining,
+  canOpenMarket,
   ccaLensStateRequest,
   deriveAuctionView,
+  goalNotReachedEffects,
   readAuctionLensState,
   readAuctionView,
+  type AuctionActionVisibility,
   type AuctionPhase,
   type AuctionView,
   type CcaCheckpoint,
@@ -76,12 +90,14 @@ export {
   poolHooksForToken,
 } from "./launchpadCca";
 export {
+  MaxPriceBelowFloorError,
   alignPriceToTick,
   bidAmountQ96ToWei,
   budgetEthToAmount,
   ethPerTokenToQ96,
   q96ToEthPerToken,
   q96ToWeiPerToken,
+  snapMaxPriceToTick,
   weiPerTokenToQ96,
 } from "./price";
 export {

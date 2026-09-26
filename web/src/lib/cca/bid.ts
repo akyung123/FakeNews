@@ -2,10 +2,14 @@
  * Place a CCA bid: budget ETH + max price per token (encoded as Q96).
  * Uses the 4-arg `submitBid` overload, which the contract implements as
  * `submitBid(..., FLOOR_PRICE_Q96, hookData)` (v2.1.0 ContinuousClearingAuction.sol).
+ *
+ * Max price is always snapped DOWN onto `floor + k * tick` (PR #41).
+ * A max price below the floor throws `MaxPriceBelowFloorError`.
  */
 import { zeroAddress, type Address } from "viem";
 import { ccaAbi } from "./abi/cca";
-import { alignPriceToTick, budgetEthToAmount, ethPerTokenToQ96 } from "./price";
+import { CCA_CONFIG } from "./config";
+import { budgetEthToAmount, ethPerTokenToQ96, snapMaxPriceToTick } from "./price";
 import { sendCcaWrite, type CcaWriteOptions, type CcaWriteRequest } from "./writes";
 import type { Hex } from "../world";
 
@@ -14,17 +18,20 @@ export type PlaceBidInput = {
   owner: Address;
   budgetEth: string;
   maxPricePerTokenEth: string;
-  /** Auction `tickSpacing()` in Q96. When set, the max price is snapped to a valid tick. */
+  /** Override auction `floorPrice()` in Q96. Defaults to `CCA_CONFIG.floorPriceQ96`. */
+  floorPriceQ96?: bigint;
+  /** Override auction `tickSpacing()` in Q96. Defaults to `CCA_CONFIG.tickSpacingQ96`. */
   tickSpacingQ96?: bigint;
   hookData?: Hex;
 };
 
 export function placeBidArgs(input: PlaceBidInput) {
   const amount = budgetEthToAmount(input.budgetEth);
-  let maxPriceQ96 = ethPerTokenToQ96(input.maxPricePerTokenEth);
-  if (input.tickSpacingQ96 !== undefined) {
-    maxPriceQ96 = alignPriceToTick(maxPriceQ96, input.tickSpacingQ96);
-  }
+  const maxPriceQ96 = snapMaxPriceToTick(
+    ethPerTokenToQ96(input.maxPricePerTokenEth),
+    input.floorPriceQ96 ?? CCA_CONFIG.floorPriceQ96,
+    input.tickSpacingQ96 ?? CCA_CONFIG.tickSpacingQ96,
+  );
   const owner = input.owner;
   if (owner === zeroAddress) {
     throw new Error("bid owner cannot be the zero address");

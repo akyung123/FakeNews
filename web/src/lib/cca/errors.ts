@@ -27,7 +27,7 @@ export function mapCcaError(error: unknown): CcaErrorKind {
     return "auction_not_live";
   }
   if (
-    /BidMustBeAboveClearingPrice|InvalidBidPriceTooHigh|BidAmountTooSmall|InvalidAmount|TickPriceNotAtBoundary|BidOwnerCannotBeZeroAddress|InvalidBidUnableToClear/i.test(
+    /BidMustBeAboveClearingPrice|InvalidBidPriceTooHigh|BidAmountTooSmall|InvalidAmount|TickPriceNotAtBoundary|BidOwnerCannotBeZeroAddress|InvalidBidUnableToClear|MaxPriceBelowFloor|below the auction floor/i.test(
       text,
     )
   ) {
@@ -64,7 +64,7 @@ export function ccaUserMessage(kind: CcaErrorKind): string {
     case "cannot_claim":
       return "Tokens cannot be claimed yet.";
     case "goal_not_reached":
-      return "The auction ended without reaching the goal.";
+      return "The goal wasn't reached, so there are no tokens to claim.";
     case "market_not_ready":
       return "The market cannot be opened yet.";
     case "swap_failed":

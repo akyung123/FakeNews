@@ -1,5 +1,6 @@
 /**
  * Claim tokens after the auction claim block. The bid must already be exited.
+ * When the goal was not reached the auction reverts `NotGraduated`.
  * Verified: IContinuousClearingAuction.claimTokens / claimTokensBatch (v2.1.0).
  */
 import type { Address } from "viem";

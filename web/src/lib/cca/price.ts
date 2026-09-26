@@ -1,10 +1,21 @@
 /**
  * CCA bid prices are Q96 (Uniswap/continuous-clearing-auction FixedPoint96).
  * A user-facing "max ETH per token" is encoded as (weiPerToken * Q96) / 1e18.
- * Bid ticks must sit on `priceQ96 % tickSpacingQ96 == 0` (TickStorage._getTick).
+ *
+ * Valid ticks (PR #41 / AuctionBaseTest): `floor + k * tick`.
+ * Round the user's max price DOWN onto that grid. Reject below the floor.
  */
 import { formatEther, parseEther } from "viem";
-import { Q96, WAD } from "./constants";
+import { CCA_CONFIG, Q96, WAD } from "./config";
+
+export class MaxPriceBelowFloorError extends Error {
+  readonly kind = "below_floor" as const;
+
+  constructor() {
+    super("Max price is below the auction floor.");
+    this.name = "MaxPriceBelowFloorError";
+  }
+}
 
 export function ethPerTokenToQ96(ethPerToken: string): bigint {
   return weiPerTokenToQ96(parseEther(ethPerToken));
@@ -26,17 +37,32 @@ export function q96ToEthPerToken(priceQ96: bigint): string {
 }
 
 /**
- * Snap a Q96 price down onto the auction tick grid.
- * Verified: TickStorage reverts TickPriceNotAtBoundary unless
- * `priceQ96 % TICK_SPACING_Q96 == 0`.
+ * Snap a Q96 max price down to `floor + k * tick`.
+ * Verified: TickStorage reverts TickPriceNotAtBoundary unless the price
+ * sits on the grid; PR #41 bids use `maxPrice = floor + n * tick`.
  */
-export function alignPriceToTick(priceQ96: bigint, tickSpacingQ96: bigint): bigint {
+export function snapMaxPriceToTick(
+  priceQ96: bigint,
+  floorPriceQ96 = CCA_CONFIG.floorPriceQ96,
+  tickSpacingQ96 = CCA_CONFIG.tickSpacingQ96,
+): bigint {
   if (tickSpacingQ96 <= 0n) {
     throw new Error("tick spacing must be greater than zero");
   }
-  const aligned = (priceQ96 / tickSpacingQ96) * tickSpacingQ96;
-  if (aligned === 0n) return tickSpacingQ96;
-  return aligned;
+  if (priceQ96 < floorPriceQ96) {
+    throw new MaxPriceBelowFloorError();
+  }
+  const k = (priceQ96 - floorPriceQ96) / tickSpacingQ96;
+  return floorPriceQ96 + k * tickSpacingQ96;
+}
+
+/** @deprecated Use snapMaxPriceToTick — same grid, with floor. */
+export function alignPriceToTick(
+  priceQ96: bigint,
+  tickSpacingQ96 = CCA_CONFIG.tickSpacingQ96,
+  floorPriceQ96 = CCA_CONFIG.floorPriceQ96,
+): bigint {
+  return snapMaxPriceToTick(priceQ96, floorPriceQ96, tickSpacingQ96);
 }
 
 /** Bid amount is uint128 currency wei; ETH bids send the same value. */

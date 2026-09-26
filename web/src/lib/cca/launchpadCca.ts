@@ -52,5 +52,4 @@ export const INTERFACE_CCA_PENDING = [
   "poolHooksForToken",
   "launchCcaWrite",
   "claimProphetFeeCcaWrite",
-  "goal-not-reached sub-line (copy.goalNotReachedSub)",
 ] as const;
