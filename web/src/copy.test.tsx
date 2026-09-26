@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "./App";
-import { eth, mcap } from "./lib/format";
+import { gwei, mcap } from "./lib/format";
 import { SEED_EVENTS } from "./lib/mock";
 
 const NEW_MEMOS = [
@@ -44,6 +44,8 @@ const REMOVED = [
   "profit",
   "yield",
   "prediction market",
+  "PRIVATE_KEY",
+  "just saw a PRIVATE_KEY on the big screen 👀",
   ...FLAGGED_MEMOS,
 ];
 
@@ -75,7 +77,7 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(held).toContain("Add a one-line memo (optional)");
     expect(held).toContain("Curve progress");
     expect(held).toContain("Holder");
-    expect(held).toContain("62% 0.0124 / 0.02 ETH");
+    expect(held).toContain("62% 0.0124 of 0.02 ETH to graduate");
     expect(held).not.toContain("3.19 ETH");
     expect(held).not.toContain("Holder +");
     expect(held).not.toContain("Holder -");
@@ -91,14 +93,14 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(empty).toContain("No trades yet. The first memo shows up here.");
     expect(empty).toContain("Trade memos");
     expect(empty).toContain("Curve progress");
-    expect(empty).toContain("0% 0.0000 / 0.02 ETH");
+    expect(empty).toContain("0% 0.0000 of 0.02 ETH to graduate");
     expect(empty).not.toContain("0.93 ETH");
     assertRemoved(empty);
 
     const graduated = renderApp("/n/two-min.ringo.prophecy.eth");
     expect(graduated).toContain("Graduated to Uniswap V4");
     expect(graduated).toContain("Trade memos");
-    expect(graduated).toContain("100% 0.0200 / 0.02 ETH");
+    expect(graduated).toContain("100% 0.0200 of 0.02 ETH to graduate");
     expect(graduated).not.toContain("Curve progress");
     expect(graduated).not.toContain("3.74 ETH");
     assertRemoved(graduated);
@@ -135,8 +137,10 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(mine).not.toContain("Return");
     expect(mine).not.toContain("5.59 ETH");
     expect(mine).not.toContain("3.19 ETH");
-    expect(mine).toContain(eth(5.591798695246977e-9, 12));
-    expect(mine).toContain(eth(3.194819350589578e-9, 12));
+    expect(mine).toContain("5.592 gwei");
+    expect(mine).toContain("3.195 gwei");
+    expect(mine).toContain(gwei(5.591798695246977e-9));
+    expect(mine).toContain(gwei(3.194819350589578e-9));
     expect(mine).not.toContain(mcap(5.591798695246977));
     expect(mine).not.toContain(mcap(3.194819350589578));
     assertRemoved(mine);
@@ -150,6 +154,8 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(home).not.toContain("degen_kim");
     expect(home).not.toContain("wagmi_lee");
     expect(home).not.toContain("moon_park");
+    expect(home).not.toContain("PRIVATE_KEY");
+    expect(says).not.toContain("just saw a PRIVATE_KEY on the big screen 👀");
     assertRemoved(home);
   });
 });

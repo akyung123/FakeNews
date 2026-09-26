@@ -30,7 +30,7 @@ describe("Screen 3 name route", () => {
       expect(html).toContain("Buy");
       expect(html).toContain("Trade memos");
       expect(html).toContain("Curve progress");
-      expect(html).toContain("40% 0.0080 / 0.02 ETH");
+      expect(html).toContain("40% 0.0080 of 0.02 ETH to graduate");
       expect(html).not.toContain("1.32 ETH");
       expect(html).not.toContain("Holder talk");
       expect(html).not.toContain("market cap since launch");
