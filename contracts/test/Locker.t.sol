@@ -54,6 +54,7 @@ contract LockerTest is Test {
     }
 
     function test_holdsNftAndHasNoWithdraw() public {
+        assertEq(locker.prophetOf(address(token)), prophet);
         assertGt(locker.tokenIdOf(address(token)), 0);
         (bool okWithdraw,) = address(locker).call(abi.encodeWithSignature("withdraw(address)", address(token)));
         assertFalse(okWithdraw);

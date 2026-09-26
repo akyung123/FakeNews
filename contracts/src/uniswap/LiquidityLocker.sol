@@ -173,6 +173,12 @@ contract LiquidityLocker {
         return positions[token].tokenId;
     }
 
+    /// Prophet stored at `prepare`. There is no `prophetOf(uint256 tokenId)`.
+    function prophetOf(address token) external view returns (address) {
+        if (!positions[token].prepared) revert UnknownLock();
+        return positions[token].prophet;
+    }
+
     function _pay(Currency currency, address to, uint256 amount) internal {
         if (amount == 0) return;
         if (currency.isAddressZero()) {
