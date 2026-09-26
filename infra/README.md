@@ -10,6 +10,8 @@ GitHub Pages workflow is a **separate PR**. Expected URL: `https://akyung123.git
 
 A person must enable Settings → Pages → source **GitHub Actions**. Until that is on, the deploy job fails. Zero extra secrets. Public `VITE_*` go in Actions variables.
 
+`VITE_RPC_URL` is shipped to browsers. Use a public / rate-limited Sepolia endpoint there — not the private deploy RPC stored as the `SEPOLIA_RPC_URL` Actions secret. Optional `VITE_WALLETCONNECT_PROJECT_ID` is also public; leaving it empty must not fail the Pages build.
+
 Preview/demo builds hard-code `VITE_WORLD_MOCK=0` (OFF). Mock is ON unless the value is exactly `0` or `false` (PR #20). The Pages workflow fails if mock resolves to ON. Recording with mock ON is not valid World ID evidence.
 
 ## World server hosting (Render)
@@ -109,6 +111,10 @@ Never commit `WORLD_SIGNER_KEY`. Never print it in CI logs. A person pastes it f
 | `VITE_WORLD_SERVER_URL` | Render `https://….onrender.com` origin |
 | `VITE_LAUNCHPAD_ADDRESS` | Deployed Launchpad |
 | `VITE_CHAIN_ID` | `11155111` |
+| `VITE_RPC_URL` | Public / rate-limited Sepolia RPC (not the `SEPOLIA_RPC_URL` secret) |
+| `VITE_PARENT_NAME` | `prophecy.eth` |
+| `VITE_UNIVERSAL_RESOLVER` | ENSv2.md section 0 |
+| `VITE_WALLETCONNECT_PROJECT_ID` | Optional, public. Empty is fine |
 
 Before recording, open https://akyung123.github.io/Prophecy/ and confirm mock is OFF: no "Simulate failure" button and no "Mock World ID" notice. Recording with mock ON is not valid World ID evidence.
 
@@ -130,7 +136,9 @@ Also needed from a person (not World Portal):
 | Env name | What it is |
 |----------|------------|
 | `TEAM_WALLET` | Team address + Sepolia ETH |
-| `SEPOLIA_RPC_URL` / `VITE_RPC_URL` | Sepolia JSON-RPC (no API key in git). Deploy scripts and PR #19 fork lock tests read `SEPOLIA_RPC_URL`. Web reads `VITE_RPC_URL`. Same RPC value. |
+| `SEPOLIA_RPC_URL` | Private Sepolia RPC for deploy scripts and PR #19 fork tests (Actions secret). Do not ship this to the web app |
+| `VITE_RPC_URL` | Public / rate-limited Sepolia RPC shipped to browsers (Actions variable) |
+| `VITE_WALLETCONNECT_PROJECT_ID` | Optional, public WalletConnect project id |
 | `DEPLOYER_PRIVATE_KEY` | Deploy key (local only) |
 | `PROTOCOL_FEE_RECIPIENT` | TBD wallet |
 
