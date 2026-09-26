@@ -344,7 +344,7 @@ Checklist:
 
 - Per-token reserves in a struct. Never `address(this).balance`.
 - Round in the protocol's favor: buy cost up, sell payout down, fees up.
-- Buy takes `minTokensOut`, sell takes `minEthOut`.
+- Buy takes `minTokensOut`, sell takes `minEthOut`. Both take an optional `memo` (≤ 140 bytes) that is emitted in `Trade` and never stored.
 - The last buy fills only the remaining supply and refunds excess ETH.
 - Graduation check only in the buy function. Block buy and sell after graduation.
 - Update state before transfers. ETH transfers last. `nonReentrant`.
@@ -357,7 +357,7 @@ Four screens:
 
 1. **Prophecy list.** Name, sentence, price, number of Departed.
 2. **Issue.** World verification; cancelling disables the issue button.
-3. **Prophecy detail.** Find the token by name; buy and sell. No True or False.
+3. **Prophecy detail.** Find the token by name; buy and sell. No True or False. Recent trades are listed with their memos: a buyer or seller can attach one line to the trade ("0.1 ETH in · here we go", "sold at −42% · why is it dropping again"). The memo is part of the trade transaction, so every note is backed by a real trade. A separate holder-only board may come later.
 4. **Prophet page.** Wallet address, prophecies held, departed prophecies, sell button, claimable fees.
 
 The prophet page is not a balance screen. It keeps departed prophecies next to the next buy so you decide whether to sell or buy the next one. A chart alone is not enough.
