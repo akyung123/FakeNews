@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { formatEther } from "viem";
+import { formatEther, isAddress } from "viem";
 import { CcaTrade } from "../components/CcaTrade";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
@@ -40,13 +40,23 @@ import {
 export type CoinPageProps = {
   sendBuy?: (input: BuyInput) => Promise<boolean>;
   sendSell?: (input: SellInput) => Promise<boolean>;
-  loadLaunched?: () => Promise<Coin[]>;
+  loadLaunched?: (options?: { fresh?: boolean }) => Promise<Coin[]>;
   watchAsset?: (input: WatchAssetInput) => Promise<boolean>;
+  /** A token just launched may not be indexed yet: read the list again this many times. */
+  retry?: { attempts: number; delayMs: number };
 };
+
+const LOOKUP_RETRY = { attempts: 3, delayMs: 2_500 };
+
+/** Only a token address or a full prophecy name can be a launch still being indexed. */
+function mayStillIndex(lookup: string): boolean {
+  return isAddress(lookup) || lookup.includes(".");
+}
 
 export function CoinPage({
   loadLaunched,
   watchAsset,
+  retry = LOOKUP_RETRY,
 }: CoinPageProps = {}) {
   const { id = "", name = "" } = useParams();
   const s = useStore();
@@ -58,27 +68,34 @@ export function CoinPage({
   useEffect(() => {
     if (!chain) return;
     let cancelled = false;
-    const run = loadLaunched ?? (() => loadLaunchedCoins());
-    void run()
-      .then((rows) => {
-        if (cancelled) return;
-        setChainCoin(findLaunchedCoin(lookup, rows) ?? null);
-        setChainReady(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setChainCoin(null);
-        setChainReady(true);
-      });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = loadLaunched ?? ((options?: { fresh?: boolean }) => loadLaunchedCoins(options));
+    const attempt = (n: number) => {
+      void run(n > 0 ? { fresh: true } : undefined)
+        .then((rows) => findLaunchedCoin(lookup, rows) ?? null)
+        .catch(() => null)
+        .then((found) => {
+          if (cancelled) return;
+          if (!found && n < retry.attempts && mayStillIndex(lookup)) {
+            // Just launched: the RPC may not have indexed the block yet. Read again shortly.
+            timer = setTimeout(() => attempt(n + 1), retry.delayMs);
+            return;
+          }
+          setChainCoin(found);
+          setChainReady(true);
+        });
+    };
+    attempt(0);
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
-  }, [chain, loadLaunched, lookup]);
+  }, [chain, loadLaunched, lookup, retry.attempts, retry.delayMs]);
 
   const fromStore = s.coins.find((c) => c.id === lookup || c.token === lookup || c.name === lookup);
   // Chain mode keeps only coins this browser launched on chain; demo seed rows stay in demo mode.
   const coin = chain
-    ? ((fromStore?.fromChain ? fromStore : undefined) ?? chainCoin)
+    ? (chainCoin ?? (fromStore?.fromChain ? fromStore : undefined))
     : (fromStore ?? prototypeCoinFromName(lookup));
   // Once migrate opens the pool, slot0 is the live price; before that the
   // auction's clearing price is, and the hook stays closed.
@@ -88,7 +105,15 @@ export function CoinPage({
   const following = useFollowing();
   if (!coin) {
     if (chain && !chainReady) {
-      return <main className="coin-page" />;
+      return (
+        <main className="coin-page">
+          {mayStillIndex(lookup) ? (
+            <p className="faint" data-testid="coin-looking">
+              Looking for this prophecy on Sepolia…
+            </p>
+          ) : null}
+        </main>
+      );
     }
     return (
       <main className="narrow">

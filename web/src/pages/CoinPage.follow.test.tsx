@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FOLLOWING_KEY, getFollowing } from "../lib/following";
 import type { Coin } from "../lib/store";
 import { Web3Provider } from "../providers/Web3Provider";
@@ -63,5 +63,46 @@ describe("coin page creator line", () => {
     renderCoin();
     await screen.findByRole("link", { name: "ringo" });
     expect(document.querySelector(".coin-by")?.textContent).not.toContain("ago");
+  });
+});
+
+describe("coin page right after a launch", () => {
+  it("reads the list again while the new block is indexed, then shows the coin", async () => {
+    const loadLaunched = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockResolvedValue([coin]);
+    render(
+      <Web3Provider>
+        <MemoryRouter initialEntries={[`/coin/${TOKEN}`]}>
+          <Routes>
+            <Route
+              path="/coin/:id"
+              element={<CoinPage loadLaunched={loadLaunched} retry={{ attempts: 3, delayMs: 5 }} />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </Web3Provider>,
+    );
+    expect(await screen.findByTestId("coin-looking")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Every badge is a name")).toBeInTheDocument());
+    expect(loadLaunched).toHaveBeenCalledTimes(3);
+    expect(loadLaunched.mock.calls[1]?.[0]).toEqual({ fresh: true });
+    expect(screen.queryByText("Prophecy not found")).toBeNull();
+  });
+
+  it("shows not found once the retries run out", async () => {
+    const loadLaunched = vi.fn(async () => []);
+    render(
+      <Web3Provider>
+        <MemoryRouter initialEntries={[`/coin/${TOKEN}`]}>
+          <Routes>
+            <Route
+              path="/coin/:id"
+              element={<CoinPage loadLaunched={loadLaunched} retry={{ attempts: 2, delayMs: 5 }} />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </Web3Provider>,
+    );
+    await waitFor(() => expect(screen.getByText("Prophecy not found")).toBeInTheDocument());
+    expect(loadLaunched).toHaveBeenCalledTimes(3);
   });
 });

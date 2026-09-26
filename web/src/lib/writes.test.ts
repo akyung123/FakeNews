@@ -11,6 +11,7 @@ import {
   createBuy,
   createClaim,
   createLaunch,
+  findLaunchedToken,
   createSell,
   ethInputToWei,
   isChainWriteTarget,
@@ -164,12 +165,58 @@ describe("launch write", () => {
     expect(tokenFromLaunchedReceipt(launchedReceipt())).toBe(TOKEN);
   });
 
-  it("throws LaunchedParseError when Launched is missing after a successful receipt", async () => {
+  it("throws LaunchedParseError when Launched is missing after a successful receipt and the retry finds nothing", async () => {
+    const findLaunched = vi.fn(async () => null);
     const fns = mocks({
-      waitForTransactionReceipt: vi.fn(async () => ({ status: "success", logs: [] })),
+      waitForTransactionReceipt: vi.fn(async () => ({ status: "success", logs: [], blockNumber: 42n })),
+      findLaunched,
     });
     await expect(createLaunch(fns)(launchInput)).rejects.toBeInstanceOf(LaunchedParseError);
     expect(fns.writeContract).toHaveBeenCalledTimes(1);
+    expect(findLaunched).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: "lingo-2028", launchpad: MOCK_WORLD_LAUNCHPAD, fromBlock: 42n }),
+    );
+  });
+
+  it("finds the token in new blocks when the receipt had no Launched log", async () => {
+    const fns = mocks({
+      waitForTransactionReceipt: vi.fn(async () => ({ status: "success", logs: [] })),
+      findLaunched: vi.fn(async () => TOKEN),
+    });
+    await expect(createLaunch(fns)(launchInput)).resolves.toBe(TOKEN);
+  });
+
+  it("findLaunchedToken retries until the Launched log for this slug is indexed", async () => {
+    const getContractEvents = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error("429"))
+      .mockResolvedValueOnce([
+        { args: { token: AUCTION, slug: "other-slug" } },
+        { args: { token: TOKEN, slug: "lingo-2028" } },
+      ]);
+    const sleep = vi.fn(async () => undefined);
+    const token = await findLaunchedToken(
+      { launchpad: MOCK_WORLD_LAUNCHPAD, slug: "lingo-2028", prophet: ACCOUNT, fromBlock: 10n },
+      { client: { getBlockNumber: async () => 12n, getContractEvents }, sleep },
+    );
+    expect(token).toBe(TOKEN);
+    expect(getContractEvents).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
+    expect(getContractEvents.mock.calls[0]?.[0]).toMatchObject({
+      eventName: "Launched",
+      args: { prophet: ACCOUNT },
+      fromBlock: 10n,
+      toBlock: 12n,
+    });
+  });
+
+  it("findLaunchedToken gives up after its attempts", async () => {
+    const token = await findLaunchedToken(
+      { launchpad: MOCK_WORLD_LAUNCHPAD, slug: "lingo-2028" },
+      { client: { getBlockNumber: async () => 500n, getContractEvents: async () => [] }, attempts: 3, sleep: async () => undefined },
+    );
+    expect(token).toBeNull();
   });
 
   it("throws on a reverted receipt", async () => {
