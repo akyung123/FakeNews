@@ -69,6 +69,9 @@ interface ILbpStrategy {
 }
 
 interface ICca {
+    /// Official CCA `IAuctionStorage.NotGraduated` — no params.
+    error NotGraduated();
+
     function submitBid(uint256 maxPriceQ96, uint128 amount, address owner, uint256 prevTickPriceQ96, bytes calldata hookData)
         external
         payable

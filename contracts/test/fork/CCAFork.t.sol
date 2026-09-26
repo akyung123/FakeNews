@@ -25,6 +25,8 @@ contract CCAForkTest is CCAForkBase {
     using StateLibrary for IPoolManager;
     using PoolIdLibrary for PoolKey;
 
+    error NotGraduated();
+
     function setUp() public {
         if (!_maybeFork()) return;
         assertEq(strategy.initializerFactory(), CCA_FACTORY);
@@ -88,7 +90,7 @@ contract CCAForkTest is CCAForkBase {
         assertEq(token.balanceOf(bidderA), 0, "failed auction: no tokens before claim");
 
         _rollTo(auction.claimBlock());
-        vm.expectRevert();
+        vm.expectRevert(NotGraduated.selector);
         auction.claimTokens(bidId);
         assertEq(token.balanceOf(bidderA), 0, "failed auction: claim does not pay tokens");
 
@@ -109,6 +111,15 @@ contract CCAForkTest is CCAForkBase {
         strategy.migrate(address(auction));
         assertEq(token.balanceOf(LBP_STRATEGY), 0, "failed migrate recovers the LP reserve");
         assertEq(token.balanceOf(protocol), AUCTION_SUPPLY + LP_RESERVE, "protocol holds auction supply + recovered LP reserve");
+        PoolKey memory missedKey = PoolKey({
+            currency0: CurrencyLibrary.ADDRESS_ZERO,
+            currency1: Currency.wrap(address(token)),
+            fee: V4_FEE,
+            tickSpacing: V4_TICK_SPACING,
+            hooks: IHooks(INITIALIZER_HOOK)
+        });
+        (uint160 sqrtPriceX96,,,) = IPoolManager(SEPOLIA_POOL_MANAGER).getSlot0(missedKey.toId());
+        assertEq(uint256(sqrtPriceX96), 0, "failed migrate must not initialize the v4 pool");
     }
 
     function _runHappyPath(uint64 auctionBlocks, string memory label) internal {
