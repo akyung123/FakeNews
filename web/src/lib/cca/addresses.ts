@@ -4,13 +4,72 @@
  * come from env copied out of `deployments/sepolia.json` and stay unset
  * until that file / Vite var exists. Do not invent them.
  */
-import { isAddress, type Address } from "viem";
+import { isAddress, zeroAddress, type Address } from "viem";
 import { webEnv } from "../env";
 
 function optionalAddress(value: string | undefined): Address | undefined {
   const trimmed = value?.trim();
-  if (!trimmed || !isAddress(trimmed)) return undefined;
+  if (!trimmed || !isAddress(trimmed) || trimmed.toLowerCase() === zeroAddress) return undefined;
   return trimmed;
+}
+
+/** Infra `deployments/sepolia.json` after a person broadcasts (INTERFACE §5). */
+export type SepoliaDeploymentRecord = {
+  launchpad?: string;
+  launchpadBlock?: number | string;
+  hook?: string;
+  locker?: string;
+  poolManager?: string;
+  lbpStrategy?: string;
+  positionManager?: string;
+  universalRouter?: string;
+  ccaLens?: string;
+  contracts?: {
+    Launchpad?: string;
+    ProphecyHook?: string;
+    LiquidityLocker?: string;
+  };
+};
+
+export function addressesFromDeploymentRecord(record: SepoliaDeploymentRecord | undefined): {
+  launchpadAddress?: Address;
+  hookAddress?: Address;
+  lockerAddress?: Address;
+  poolManagerAddress?: Address;
+  lbpStrategy?: Address;
+  positionManager?: Address;
+  universalRouter?: Address;
+  ccaLens?: Address;
+} {
+  if (!record) return {};
+  return {
+    launchpadAddress: optionalAddress(record.launchpad ?? record.contracts?.Launchpad),
+    hookAddress: optionalAddress(record.hook ?? record.contracts?.ProphecyHook),
+    lockerAddress: optionalAddress(record.locker ?? record.contracts?.LiquidityLocker),
+    poolManagerAddress: optionalAddress(record.poolManager),
+    lbpStrategy: optionalAddress(record.lbpStrategy),
+    positionManager: optionalAddress(record.positionManager),
+    universalRouter: optionalAddress(record.universalRouter),
+    ccaLens: optionalAddress(record.ccaLens),
+  };
+}
+
+function bundledSepoliaDeployment(): SepoliaDeploymentRecord | undefined {
+  try {
+    const glob = (import.meta as ImportMeta & { glob?: (pattern: string, opts: { eager: boolean }) => Record<string, unknown> })
+      .glob;
+    if (!glob) return undefined;
+    const mods = {
+      ...glob("../../../deployments/sepolia.json", { eager: true }),
+      ...glob("../../../contracts/deployments/sepolia.json", { eager: true }),
+    };
+    const first = Object.values(mods)[0];
+    if (!first || typeof first !== "object") return undefined;
+    const record = "default" in first ? (first as { default: unknown }).default : first;
+    return record && typeof record === "object" ? (record as SepoliaDeploymentRecord) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export const CCA_SEPOLIA = {
@@ -59,16 +118,18 @@ export function resolveCcaProductAddresses(
     universalRouter?: Address;
     ccaLens?: Address;
   } = webEnv,
+  deployment: SepoliaDeploymentRecord | undefined = bundledSepoliaDeployment(),
 ): CcaProductAddresses {
+  const fromFile = addressesFromDeploymentRecord(deployment);
   return {
-    launchpad: env.launchpadAddress,
-    hook: env.hookAddress,
-    locker: env.lockerAddress,
-    poolManager: env.poolManagerAddress ?? CCA_SEPOLIA.poolManager,
-    lbpStrategy: env.lbpStrategy ?? CCA_SEPOLIA.lbpStrategy,
-    positionManager: env.positionManager ?? CCA_SEPOLIA.positionManager,
-    universalRouter: env.universalRouter ?? CCA_SEPOLIA.universalRouter,
-    ccaLens: env.ccaLens ?? CCA_SEPOLIA.ccaLens,
+    launchpad: env.launchpadAddress ?? fromFile.launchpadAddress,
+    hook: env.hookAddress ?? fromFile.hookAddress,
+    locker: env.lockerAddress ?? fromFile.lockerAddress,
+    poolManager: env.poolManagerAddress ?? fromFile.poolManagerAddress ?? CCA_SEPOLIA.poolManager,
+    lbpStrategy: env.lbpStrategy ?? fromFile.lbpStrategy ?? CCA_SEPOLIA.lbpStrategy,
+    positionManager: env.positionManager ?? fromFile.positionManager ?? CCA_SEPOLIA.positionManager,
+    universalRouter: env.universalRouter ?? fromFile.universalRouter ?? CCA_SEPOLIA.universalRouter,
+    ccaLens: env.ccaLens ?? fromFile.ccaLens ?? CCA_SEPOLIA.ccaLens,
     permit2: CCA_SEPOLIA.permit2,
   };
 }

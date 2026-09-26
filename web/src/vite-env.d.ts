@@ -13,6 +13,9 @@ interface ImportMetaEnv {
   readonly VITE_POSITION_MANAGER?: string;
   readonly VITE_UNIVERSAL_ROUTER?: string;
   readonly VITE_CCA_LENS?: string;
+  readonly VITE_CCA_MIGRATE?: string;
+  readonly VITE_CCA_SWAP?: string;
+  readonly VITE_CCA_COLLECT?: string;
   readonly VITE_PARENT_NAME: string;
   readonly VITE_UNIVERSAL_RESOLVER: string;
   readonly VITE_WORLD_APP_ID: string;

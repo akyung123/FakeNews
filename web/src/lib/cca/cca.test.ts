@@ -79,7 +79,7 @@ import {
   fetchCcaEventLogs,
   tokensClaimedLogsQuery,
 } from "./logs";
-import { assertSuccessfulReceipt } from "./writes";
+import { assertSuccessfulReceipt, sendCcaWrite } from "./writes";
 
 const AUCTION = "0x1111111111111111111111111111111111111111" as const;
 const OWNER = "0x2222222222222222222222222222222222222222" as const;
@@ -526,6 +526,33 @@ describe("chain writes: simulate then write then require success", () => {
     expect(fns.write).toHaveBeenCalledTimes(1);
     expect(fns.write).toHaveBeenCalledWith(wagmiConfig, placeBidWrite(bidInput));
     expect(() => assertSuccessfulReceipt({ status: "reverted" }, "submitBid")).toThrow(/did not succeed/);
+  });
+
+  it("skips the Sepolia gate when simulate/write are injected", async () => {
+    const fns = okWrite();
+    const ensureSepolia = vi.fn(async () => false);
+    await sendCcaWrite(
+      { address: AUCTION, abi: ccaAbi, functionName: "checkpoint" },
+      "checkpoint",
+      { ...optionsOf(fns), ensureSepolia },
+    );
+    expect(ensureSepolia).not.toHaveBeenCalled();
+    expect(fns.simulate).toHaveBeenCalled();
+    expect(fns.write).toHaveBeenCalled();
+  });
+
+  it("blocks a live write until the wallet is on Sepolia", async () => {
+    const ensureSepolia = vi.fn(async () => false);
+    const simulate = vi.fn(async () => ({}));
+    await expect(
+      sendCcaWrite(
+        { address: AUCTION, abi: ccaAbi, functionName: "checkpoint" },
+        "checkpoint",
+        { ensureSepolia },
+      ),
+    ).rejects.toThrow(/Switch to Sepolia/);
+    expect(ensureSepolia).toHaveBeenCalledTimes(1);
+    expect(simulate).not.toHaveBeenCalled();
   });
 
   it("claimTokens throws when the receipt is not success", async () => {

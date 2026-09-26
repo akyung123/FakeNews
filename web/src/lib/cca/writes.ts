@@ -6,6 +6,7 @@
 import { simulateContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { wagmiConfig } from "../wagmi";
 import type { Hex } from "../world";
+import { ensureSepoliaChain } from "./sepolia";
 
 export type CcaWriteRequest = {
   address: `0x${string}`;
@@ -37,6 +38,7 @@ export type CcaWriteOptions = {
   simulateContract?: WagmiCcaSimulate;
   writeContract?: WagmiCcaWrite;
   waitForTransactionReceipt?: WagmiCcaWait;
+  ensureSepolia?: () => Promise<boolean>;
 };
 
 export type CcaWriteResult = {
@@ -58,6 +60,11 @@ export async function sendCcaWriteResult(
   label: string,
   options: CcaWriteOptions = {},
 ): Promise<CcaWriteResult> {
+  const mocked = Boolean(options.simulateContract || options.writeContract);
+  if (!mocked) {
+    const onSepolia = await (options.ensureSepolia ?? ensureSepoliaChain)();
+    if (!onSepolia) throw new Error("Switch to Sepolia");
+  }
   const simulate = options.simulateContract ?? ((config, req) => simulateContract(config, req as never));
   const send = options.writeContract ?? ((config, req) => writeContract(config, req as never));
   const wait = options.waitForTransactionReceipt ?? waitForTransactionReceipt;

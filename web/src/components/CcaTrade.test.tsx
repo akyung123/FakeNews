@@ -251,6 +251,127 @@ describe("CcaTrade CCA states", () => {
     expect(screen.queryByText(FEE_COLLECT_COPY.collectFees)).toBeNull();
   });
 
+  it("hides migrate, swap, and collect when their flags are off", async () => {
+    render(
+      <CcaTrade
+        coin={coin}
+        balance={0.05}
+        held={0}
+        chain
+        demo={false}
+        chainId={11_155_111}
+        features={{ migrate: false, swap: true, collect: true }}
+        loadAuction={async () =>
+          snap({
+            copyStatus: "graduated",
+            view: view({
+              phase: "ended_goal_reached",
+              goalReached: true,
+              isGraduated: true,
+              blocksRemaining: 0,
+              canOpenMarket: true,
+            }),
+            finalized: true,
+          })
+        }
+      />,
+    );
+    await waitFor(() => expect(screen.getByText(CCA_COPY.claimTokens)).toBeInTheDocument());
+    expect(screen.queryByText(CCA_COPY.openMarket)).toBeNull();
+    expect(screen.queryByText(CCA_COPY.openMarketHelp)).toBeNull();
+    cleanup();
+
+    render(
+      <CcaTrade
+        coin={coin}
+        balance={0.05}
+        held={0}
+        chain
+        demo={false}
+        chainId={11_155_111}
+        features={{ migrate: true, swap: false, collect: true }}
+        loadAuction={async () =>
+          snap({
+            copyStatus: "pool_open",
+            poolOpen: true,
+            view: view({
+              phase: "ended_goal_reached",
+              goalReached: true,
+              isGraduated: true,
+              blocksRemaining: 0,
+            }),
+          })
+        }
+      />,
+    );
+    await waitFor(() => expect(screen.getByText(FEE_COLLECT_COPY.collectFees)).toBeInTheDocument());
+    expect(screen.queryByText(SWAP_SECTION_COPY.title)).toBeNull();
+    expect(screen.queryByText(SWAP_SECTION_COPY.beforeOpen)).toBeNull();
+    cleanup();
+
+    render(
+      <CcaTrade
+        coin={coin}
+        balance={0.05}
+        held={0}
+        chain
+        demo={false}
+        chainId={11_155_111}
+        features={{ migrate: true, swap: true, collect: false }}
+        loadAuction={async () =>
+          snap({
+            copyStatus: "pool_open",
+            poolOpen: true,
+            view: view({
+              phase: "ended_goal_reached",
+              goalReached: true,
+              isGraduated: true,
+              blocksRemaining: 0,
+            }),
+          })
+        }
+      />,
+    );
+    await waitFor(() => expect(screen.getByText(SWAP_SECTION_COPY.title)).toBeInTheDocument());
+    expect(screen.queryByText(FEE_COLLECT_COPY.title)).toBeNull();
+    expect(screen.queryByText(FEE_COLLECT_COPY.collectFees)).toBeNull();
+    expect(screen.queryByText(FEE_COLLECT_COPY.beforeOpen)).toBeNull();
+  });
+
+  it("hides demo cash and blocks writes on the wrong chain", async () => {
+    render(
+      <CcaTrade
+        coin={coin}
+        balance={0.05}
+        held={0}
+        chain
+        demo={false}
+        chainId={1}
+        loadAuction={async () => snap()}
+      />,
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: CCA_COPY.placeBid })).toBeDisabled());
+    expect(screen.queryByText(/Cash /)).toBeNull();
+    expect(screen.queryByText("Sample data")).toBeNull();
+  });
+
+  it("does not mock a bid when product addresses are set and the auction is missing", async () => {
+    render(
+      <CcaTrade
+        coin={coin}
+        balance={0.05}
+        held={0}
+        chain
+        demo={false}
+        chainId={11_155_111}
+        loadAuction={async () => snap({ auction: undefined })}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText(CCA_COPY.notFunded)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: CCA_COPY.placeBid })).toBeNull();
+    expect(screen.queryByText(/Cash /)).toBeNull();
+  });
+
   it("runs simulate then write then receipt on Place bid", async () => {
     const user = userEvent.setup();
     const simulateContract = vi.fn(async () => ({}));

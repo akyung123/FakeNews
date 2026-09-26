@@ -95,7 +95,7 @@ Gates (KST): 22:00 INTERFACE + contract skeleton; 02:00 Sepolia-fork 4 steps; 03
 - [x] `FEEDBACK.md` Uniswap prize write-up (CCA + LBPStrategy + v4 hook) @cursor
 - [ ] Contracts skeleton on a `cca/*` branch (Launchpad calls `initializeDistribution`; no curve) — 22:00 gate
 - [ ] Sepolia-fork 4 steps green: launch+create auction, bid, migrate opens v4 pool, swap — 02:00 gate
-- [ ] Web bid / CCALens / claim / migrate / v4 swap + deploy script keys in `deployments/sepolia.json` — 03:30 gate
+- [x] Web bid / CCALens / claim / migrate / v4 swap + deploy script keys in `deployments/sepolia.json` — 03:30 gate @cursor
 
 ## If there is time
 

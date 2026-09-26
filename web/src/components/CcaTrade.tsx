@@ -33,10 +33,13 @@ import {
   type AuctionCopyStatus,
   type CcaWriteOptions,
 } from "../lib/cca";
+import { ccaFeatureFlags, type CcaFeatureFlags } from "../lib/cca/config";
 import { loadCcaAuction, type CcaAuctionSnapshot } from "../lib/cca/loadAuction";
+import { SEPOLIA_CHAIN_ID } from "../lib/env";
 import { graduated } from "../lib/curve";
 import { eth, tokens } from "../lib/format";
 import { GRADUATION_ETH } from "../lib/mock";
+import { isCcaDemoMode } from "../lib/mode";
 import { actions, type Coin } from "../lib/store";
 import { isChainWriteTarget, liveTokenAddress } from "../lib/writes";
 import { wagmiConfig } from "../lib/wagmi";
@@ -46,6 +49,9 @@ export type CcaTradeProps = {
   balance: number;
   held: number;
   chain?: boolean;
+  demo?: boolean;
+  features?: CcaFeatureFlags;
+  chainId?: number;
   loadAuction?: (token: Address) => Promise<CcaAuctionSnapshot>;
   writes?: CcaWriteOptions;
 };
@@ -55,9 +61,14 @@ export function CcaTrade({
   balance,
   held,
   chain = false,
+  demo: demoOverride,
+  features,
+  chainId,
   loadAuction = loadCcaAuction,
   writes,
 }: CcaTradeProps) {
+  const demo = demoOverride ?? isCcaDemoMode();
+  const flags = features ?? ccaFeatureFlags();
   const writeTarget = isChainWriteTarget(coin);
   const token = liveTokenAddress(coin.id, coin.token);
   const [snap, setSnap] = useState<CcaAuctionSnapshot | null>(null);
@@ -83,13 +94,25 @@ export function CcaTrade({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chain, writeTarget, token]);
 
-  const prototype = !chain || !writeTarget || !snap?.auction;
+  const prototype = demo && (!chain || !writeTarget || !snap?.auction);
   const mockComplete = graduated(coin) || Boolean(coin.complete);
   const copyStatus: AuctionCopyStatus = snap?.auction
     ? snap.copyStatus
-    : mockComplete
-      ? "pool_open"
-      : "live";
+    : demo
+      ? mockComplete
+        ? "pool_open"
+        : "live"
+      : "not_funded";
+  let connectedChainId: number | undefined = chainId;
+  if (connectedChainId == null) {
+    try {
+      connectedChainId = getAccount(wagmiConfig).chainId;
+    } catch {
+      connectedChainId = undefined;
+    }
+  }
+  const wrongChain = !demo && connectedChainId != null && connectedChainId !== SEPOLIA_CHAIN_ID;
+  const writesBlocked = Boolean(pending) || wrongChain;
   const view = snap?.view;
   const raisedWei = view?.currencyRaised ?? parseEther(Math.max(0, coin.ethRaised).toFixed(18));
   const goalReached = view?.goalReached ?? mockComplete;
@@ -104,9 +127,11 @@ export function CcaTrade({
   const symbol = `$${coin.ticker}`;
   const showBid = copyStatus === "live" || copyStatus === "not_started" || copyStatus === "sold_out";
   const showSettle = copyStatus === "ended_not_finalized" || copyStatus === "graduated" || copyStatus === "failed" || copyStatus === "market_failed";
-  const showMarket = copyStatus === "graduated" && !snap?.poolOpen && !snap?.marketFailed;
-  const showSwap = copyStatus === "pool_open";
-  const showFees = copyStatus === "pool_open" || (copyStatus === "graduated" && !snap?.poolOpen);
+  const showMarket = flags.migrate && copyStatus === "graduated" && !snap?.poolOpen && !snap?.marketFailed;
+  const showSwap = flags.swap && copyStatus === "pool_open";
+  const showFees = flags.collect && (copyStatus === "pool_open" || (copyStatus === "graduated" && !snap?.poolOpen));
+  const showSwapHint = flags.swap && !showSwap && (copyStatus === "live" || copyStatus === "graduated" || copyStatus === "failed");
+  const showFeeHint = !showFees && flags.collect;
   const refundWei = snap?.refundWei ?? 0n;
   const openBids = (snap?.bids ?? []).filter((row) => row.bid.exitedBlock === 0n);
 
@@ -175,16 +200,18 @@ export function CcaTrade({
           <button
             type="button"
             className="btn primary full"
-            disabled={Boolean(pending) || !(Number(budget) > 0) || copyStatus === "not_started" || copyStatus === "sold_out"}
+            disabled={writesBlocked || !(Number(budget) > 0) || copyStatus === "not_started" || copyStatus === "sold_out" || (!demo && !snap?.auction)}
             onClick={() => {
-              if (prototype || !snap?.auction) {
+              if (demo && (prototype || !snap?.auction)) {
                 mockBid();
                 return;
               }
+              if (!snap?.auction) return;
+              const auction = snap.auction;
               const owner = snap.owner ?? getAccount(wagmiConfig).address;
               if (!owner) return;
               void run(CCA_COPY.placingBid, () => placeBid({
-                auction: snap.auction!,
+                auction,
                 owner,
                 budgetEth: budget,
                 maxPricePerTokenEth: maxPrice,
@@ -204,27 +231,28 @@ export function CcaTrade({
             <button
               type="button"
               className="btn primary full"
-              disabled={Boolean(pending)}
+              disabled={writesBlocked}
               onClick={() => void run(CCA_COPY.settingFinalPrice, () => checkpoint(snap.auction!, writes), CCA_COPY.finalClearingPrice)}
             >
               {pending === CCA_COPY.settingFinalPrice ? CCA_COPY.settingFinalPrice : CCA_COPY.setFinalPrice}
             </button>
           ) : null}
-          {openBids.length > 0 || prototype ? (
+          {openBids.length > 0 || (demo && prototype) ? (
             <>
               <p className="faint small">{exitHelpCopy(goalReached, refundWei)}</p>
               <button
                 type="button"
                 className="btn primary full"
-                disabled={Boolean(pending) || (!prototype && openBids.length === 0)}
+                disabled={writesBlocked || (!demo && openBids.length === 0)}
                 onClick={() => {
-                  if (prototype || !snap?.auction) {
+                  if (demo && (prototype || !snap?.auction)) {
                     setSuccess(exitDoneCopy(goalReached));
                     return;
                   }
                   const first = openBids[0];
-                  if (!first) return;
-                  void run(CCA_COPY.sendingEth, () => exitBid(snap.auction!, first.id, writes), exitDoneCopy(goalReached));
+                  if (!first || !snap?.auction) return;
+                  const auction = snap.auction;
+                  void run(CCA_COPY.sendingEth, () => exitBid(auction, first.id, writes), exitDoneCopy(goalReached));
                 }}
               >
                 {pending === CCA_COPY.sendingEth
@@ -243,15 +271,17 @@ export function CcaTrade({
               <button
                 type="button"
                 className="btn primary full"
-                disabled={Boolean(pending)}
+                disabled={writesBlocked}
                 onClick={() => {
-                  if (prototype || !snap?.auction) {
+                  if (demo && (prototype || !snap?.auction)) {
                     setSuccess(CCA_COPY.tokensClaimed);
                     return;
                   }
+                  if (!snap?.auction) return;
+                  const auction = snap.auction;
                   const first = snap.bids.find((row) => row.bid.exitedBlock !== 0n) ?? snap.bids[0];
                   if (!first) return;
-                  void run(CCA_COPY.claiming, () => claimTokens(snap.auction!, first.id, writes), CCA_COPY.tokensClaimed);
+                  void run(CCA_COPY.claiming, () => claimTokens(auction, first.id, writes), CCA_COPY.tokensClaimed);
                 }}
               >
                 {pending === CCA_COPY.claiming ? CCA_COPY.claiming : CCA_COPY.claimTokens}
@@ -268,7 +298,7 @@ export function CcaTrade({
           <button
             type="button"
             className="btn primary full"
-            disabled={Boolean(pending) || (view ? !view.canOpenMarket : false)}
+            disabled={writesBlocked || (view ? !view.canOpenMarket : false)}
             onClick={() => {
               void run(CCA_COPY.openingMarket, async () => {
                 const { outcome, receipt } = await openMarketResult(snap.auction!, writes, snap.lbpStrategy);
@@ -319,7 +349,7 @@ export function CcaTrade({
               <button
                 type="button"
                 className="btn full"
-                disabled={Boolean(pending) || !token}
+                disabled={writesBlocked || !token}
                 onClick={() => {
                   if (!token) return;
                   void run(
@@ -335,7 +365,7 @@ export function CcaTrade({
               <button
                 type="button"
                 className="btn full"
-                disabled={Boolean(pending) || !token}
+                disabled={writesBlocked || !token}
                 onClick={() => {
                   if (!token) return;
                   void run(
@@ -352,10 +382,10 @@ export function CcaTrade({
           <button
             type="button"
             className={`btn ${swapSide === "buy" ? "primary" : "sell"} full`}
-            disabled={Boolean(pending) || !(Number(swapAmount) > 0)}
+            disabled={writesBlocked || !(Number(swapAmount) > 0) || (!demo && (!token || !snap?.hook))}
             onClick={() => {
               const amount = Number(swapAmount) || 0;
-              if (prototype || !token || !snap?.hook) {
+              if (demo && (prototype || !token || !snap?.hook)) {
                 if (swapSide === "buy") actions.buy(coin.id, Math.min(amount, balance));
                 else actions.sell(coin.id, Math.min(held, amount));
                 setSuccess(
@@ -365,6 +395,7 @@ export function CcaTrade({
                 );
                 return;
               }
+              if (!token || !snap?.hook) return;
               const amountIn = parseEther(swapAmount || "0");
               if (swapSide === "buy" && amount > balance) {
                 setError(SWAP_SECTION_COPY.notEnoughEth);
@@ -391,7 +422,7 @@ export function CcaTrade({
               : (pending === SWAP_SECTION_COPY.selling ? SWAP_SECTION_COPY.selling : swapTokenLine(SWAP_SECTION_COPY.sellSymbol, symbol))}
           </button>
         </>
-      ) : !showSwap && (copyStatus === "live" || copyStatus === "graduated" || copyStatus === "failed") ? (
+      ) : showSwapHint ? (
         <p className="faint small">{SWAP_SECTION_COPY.beforeOpen}</p>
       ) : null}
 
@@ -406,7 +437,7 @@ export function CcaTrade({
               <button
                 type="button"
                 className="btn primary full"
-                disabled={Boolean(pending) || !snap.locker || !token || snap.tokenId == null}
+                disabled={writesBlocked || !snap.locker || !token || snap.tokenId == null}
                 onClick={() => {
                   if (!snap.locker || !token || snap.tokenId == null) return;
                   void run(
@@ -425,12 +456,13 @@ export function CcaTrade({
               <button
                 type="button"
                 className="btn primary full"
-                disabled={Boolean(pending) || !snap?.locker || !token}
+                disabled={writesBlocked || !snap?.locker || !token}
                 onClick={() => {
-                  if (prototype || !snap?.locker || !token) {
+                  if (demo && (prototype || !snap?.locker || !token)) {
                     setSuccess(FEE_COLLECT_COPY.feesSent);
                     return;
                   }
+                  if (!snap?.locker || !token) return;
                   void run(
                     FEE_COLLECT_COPY.collectingFees,
                     () => sendCcaWrite(collectCcaWrite(snap.locker!, token), "collect", writes),
@@ -443,11 +475,11 @@ export function CcaTrade({
             </>
           )}
         </>
-      ) : (
+      ) : showFeeHint ? (
         <p className="faint small">{FEE_COLLECT_COPY.beforeOpen}</p>
-      )}
+      ) : null}
 
-      <p className="faint small">Cash {eth(balance)}</p>
+      {demo ? <p className="faint small">Cash {eth(balance)}</p> : null}
     </section>
   );
 }

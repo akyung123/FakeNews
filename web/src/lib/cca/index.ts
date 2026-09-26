@@ -32,10 +32,24 @@ export {
   auctionClaimBlock,
   auctionEndBlock,
   auctionMigrationBlock,
+  ccaFeatureFlags,
+  envFlagOn,
   packUniformAuctionSteps,
   resolveCcaConfig,
   type CcaConfig,
+  type CcaFeatureFlags,
 } from "./config";
+export {
+  SEPOLIA_ADD_CHAIN_PARAMS,
+  SEPOLIA_HEX_CHAIN_ID,
+  ensureSepoliaChain,
+  injectedProvider,
+  isSepoliaChainId,
+  isUnrecognizedChainError,
+  parseProviderChainId,
+  readProviderChainId,
+  type Eip1193Provider,
+} from "./sepolia";
 export {
   CCA_BID_ERROR_COPY,
   CCA_CLAIM_ERROR_COPY,

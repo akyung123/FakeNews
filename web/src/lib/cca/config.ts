@@ -76,6 +76,32 @@ export const FLOOR_PRICE_Q96 = CCA_CONFIG.floorPriceQ96;
 export const TICK_SPACING_Q96 = CCA_CONFIG.tickSpacingQ96;
 export const AUCTION_STEPS_MPS_TOTAL = CCA_CONFIG.auctionStepsMpsTotal;
 
+/** One flag per later feature. Default on. `0` / `false` hides the section. */
+export type CcaFeatureFlags = {
+  migrate: boolean;
+  swap: boolean;
+  collect: boolean;
+};
+
+export function envFlagOn(value: string | undefined, fallback = true): boolean {
+  if (value === undefined || value.trim() === "") return fallback;
+  return value !== "0" && value !== "false";
+}
+
+export function ccaFeatureFlags(
+  env: {
+    VITE_CCA_MIGRATE?: string;
+    VITE_CCA_SWAP?: string;
+    VITE_CCA_COLLECT?: string;
+  } = import.meta.env,
+): CcaFeatureFlags {
+  return {
+    migrate: envFlagOn(env.VITE_CCA_MIGRATE),
+    swap: envFlagOn(env.VITE_CCA_SWAP),
+    collect: envFlagOn(env.VITE_CCA_COLLECT),
+  };
+}
+
 /**
  * `AuctionParameters.auctionStepsData` = `abi.encodePacked(uint24(1e7/N), uint40(N))`.
  * N=25 → (400_000, 25); N=10 → (1_000_000, 10).
