@@ -221,7 +221,7 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     }
 
     function test_receiveRefundPath() public {
-        address token = _graduate();
+        _graduate();
         uint256 fees = launchpad.protocolFees() + launchpad.creatorFeeOf(prophet);
         assertGe(address(launchpad).balance, fees);
 

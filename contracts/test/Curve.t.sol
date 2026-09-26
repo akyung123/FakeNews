@@ -238,7 +238,7 @@ contract CurveTest is LaunchpadStack {
         address clean = address(_newStack(protocol, signer));
         vm.prank(prophet);
         address tokenB = Launchpad(payable(clean)).launch("eth-10k", "", 0, 0);
-        (uint256 tokensB, uint256 feeB) = Launchpad(clean).quoteBuy(tokenB, 0.001 ether);
+        (uint256 tokensB, uint256 feeB) = Launchpad(payable(clean)).quoteBuy(tokenB, 0.001 ether);
         assertEq(tokensA, tokensB);
         assertEq(feeA, feeB);
     }
