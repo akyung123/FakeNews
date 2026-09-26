@@ -55,9 +55,28 @@ describe("Launchpad ABI from #25", () => {
     expect(ev.inputs.some((input) => input.name === "deadline")).toBe(false);
   });
 
-  it("includes the six write-facing custom errors for revert decoding", () => {
+  it("includes the seven write-facing custom errors for revert decoding", () => {
     const names = launchpadAbi.filter((item) => item.type === "error").map((item) => item.name);
-    for (const name of ["NullifierUsed", "LabelTaken", "AlreadyProphet", "SlugTaken", "Slippage", "CurveComplete"]) {
+    const writeFacing = [
+      "NullifierUsed",
+      "LabelTaken",
+      "AlreadyProphet",
+      "SlugTaken",
+      "Slippage",
+      "CurveComplete",
+      "ZeroAmount",
+    ] as const;
+    expect(writeFacing).toHaveLength(7);
+    expect(writeFacing).toEqual([
+      "NullifierUsed",
+      "LabelTaken",
+      "AlreadyProphet",
+      "SlugTaken",
+      "Slippage",
+      "CurveComplete",
+      "ZeroAmount",
+    ]);
+    for (const name of writeFacing) {
       expect(names).toContain(name);
     }
     for (const extra of [
@@ -67,7 +86,6 @@ describe("Launchpad ABI from #25", () => {
       "BadProphecy",
       "BadSlug",
       "BadLabel",
-      "ZeroAmount",
       "UnexpectedEth",
       "NotDeployer",
       "UniswapAlreadySet",
