@@ -34,7 +34,12 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1
       - run: forge --version
       - run: forge build
-      - run: forge test -vv
+      # PR #19 LockReal tests skip when this is empty. Missing secret must not fail CI.
+      # Fork PRs do not receive Actions secrets, so those runs stay skipped and still pass.
+      - name: Test
+        env:
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+        run: forge test -vv
 
   detect-world:
     # hashFiles is not valid on a job-level if. Detect after checkout instead.
