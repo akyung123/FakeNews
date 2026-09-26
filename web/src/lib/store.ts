@@ -25,6 +25,8 @@ export type Coin = CurveState & {
   complete?: boolean;
   /** Set when the row came from a Launched log or a live launch receipt. */
   fromChain?: boolean;
+  /** CCA auction address from Launched / auctionOf. */
+  auction?: `0x${string}`;
 };
 
 /** A one-line memo attached to a trade. */

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5174",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run && bun test src/lib/curve.vectors.test.ts src/lib/ensName.test.ts src/lib/prophetData.test.ts src/lib/graduation.test.ts src/pages/CoinPage.test.tsx src/pages/ProphetPage.test.tsx src/copy.test.tsx src/lib/cca/copy.test.ts",
+    "test": "vitest run && bun test src/lib/curve.vectors.test.ts src/lib/ensName.test.ts src/lib/prophetData.test.ts src/lib/graduation.test.ts src/pages/CoinPage.test.tsx src/pages/ProphetPage.test.tsx src/copy.test.tsx src/lib/cca/copy.test.ts src/lib/cca/swap.test.ts src/lib/cca/register.test.ts src/lib/cca/config.test.ts src/lib/cca/sepolia.test.ts src/lib/cca/addresses.test.ts src/lib/mode.test.ts src/lib/cca/ccaLib.test.ts",
     "banned": "bash banned_check.sh"
   },
   "dependencies": {

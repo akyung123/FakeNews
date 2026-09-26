@@ -3,7 +3,13 @@
  * Official error names look up `CCA_ERROR_COPY` first. Kind messages are
  * fallbacks and must never leak a revert name.
  */
-import { CCA_CLAIM_ERROR_COPY, ccaErrorCopy, officialCcaErrorName, type CcaErrorCopyVars } from "./copy";
+import {
+  CCA_CLAIM_ERROR_COPY,
+  CCA_SWAP_ERROR_COPY,
+  ccaErrorCopy,
+  officialCcaErrorName,
+  type CcaErrorCopyVars,
+} from "./copy";
 
 export type CcaErrorKind =
   | "auction_not_live"
@@ -61,7 +67,11 @@ export function mapCcaError(error: unknown): CcaErrorKind {
   ) {
     return "launch_rejected";
   }
-  if (/ExecutionFailed|TransactionDeadlinePassed|V4TooLittleReceived|LengthMismatch/i.test(text)) {
+  if (
+    /ExecutionFailed|TransactionDeadlinePassed|V4TooLittleReceived|LengthMismatch|InsufficientAllowance|AllowanceExpired|PoolNotInitialized/i.test(
+      text,
+    )
+  ) {
     return "swap_failed";
   }
   if (/did not succeed|reverted/i.test(text)) return "reverted";
@@ -86,7 +96,7 @@ export function ccaUserMessage(kind: CcaErrorKind): string {
     case "launch_rejected":
       return "Couldn't start the auction. Try again.";
     case "swap_failed":
-      return "The pool swap did not go through.";
+      return CCA_SWAP_ERROR_COPY.ExecutionFailed;
     case "user_rejected":
       return "Wallet confirmation was cancelled.";
     case "reverted":

@@ -1,28 +1,23 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { parseUnits } from "viem";
+import { parseEther } from "viem";
+import { CcaTrade } from "../components/CcaTrade";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
 import { SampleBadge } from "../components/SampleBadge";
 import { TokenName, tokenDisplayName } from "../components/TokenName";
+import { CCA_COPY, raisedProgressCopy } from "../lib/cca";
 import { hasLaunchpad } from "../lib/contracts";
-import { graduated, progress, quoteBuy, quoteSell, TOTAL_SUPPLY } from "../lib/curve";
-import { ago, eth, gwei, tokens } from "../lib/format";
+import { graduated, progress, TOTAL_SUPPLY } from "../lib/curve";
+import { ago, gwei, tokens } from "../lib/format";
 import {
   GRADUATED_BODY,
   GRADUATED_LINK,
   GRADUATED_TITLE,
-  uniswapGraduationHref,
-  type GraduationState,
 } from "../lib/graduation";
 import { findLaunchedCoin, loadLaunchedCoins } from "../lib/launched";
-import {
-  MEMO_COPY,
-  isMemoTooLong,
-  memoRemainingLabel,
-} from "../lib/limits";
-import { GRADUATION_ETH } from "../lib/mock";
-import { getProphecyByName, prototypeCoinFromName } from "../lib/prophetData";
+import { memoRemainingLabel } from "../lib/limits";
+import { prototypeCoinFromName } from "../lib/prophetData";
 import {
   actions,
   myPosition,
@@ -30,21 +25,10 @@ import {
   useStore,
   type Coin,
 } from "../lib/store";
-import { useGraduation } from "../lib/useGraduation";
 import {
-  createBuy,
-  createSell,
-  ethInputToWei,
   isChainWriteTarget,
-  liveTokenAddress,
-  refreshCoinFromChain,
-  writeErrorMessage,
-  writePhaseCopy,
-  WRITE_COPY,
-  ZERO_QUOTE_COPY,
   type BuyInput,
   type SellInput,
-  type WritePhase,
 } from "../lib/writes";
 
 export type CoinPageProps = {
@@ -54,8 +38,6 @@ export type CoinPageProps = {
 };
 
 export function CoinPage({
-  sendBuy = createBuy(),
-  sendSell = createSell(),
   loadLaunched,
 }: CoinPageProps = {}) {
   const { id = "", name = "" } = useParams();
@@ -87,8 +69,6 @@ export function CoinPage({
 
   const fromStore = s.coins.find((c) => c.id === lookup || c.token === lookup || c.name === lookup);
   const coin = chain ? (fromStore ?? chainCoin) : (fromStore ?? prototypeCoinFromName(lookup));
-  const token = coin ? (coin.token ?? getProphecyByName(coin.name)?.token) : undefined;
-  const graduation = useGraduation(token, coin ? graduated(coin) : false);
   if (!coin) {
     if (chain && !chainReady) {
       return <main className="coin-page" />;
@@ -105,6 +85,7 @@ export function CoinPage({
 
   const pos = myPosition(s, coin.id);
   const talk = s.comments.filter((c) => c.coinId === coin.id).sort((a, b) => b.at - a.at);
+  const closed = graduated(coin) || Boolean(coin.complete);
 
   return (
     <main className="coin-page">
@@ -124,8 +105,8 @@ export function CoinPage({
           </div>
           <h1 className="prophecy-title">{coin.prophecy}</h1>
           <p className="price-now">{gwei(price(coin))}</p>
-          <p className="big-num">{curveProgressHeader(coin)}</p>
-          {graduation.graduated ? null : <p className="faint">Curve progress</p>}
+          <p className="big-num">{auctionProgressHeader(coin)}</p>
+          <p className="faint">{closed ? CCA_COPY.finalClearingPrice : CCA_COPY.currentClearingPrice}</p>
           <Sparkline coin={coin} />
           <Bar value={progress(coin)} labelled />
         </section>
@@ -146,17 +127,12 @@ export function CoinPage({
       </div>
 
       <aside className="stack side">
-        {graduation.graduated ? (
-          <GraduationPanel href={uniswapGraduationHref(graduation)} />
-        ) : !chain || isChainWriteTarget(coin) ? (
-          <TradeBox
+        {!chain || isChainWriteTarget(coin) ? (
+          <CcaTrade
             coin={coin}
             balance={s.balance}
             held={pos?.tokens ?? 0}
-            graduation={graduation}
             chain={chain}
-            sendBuy={sendBuy}
-            sendSell={sendSell}
           />
         ) : null}
         {pos ? (
@@ -176,168 +152,17 @@ export function TradeBox({
   coin,
   balance,
   held,
-  graduation,
   chain = false,
-  sendBuy = createBuy(),
-  sendSell = createSell(),
 }: {
   coin: Coin;
   balance: number;
   held: number;
-  graduation: GraduationState;
+  graduation?: unknown;
   chain?: boolean;
   sendBuy?: (input: BuyInput) => Promise<boolean>;
   sendSell?: (input: SellInput) => Promise<boolean>;
 }) {
-  const [side, setSide] = useState<"buy" | "sell">("buy");
-  const [amount, setAmount] = useState("0.001");
-  const [memo, setMemo] = useState("");
-  const [pending, setPending] = useState(false);
-  const [phase, setPhase] = useState<WritePhase | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const value = Number(amount) || 0;
-  const closed = graduation.graduated;
-  const memoTooLong = isMemoTooLong(memo);
-
-  const buyQuote = quoteBuy(coin, Math.min(value, balance));
-  const sellTokens = Math.min(held, (held * Math.min(value, 100)) / 100);
-  const sellQuote = quoteSell(coin, sellTokens).eth;
-  const cannotTrade = side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0 || sellQuote <= 0;
-  const rawBuyQuoteZero = quoteBuy(coin, value).tokens <= 0;
-  const rawSellQuoteZero = held > 0 && quoteSell(coin, (held * Math.min(value, 100)) / 100).eth <= 0;
-  const showTooSmallBanner = value > 0 && (side === "buy" ? rawBuyQuoteZero : rawSellQuoteZero);
-  const writeTarget = isChainWriteTarget(coin);
-  const showWrites = !chain || writeTarget;
-
-  function submit() {
-    if (pending || memoTooLong || closed || cannotTrade) return;
-    if (chain && !writeTarget) return;
-    const token = liveTokenAddress(coin.id, coin.token);
-    if (!writeTarget || !token) {
-      if (side === "buy") actions.buy(coin.id, value);
-      else actions.sell(coin.id, sellTokens);
-      return;
-    }
-    void (async () => {
-      setPending(true);
-      setPhase("wallet");
-      setError(null);
-      setSuccess(null);
-      try {
-        if (side === "buy") {
-          const sent = await sendBuy({
-            token,
-            ethIn: ethInputToWei(value),
-            memo,
-            curve: coin,
-            onPhase: setPhase,
-          });
-          if (!sent) actions.buy(coin.id, value);
-        } else {
-          const tokensIn = parseUnits(sellTokens.toFixed(8), 18);
-          const sent = await sendSell({
-            token,
-            tokensIn,
-            memo,
-            curve: coin,
-            onPhase: setPhase,
-          });
-          if (!sent) actions.sell(coin.id, sellTokens);
-        }
-        await refreshCoinFromChain(coin.id, token).catch(() => undefined);
-        setSuccess(WRITE_COPY.tradeSuccess);
-      } catch (err) {
-        setError(writeErrorMessage(err));
-      } finally {
-        setPending(false);
-        setPhase(null);
-      }
-    })();
-  }
-
-  if (closed) {
-    return <GraduationPanel href={uniswapGraduationHref(graduation)} />;
-  }
-
-  return (
-    <section className="block trade">
-      <div className="tabs">
-        <button type="button" className={side === "buy" ? "on buy" : ""} onClick={() => { setSide("buy"); setAmount("0.001"); }}>
-          Buy
-        </button>
-        <button type="button" className={side === "sell" ? "on sell" : ""} onClick={() => { setSide("sell"); setAmount("100"); }}>
-          Sell
-        </button>
-      </div>
-      <label className="field">
-        <span>{side === "buy" ? "Amount (ETH)" : "Amount (% of holding)"}</span>
-        <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
-      </label>
-      <label className="field">
-        <span>Memo</span>
-        <input
-          aria-label="Memo"
-          value={memo}
-          autoComplete="off"
-          spellCheck={false}
-          placeholder="Optional"
-          onChange={(e) => setMemo(e.target.value)}
-        />
-        {memoTooLong ? null : (
-          <span className="faint small" data-testid="memo-left">
-            {memoRemainingLabel(memo)}
-          </span>
-        )}
-      </label>
-      <div className="quick">
-        {(side === "buy" ? ["0.0005", "0.001", "0.002", "0.005"] : ["25", "50", "100"]).map((q) => (
-          <button type="button" key={q} onClick={() => setAmount(q)}>
-            {side === "buy" ? `${q} ETH` : `${q}%`}
-          </button>
-        ))}
-      </div>
-      <p className="faint">
-        {side === "buy"
-          ? `You get ≈ ${tokens(buyQuote.tokens)} $${coin.ticker}`
-          : `You get ≈ ${eth(sellQuote, 4)}`}
-      </p>
-      {pending && writePhaseCopy(phase) ? (
-        <p className="banner-lock">{writePhaseCopy(phase)}</p>
-      ) : null}
-      {success ? <p className="up">{success}</p> : null}
-      {error ? (
-        <p className="banner-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {memoTooLong ? (
-        <p className="banner-error" role="alert">
-          {MEMO_COPY.tooLong}
-        </p>
-      ) : null}
-      {showTooSmallBanner ? (
-        <p className="banner-error" role="alert">
-          {ZERO_QUOTE_COPY}
-        </p>
-      ) : null}
-      {showWrites ? (
-        <button
-          type="button"
-          className={`btn ${side === "buy" ? "primary" : "sell"} full`}
-          disabled={pending || memoTooLong || cannotTrade}
-          onClick={submit}
-        >
-          {pending && phase === "approve"
-            ? WRITE_COPY.approve
-            : side === "buy"
-              ? `Buy $${coin.ticker}`
-              : `Sell $${coin.ticker}`}
-        </button>
-      ) : null}
-      <p className="faint small">Cash {eth(balance)}</p>
-    </section>
-  );
+  return <CcaTrade coin={coin} balance={balance} held={held} chain={chain} />;
 }
 
 export function GraduationPanel({ href }: { href: string }) {
@@ -373,14 +198,16 @@ function PostBox({ coinId, holds }: { coinId: string; holds: boolean }) {
       <button type="submit" className="btn primary" disabled={!text.trim()}>
         Post
       </button>
+      <span className="faint small" data-testid="memo-left">
+        {memoRemainingLabel(text)}
+      </span>
     </form>
   );
 }
 
-function curveProgressHeader(coin: Coin): string {
-  const pctFilled = Math.round(progress(coin) * 100);
-  const raised = (pctFilled / 100) * GRADUATION_ETH;
-  return `${pctFilled}% ${raised.toFixed(4)} of ${GRADUATION_ETH} ETH to graduate`;
+function auctionProgressHeader(coin: Coin): string {
+  const raisedWei = parseEther(Math.max(0, coin.ethRaised).toFixed(18));
+  return raisedProgressCopy(raisedWei);
 }
 
 function Sparkline({ coin }: { coin: Coin }) {

@@ -1,21 +1,23 @@
 /**
- * Chain-mode list: Launched logs → existing Coin card shape (INTERFACE §4).
+ * Chain-mode list: Launched logs → existing Coin card shape.
  * Sentence comes from ENS when a resolver is set — never from Launched.
- * Curve sold / complete come from Launchpad.curve(token).
+ * On the cca branch, raised / complete come from auctionOf + CCALens.
  */
-import { createPublicClient, formatEther, formatUnits, http, isAddress, type Address, type PublicClient } from "viem";
+import { createPublicClient, formatEther, http, isAddress, zeroAddress, type Address, type PublicClient } from "viem";
 import { sepolia } from "viem/chains";
+import { auctionOfRead, readAuctionView } from "./cca";
 import { contracts, hasLaunchpad } from "./contracts";
+import { TOTAL_SUPPLY } from "./curve";
 import { ENS_TEXT_PROPHECY, getEnsText } from "./ens";
 import { webEnv } from "./env";
 import { fetchLaunchedLogs } from "./launchpad";
-import { launchpadAbi } from "./launchpadAbi";
 import type { Coin } from "./store";
 
 export type LaunchedLogLike = {
   args?: {
     token?: Address | string;
     prophet?: Address | string;
+    auction?: Address | string;
     prophetLabel?: string;
     slug?: string;
   };
@@ -46,6 +48,7 @@ export function coinFromLaunchedLog(log: LaunchedLogLike, parentName = webEnv.pa
     ethRaised: 0,
     history: [],
     fromChain: true,
+    auction: log.args?.auction && isAddress(log.args.auction) ? log.args.auction : undefined,
   };
 }
 
@@ -71,20 +74,31 @@ export function findLaunchedCoin(lookup: string, coins: readonly Coin[]): Coin |
 
 export async function readCurveView(
   token: Address,
-  client: Pick<PublicClient, "readContract">,
+  client: Pick<PublicClient, "readContract"> & {
+    simulateContract?: (request: unknown) => Promise<{ result: unknown }>;
+    getBlockNumber?: () => Promise<bigint>;
+  },
   address = contracts.launchpad,
 ): Promise<CurveView> {
   if (!address) return { sold: 0, ethRaised: 0, complete: false };
-  const curve = (await client.readContract({
-    address,
-    abi: launchpadAbi,
-    functionName: "curve",
-    args: [token],
-  })) as readonly [bigint, bigint, bigint, bigint, boolean];
+  const auction = (await client.readContract(auctionOfRead(address, token))) as Address;
+  if (!auction || auction === zeroAddress) return { sold: 0, ethRaised: 0, complete: false };
+  if (!client.simulateContract || !client.getBlockNumber) {
+    return { sold: 0, ethRaised: 0, complete: false, };
+  }
+  const view = await readAuctionView(
+    {
+      simulateContract: client.simulateContract as never,
+      readContract: client.readContract as never,
+      getBlockNumber: client.getBlockNumber,
+    },
+    auction,
+  );
+  const frac = view.graduationWei === 0n ? 0 : Number(view.currencyRaised) / Number(view.graduationWei);
   return {
-    sold: Number(formatUnits(curve[3], 18)),
-    ethRaised: Number(formatEther(curve[2])),
-    complete: curve[4],
+    sold: Math.min(1, frac) * TOTAL_SUPPLY,
+    ethRaised: Number(formatEther(view.currencyRaised)),
+    complete: view.isGraduated,
   };
 }
 
@@ -94,6 +108,7 @@ export type LoadLaunchedOptions = {
     getBlockNumber: () => Promise<bigint>;
     getContractEvents: (query: unknown) => Promise<unknown>;
     readContract?: PublicClient["readContract"];
+    simulateContract?: PublicClient["simulateContract"];
   };
   readCurve?: (token: Address) => Promise<CurveView>;
   readSentence?: (name: string) => Promise<string | null>;
@@ -121,7 +136,16 @@ export async function loadLaunchedCoins(options: LoadLaunchedOptions = {}): Prom
           const read = options.readCurve
             ? options.readCurve
             : typeof client.readContract === "function"
-              ? (t: Address) => readCurveView(t, { readContract: client.readContract as PublicClient["readContract"] })
+              ? (t: Address) => {
+                  const simulate = client.simulateContract;
+                  return readCurveView(t, {
+                    readContract: client.readContract as PublicClient["readContract"],
+                    simulateContract: simulate
+                      ? (request) => simulate(request as never)
+                      : undefined,
+                    getBlockNumber: client.getBlockNumber,
+                  });
+                }
               : null;
           const curve = read ? await read(token) : null;
           if (curve) {

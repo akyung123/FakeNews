@@ -3,15 +3,14 @@
  *
  * Today this is a mock. Live reads (when `VITE_UNIVERSAL_RESOLVER` is set):
  *   - prophet wallet: getEnsAddress(name)
- *   - sentence / deadline: getEnsText(name, "prophecy" | "deadline")
+ *   - sentence: getEnsText(name, "prophecy")
  *   - token: getEnsAddress(slug.name.prophecy.eth)
  *   - curve + fees: Launchpad.curve(token) and creatorFeeOf(wallet) via viem
  *
- * Sentences and deadlines come through the ENS text helpers. Screens never
- * hardcode them. `Launched` has no deadline (PR #25).
+ * Sentences come through the ENS text helpers. Screens never hardcode them.
  */
 import { CURVE_SUPPLY as PROTOTYPE_CURVE_SUPPLY } from "./curve";
-import { mockEnsAddress, mockEnsText, parseDeadlineText, ENS_TEXT_DEADLINE, ENS_TEXT_PROPHECY } from "./ens";
+import { mockEnsAddress, mockEnsText, ENS_TEXT_PROPHECY } from "./ens";
 import { isMockMode } from "./mode";
 import { GRADUATION_ETH, MOCK_PARENT_NAME, MOCK_PROPHETS, MOCK_PROPHECIES } from "./mock";
 import { marketCap, type Coin } from "./store";
@@ -31,8 +30,6 @@ export type ProphetProphecy = {
   slug: string;
   ensName: string;
   sentence: string;
-  deadline: number;
-  departed: boolean;
   token: Address;
   sold: bigint;
   complete: boolean;
@@ -43,7 +40,6 @@ export type ProphetProphecy = {
 export type ProphetPageData = {
   prophet: ProphetIdentity;
   prophecies: ProphetProphecy[];
-  departedCount: number;
   claimableFeeWei: bigint;
   /** Set when the page came from prophetOf / creatorFeeOf, not MOCK_PROPHETS. */
   fromChain?: boolean;
@@ -78,7 +74,7 @@ function decodeName(name: string): string {
 }
 
 /** Look up one prophecy by full ENS name or slug. */
-export function getProphecyByName(name: string, nowSec = Math.floor(Date.now() / 1000)): ProphetProphecy | null {
+export function getProphecyByName(name: string): ProphetProphecy | null {
   const key = decodeName(name);
   if (!key) return null;
   const row = MOCK_PROPHECIES.find((item) => {
@@ -86,7 +82,7 @@ export function getProphecyByName(name: string, nowSec = Math.floor(Date.now() /
     return ens === key || item.slug === key;
   });
   if (!row) return null;
-  return toProphetProphecy(row, nowSec);
+  return toProphetProphecy(row);
 }
 
 /**
@@ -99,7 +95,7 @@ export function prototypeCoinFromName(
 ): Coin | null {
   const mock = options?.mock ?? isMockMode();
   if (!mock) return null;
-  const p = getProphecyByName(name, nowSec);
+  const p = getProphecyByName(name);
   if (!p) return null;
   const sold = p.complete ? PROTOTYPE_CURVE_SUPPLY : Number(p.sold / 10n ** 18n);
   const createdAt = (nowSec ?? Math.floor(Date.now() / 1000)) * 1000;
@@ -114,21 +110,13 @@ export function prototypeCoinFromName(
     ethRaised: p.complete ? GRADUATION_ETH : sold > 0 ? 0.001 : 0,
     history: [],
     token: p.token,
+    complete: p.complete,
   };
   coin.history = [
     { at: createdAt - 60_000, mcap: marketCap({ sold: 0, ethRaised: 0 }) },
     { at: createdAt, mcap: marketCap(coin) },
   ];
   return coin;
-}
-
-export function isDeparted(deadline: number, nowSec: number): boolean {
-  return nowSec >= deadline;
-}
-
-/** Open rows buy; Departed (and later, held) rows sell. SPEC Screen 4. */
-export function prophecyTradeLabel(row: { departed: boolean }): "Buy" | "Sell" {
-  return row.departed ? "Sell" : "Buy";
 }
 
 export function curveProgress(sold: bigint, complete: boolean): number {
@@ -168,7 +156,6 @@ export function prophetPageFromChain(input: {
       wallet: input.wallet,
     },
     prophecies,
-    departedCount: prophecies.filter((p) => p.departed).length,
     claimableFeeWei: input.claimableFeeWei,
     fromChain: true,
   };
@@ -195,15 +182,15 @@ export function canClaimCreatorFee(
 /**
  * Load a prophet page. Mock implementation — replace with ENS + contract reads.
  */
-export function getProphetPage(name: string, nowSec = Math.floor(Date.now() / 1000)): ProphetPageData | null {
+export function getProphetPage(name: string): ProphetPageData | null {
   const label = normalizeProphetLabel(name);
   if (!label) return null;
   const prophet = MOCK_PROPHETS.find((p) => p.label === label);
   if (!prophet) return null;
 
   const prophecies = MOCK_PROPHECIES.filter((row) => row.prophetLabel === label)
-    .map((row) => toProphetProphecy(row, nowSec))
-    .sort(byDeadlineThenSlug);
+    .map(toProphetProphecy)
+    .sort(bySlug);
 
   return {
     prophet: {
@@ -212,25 +199,18 @@ export function getProphetPage(name: string, nowSec = Math.floor(Date.now() / 10
       wallet: prophet.wallet,
     },
     prophecies,
-    departedCount: prophecies.filter((p) => p.departed).length,
     claimableFeeWei: prophet.claimableFeeWei,
   };
 }
 
-function toProphetProphecy(
-  row: (typeof MOCK_PROPHECIES)[number],
-  nowSec: number,
-): ProphetProphecy {
+function toProphetProphecy(row: (typeof MOCK_PROPHECIES)[number]): ProphetProphecy {
   const ensName = prophecyEnsName(row.slug, row.prophetLabel);
   const sentence = mockEnsText(ensName, ENS_TEXT_PROPHECY) ?? row.sentence;
-  const deadline = parseDeadlineText(mockEnsText(ensName, ENS_TEXT_DEADLINE)) ?? row.deadline;
   const token = mockEnsAddress(ensName) ?? row.token;
   return {
     slug: row.slug,
     ensName,
     sentence,
-    deadline,
-    departed: isDeparted(deadline, nowSec),
     token,
     sold: row.sold,
     complete: row.complete,
@@ -238,7 +218,6 @@ function toProphetProphecy(
   };
 }
 
-function byDeadlineThenSlug(a: ProphetProphecy, b: ProphetProphecy): number {
-  if (a.deadline !== b.deadline) return a.deadline - b.deadline;
+function bySlug(a: ProphetProphecy, b: ProphetProphecy): number {
   return a.slug.localeCompare(b.slug);
 }

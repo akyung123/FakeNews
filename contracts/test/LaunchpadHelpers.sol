@@ -3,10 +3,15 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
+
 import {IProphecyEns} from "../src/ens/IProphecyEns.sol";
 import {Launchpad} from "../src/Launchpad.sol";
+import {LiquidityLocker} from "../src/uniswap/LiquidityLocker.sol";
+import {MockLBPStrategy, MockPositionManager} from "./mocks/MockCca.sol";
 
-/// Minimal ENS adapter for curve and World-signature tests.
+/// Minimal ENS adapter for World-signature and CCA launch tests.
 contract MockProphecyEns is IProphecyEns {
     error UnknownProphet();
     error InvalidSlug();
@@ -40,6 +45,14 @@ contract MockProphecyEns is IProphecyEns {
     }
 }
 
+contract MockAuthorizedHook {
+    address public authorized;
+
+    constructor(address authorized_) {
+        authorized = authorized_;
+    }
+}
+
 abstract contract LaunchpadTestBase is Test {
     uint256 internal constant SIGNER_PK =
         0x51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C5;
@@ -50,16 +63,31 @@ abstract contract LaunchpadTestBase is Test {
     address internal buyer = address(0xB0B);
     MockProphecyEns internal mockEns;
     Launchpad internal launchpad;
+    MockLBPStrategy internal mockStrategy;
+    MockPositionManager internal mockPosm;
+    LiquidityLocker internal mockLocker;
     uint256 internal nextNullifier = 1;
 
     function _deployLaunchpad() internal {
         signer = vm.addr(SIGNER_PK);
         mockEns = new MockProphecyEns();
         launchpad = new Launchpad(protocol, signer, IProphecyEns(address(mockEns)));
+        _wireCcaMocks(launchpad);
     }
 
     function _newLaunchpad(address protocol_, address signer_) internal returns (Launchpad pad) {
         pad = new Launchpad(protocol_, signer_, IProphecyEns(address(new MockProphecyEns())));
+        _wireCcaMocks(pad);
+    }
+
+    function _wireCcaMocks(Launchpad pad) internal {
+        mockStrategy = new MockLBPStrategy();
+        mockPosm = new MockPositionManager();
+        address dummyPm = address(uint160(0xB001));
+        address dummyHook = address(new MockAuthorizedHook(address(mockStrategy)));
+        mockLocker = new LiquidityLocker(IPoolManager(dummyPm), address(pad), IHooks(dummyHook));
+        pad.setUniswap(IPoolManager(dummyPm), dummyHook, address(mockLocker));
+        pad.setCca(address(mockStrategy), address(mockPosm));
     }
 
     function worldDigest(address pad, address wallet, uint256 nullifier, uint256 chainId)
@@ -97,7 +125,7 @@ abstract contract LaunchpadTestBase is Test {
 
     function _launchOn(Launchpad pad, address wallet, string memory slug) internal returns (address token) {
         vm.prank(wallet);
-        token = pad.launch(slug, "a prophecy sentence", 1_800_000_000, 0);
+        token = pad.launch(slug, "a prophecy sentence", 1_800_000_000);
     }
 
     function _launch(string memory slug) internal returns (address token) {
@@ -115,15 +143,5 @@ abstract contract LaunchpadTestBase is Test {
     {
         _registerProphet(wallet, label);
         return _launchOn(launchpad, wallet, slug);
-    }
-
-    function _sellOutOn(Launchpad pad, address trader, address token) internal {
-        vm.prank(trader);
-        pad.buy{value: 1 ether}(token, 0, "");
-    }
-
-    /// Last-curve buy: fills remaining supply and graduates when Uniswap is set.
-    function _sellOut(address token) internal {
-        _sellOutOn(launchpad, buyer, token);
     }
 }

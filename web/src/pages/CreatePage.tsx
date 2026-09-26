@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { WorldGate } from "../components/WorldGate";
 import {
-  fromDatetimeLocalValue,
   isIssueFormValid,
   isIssueSubmitEnabled,
   isLaunchEnabled,
@@ -12,7 +11,6 @@ import {
   prophecyName,
   readStoredProphetLabel,
   storeProphetLabel,
-  toDatetimeLocalValue,
   worldUserMessage,
   type IssueSession,
   type RegisterStatus,
@@ -24,13 +22,10 @@ import { actions } from "../lib/store";
 import { MAX_PROPHECY_BYTES, utf8ByteLength } from "../lib/limits";
 import {
   createLaunch,
-  ethInputToWei,
-  isFirstBuyTooSmall,
   refreshCoinFromChain,
   writeErrorMessage,
   writePhaseCopy,
   WRITE_COPY,
-  ZERO_QUOTE_COPY,
   type LaunchInput,
   type WritePhase,
 } from "../lib/writes";
@@ -41,12 +36,9 @@ import {
   type WorldServerSignature,
 } from "../lib/world";
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-
 export type IssueScreenProps = {
   session: IssueSession;
   world?: WorldClient;
-  now?: number;
   parentName?: string;
   onIssued?: (id: string) => void;
   registerProphet?: (input: RegisterProphetInput) => Promise<void>;
@@ -70,7 +62,6 @@ export function CreatePage() {
 export function IssueScreen({
   session,
   world = createWorldClient(),
-  now = Date.now(),
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
   onIssued,
   registerProphet = createRegisterProphet(),
@@ -84,8 +75,6 @@ export function IssueScreen({
   const [prophetLabel, setProphetLabel] = useState(session.prophetLabel ?? "");
   const [prophecy, setProphecy] = useState("");
   const [slug, setSlug] = useState("");
-  const [deadlineLocal, setDeadlineLocal] = useState(toDatetimeLocalValue(now + WEEK_MS));
-  const [firstBuy, setFirstBuy] = useState("0");
   const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
   const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
@@ -95,8 +84,6 @@ export function IssueScreen({
   const [writeError, setWriteError] = useState<string | null>(null);
   const [writeSuccess, setWriteSuccess] = useState<string | null>(null);
 
-  const deadlineUnix = fromDatetimeLocalValue(deadlineLocal);
-  const nowSeconds = Math.floor(now / 1000);
   useEffect(() => {
     let cancelled = false;
     void readProphet(session.wallet).then((label) => {
@@ -113,15 +100,11 @@ export function IssueScreen({
     prophetLabel,
     prophecy,
     slug,
-    deadlineUnix,
-    firstBuy,
-    nowSeconds,
   });
   const gate = { returningProphet, worldStatus, formValid, registerStatus };
   const canLaunch = isLaunchEnabled(gate);
   const canRegister = isRegisterSubmitEnabled(gate);
   const canSubmit = isIssueSubmitEnabled(gate);
-  const firstBuyTooSmall = isFirstBuyTooSmall(ethInputToWei(firstBuy));
   const registerBusy = registerStatus === "pending";
   const busy = registerBusy || writeBusy;
   const pending = writeBusy
@@ -165,7 +148,7 @@ export function IssueScreen({
         className="block create"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!canSubmit || busy || (canLaunch && firstBuyTooSmall)) return;
+          if (!canSubmit || busy) return;
           void (async () => {
             setWriteError(null);
             if (canRegister) {
@@ -196,8 +179,6 @@ export function IssueScreen({
               const token = await runLaunch({
                 slug,
                 prophecy: prophecy.trim(),
-                deadline: BigInt(deadlineUnix),
-                firstBuyWei: ethInputToWei(firstBuy),
               });
               if (token) {
                 actions.create({
@@ -207,7 +188,7 @@ export function IssueScreen({
                   prophecy: prophecy.trim(),
                   name: fullName || slug,
                   ticker: slug.toUpperCase().slice(0, 11),
-                  firstBuy: Number(firstBuy) || 0,
+                  firstBuy: 0,
                 });
                 await refreshCoinFromChain(token, token).catch(() => undefined);
                 if (!returningProphet) storeProphetLabel(prophetLabel);
@@ -220,7 +201,7 @@ export function IssueScreen({
                 prophecy: prophecy.trim(),
                 name: fullName || slug,
                 ticker: slug.toUpperCase().slice(0, 11),
-                firstBuy: Number(firstBuy) || 0,
+                firstBuy: 0,
               });
               if (!returningProphet) storeProphetLabel(prophetLabel);
               if (onIssued) onIssued(id);
@@ -277,26 +258,9 @@ export function IssueScreen({
             />
             <span className="faint small">3–32 characters, a–z, 0–9 and hyphen</span>
           </label>
-          <label className="field">
-            <span>Deadline</span>
-            <input
-              aria-label="Deadline"
-              type="datetime-local"
-              value={deadlineLocal}
-              onChange={(e) => setDeadlineLocal(e.target.value)}
-            />
-            <span className="faint small">
-              After this time the screen shows Departed. Unix {deadlineUnix || "—"}.
-            </span>
-          </label>
         </div>
 
         {fullName ? <p className="name-preview">{fullName}</p> : null}
-
-        <label className="field">
-          <span>First buy (ETH, optional)</span>
-          <input inputMode="decimal" value={firstBuy} onChange={(e) => setFirstBuy(e.target.value)} />
-        </label>
 
         <WorldGate
           returningProphet={returningProphet}
@@ -332,17 +296,12 @@ export function IssueScreen({
             {error}
           </p>
         ) : null}
-        {firstBuyTooSmall ? (
-          <p className="banner-error" role="alert">
-            {ZERO_QUOTE_COPY}
-          </p>
-        ) : null}
 
         <button
           type="submit"
           className="btn primary full"
           data-testid={canLaunch ? "launch-submit" : canRegister ? "register-submit" : "issue-submit"}
-          disabled={!canSubmit || busy || (canLaunch && firstBuyTooSmall)}
+          disabled={!canSubmit || busy}
         >
           {submitLabel}
         </button>

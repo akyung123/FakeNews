@@ -1,9 +1,6 @@
 /**
- * Launchpad / LiquidityLocker names copied from INTERFACE_CCA.md
- * (PR #40 head b02a445), section 2. Only names already specified there.
- *
- * Do not add guessed custom-error names (`LbpNotSet` and the like) —
- * those stay TBD(INTERFACE_CCA).
+ * Launchpad / LiquidityLocker names from INTERFACE_CCA.md PR #44
+ * and PR #42 (`Launchpad.sol`, `LiquidityLocker.sol`; follow latest head).
  */
 export const launchpadCcaAbi = [
   {
@@ -26,20 +23,21 @@ export const launchpadCcaAbi = [
       { name: "prophecy", type: "string" },
       { name: "deadline", type: "uint64" },
     ],
-    outputs: [
-      { name: "token", type: "address" },
-      { name: "auction", type: "address" },
-    ],
+    outputs: [{ name: "token", type: "address" }],
   },
   {
     type: "function",
     name: "auctionOf",
     stateMutability: "view",
     inputs: [{ name: "token", type: "address" }],
-    outputs: [
-      { name: "auction", type: "address" },
-      { name: "poolOpened", type: "bool" },
-    ],
+    outputs: [{ name: "auction", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "isGraduated",
+    stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
   },
   {
     type: "function",
@@ -77,6 +75,13 @@ export const launchpadCcaAbi = [
     outputs: [{ name: "", type: "address" }],
   },
   {
+    type: "function",
+    name: "auctionBlocks",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint64" }],
+  },
+  {
     type: "event",
     name: "Launched",
     inputs: [
@@ -94,7 +99,10 @@ export const lockerCcaAbi = [
     type: "function",
     name: "collect",
     stateMutability: "nonpayable",
-    inputs: [{ name: "token", type: "address" }],
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
     outputs: [],
   },
   {
@@ -106,10 +114,30 @@ export const lockerCcaAbi = [
   },
   {
     type: "function",
-    name: "tokenIdOf",
+    name: "register",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "tokenIdsOf",
     stateMutability: "view",
     inputs: [{ name: "token", type: "address" }],
-    outputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "isRegistered",
+    stateMutability: "view",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
   },
   {
     type: "function",
@@ -117,5 +145,93 @@ export const lockerCcaAbi = [
     stateMutability: "view",
     inputs: [{ name: "token", type: "address" }],
     outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "accruedEth",
+    stateMutability: "view",
+    inputs: [{ name: "prophet", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "event",
+    name: "Registered",
+    inputs: [
+      { name: "token", type: "address", indexed: true },
+      { name: "tokenId", type: "uint256", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "Collected",
+    inputs: [
+      { name: "token", type: "address", indexed: true },
+      { name: "tokenId", type: "uint256", indexed: true },
+      { name: "prophetAmount0", type: "uint256", indexed: false },
+      { name: "protocolAmount0", type: "uint256", indexed: false },
+      { name: "prophetAmount1", type: "uint256", indexed: false },
+      { name: "protocolAmount1", type: "uint256", indexed: false },
+    ],
+  },
+  { type: "error", name: "UnknownLock", inputs: [] },
+  { type: "error", name: "NotNftOwner", inputs: [] },
+  { type: "error", name: "AlreadyReceived", inputs: [] },
+  { type: "error", name: "BadPoolKey", inputs: [] },
+  { type: "error", name: "NothingAccrued", inputs: [] },
+  { type: "error", name: "EthTransferFailed", inputs: [] },
+  { type: "error", name: "TokenTransferFailed", inputs: [] },
+  { type: "error", name: "PositionManagerNotSet", inputs: [] },
+  { type: "error", name: "Reentrant", inputs: [] },
+] as const;
+
+export const positionManagerAbi = [
+  {
+    type: "function",
+    name: "nextTokenId",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "ownerOf",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "getPoolAndPositionInfo",
+    stateMutability: "view",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [
+      {
+        name: "poolKey",
+        type: "tuple",
+        components: [
+          { name: "currency0", type: "address" },
+          { name: "currency1", type: "address" },
+          { name: "fee", type: "uint24" },
+          { name: "tickSpacing", type: "int24" },
+          { name: "hooks", type: "address" },
+        ],
+      },
+      { name: "info", type: "uint256" },
+    ],
+  },
+] as const;
+
+export const poolManagerAbi = [
+  {
+    type: "function",
+    name: "getSlot0",
+    stateMutability: "view",
+    inputs: [{ name: "id", type: "bytes32" }],
+    outputs: [
+      { name: "sqrtPriceX96", type: "uint160" },
+      { name: "tick", type: "int24" },
+      { name: "protocolFee", type: "uint24" },
+      { name: "lpFee", type: "uint24" },
+    ],
   },
 ] as const;

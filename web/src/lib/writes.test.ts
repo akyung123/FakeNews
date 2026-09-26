@@ -2,7 +2,6 @@ import { encodeAbiParameters, encodeEventTopics, parseEther, parseUnits } from "
 import { describe, expect, it, vi } from "vitest";
 import { launchpadAbi } from "./launchpadAbi";
 import { MOCK_PROPHECIES, MOCK_WORLD_LAUNCHPAD } from "./mock";
-import { quoteBuyWei, toCurveWei } from "./curve";
 import { actions } from "./store";
 import { wagmiConfig } from "./wagmi";
 import {
@@ -15,7 +14,6 @@ import {
   createSell,
   ethInputToWei,
   isChainWriteTarget,
-  isFirstBuyTooSmall,
   isMockCoinRecord,
   isMockTokenAddress,
   launchWrite,
@@ -23,7 +21,6 @@ import {
   liveTokenAddress,
   minEthOutForSell,
   minOutAfterSlippage,
-  minTokensOutForBuy,
   sellWrite,
   tokenFromLaunchedReceipt,
   tradeDeadlineUnix,
@@ -39,20 +36,19 @@ import {
 
 const TOKEN = "0x1111111111111111111111111111111111111111" as const;
 const ACCOUNT = "0x2222222222222222222222222222222222222222" as const;
+const AUCTION = "0x3333333333333333333333333333333333333333" as const;
 const HASH = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
 
 const launchInput: LaunchInput = {
   slug: "lingo-2028",
   prophecy: "Every badge is a name",
-  deadline: 1_830_297_600n,
-  firstBuyWei: parseEther("0.001"),
 };
 
 function launchedReceipt(token = TOKEN): WriteReceipt {
   const topics = encodeEventTopics({
     abi: launchpadAbi,
     eventName: "Launched",
-    args: { token, prophet: ACCOUNT },
+    args: { token, prophet: ACCOUNT, auction: AUCTION },
   });
   const data = encodeAbiParameters(
     [
@@ -109,12 +105,6 @@ describe("slippage and deadline helpers", () => {
     expect(minOutAfterSlippage(10_000n)).toBe(9_900n);
     expect(minOutAfterSlippage(10_000n)).toBeGreaterThan(0n);
     expect(minOutAfterSlippage(1n)).toBe(1n);
-    expect(minTokensOutForBuy(0n)).toBe(0n);
-    const ethIn = parseEther("0.001");
-    const raw = quoteBuyWei(toCurveWei({ sold: 0, ethRaised: 0 }), ethIn).tokensOut;
-    expect(minTokensOutForBuy(ethIn)).toBe(minOutAfterSlippage(raw));
-    expect(minTokensOutForBuy(ethIn)).toBeGreaterThan(0n);
-    expect(minTokensOutForBuy(ethIn)).toBeLessThan(raw);
     const now = Date.parse("2026-09-26T00:00:00Z");
     expect(tradeDeadlineUnix(now)).toBe(BigInt(Math.floor(now / 1000) + TX_DEADLINE_SECONDS));
     expect(TX_DEADLINE_SECONDS).toBe(600);
@@ -163,14 +153,13 @@ describe("launch write", () => {
     expect(fns.simulateContract).toHaveBeenCalledTimes(1);
     expect(fns.writeContract).toHaveBeenCalledTimes(1);
     expect(fns.waitForTransactionReceipt).toHaveBeenCalledTimes(1);
-    const request = launchWrite(launchInput, MOCK_WORLD_LAUNCHPAD);
     expect(fns.simulateContract.mock.calls[0][0]).toBe(wagmiConfig);
     expect(fns.simulateContract.mock.calls[0][1]).toMatchObject({
       address: MOCK_WORLD_LAUNCHPAD,
       functionName: "launch",
-      args: [launchInput.slug, launchInput.prophecy, launchInput.deadline, request.args[3]],
-      value: launchInput.firstBuyWei,
+      args: [launchInput.slug, launchInput.prophecy, 0n],
     });
+    expect(fns.simulateContract.mock.calls[0][1]).not.toHaveProperty("value");
     expect(fns.writeContract.mock.calls[0][1]).toMatchObject({ functionName: "launch" });
     expect(tokenFromLaunchedReceipt(launchedReceipt())).toBe(TOKEN);
   });
@@ -209,33 +198,6 @@ describe("launch write", () => {
     expect(fns.writeContract).not.toHaveBeenCalled();
   });
 
-  it("refuses a first buy whose quote is 0 before simulate or write", async () => {
-    const fns = mocks();
-    const tiny = { ...launchInput, firstBuyWei: 1n };
-    expect(isFirstBuyTooSmall(tiny.firstBuyWei)).toBe(true);
-    expect(minTokensOutForBuy(tiny.firstBuyWei)).toBe(0n);
-    await expect(createLaunch(fns)(tiny)).rejects.toBeInstanceOf(ZeroQuoteError);
-    await expect(createLaunch(fns)(tiny)).rejects.toThrow(ZERO_QUOTE_COPY);
-    expect(fns.simulateContract).not.toHaveBeenCalled();
-    expect(fns.writeContract).not.toHaveBeenCalled();
-  });
-
-  it("still launches when first buy is 0 ETH (no first-buy minOut)", async () => {
-    const fns = mocks({
-      waitForTransactionReceipt: vi.fn(async () => launchedReceipt()),
-    });
-    const none = { ...launchInput, firstBuyWei: 0n };
-    expect(isFirstBuyTooSmall(none.firstBuyWei)).toBe(false);
-    expect(minTokensOutForBuy(none.firstBuyWei)).toBe(0n);
-    expect(await createLaunch(fns)(none)).toBe(TOKEN);
-    expect(fns.simulateContract).toHaveBeenCalledTimes(1);
-    expect(fns.writeContract).toHaveBeenCalledTimes(1);
-    expect(fns.simulateContract.mock.calls[0][1]).toMatchObject({
-      functionName: "launch",
-      args: [none.slug, none.prophecy, none.deadline, 0n],
-      value: 0n,
-    });
-  });
 });
 
 describe("buy write", () => {

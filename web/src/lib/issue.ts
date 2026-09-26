@@ -51,30 +51,15 @@ export function isValidProphecy(value: string): boolean {
   return isProphecyWithinLimit(value.trim(), MAX_PROPHECY_BYTES);
 }
 
-export function isValidDeadline(unixSeconds: number, nowSeconds: number): boolean {
-  return Number.isInteger(unixSeconds) && unixSeconds > nowSeconds;
-}
-
-export function isValidFirstBuy(value: string): boolean {
-  if (value.trim() === "") return true;
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0;
-}
-
 export function isIssueFormValid(input: {
   prophetLabel: string;
   prophecy: string;
   slug: string;
-  deadlineUnix: number;
-  firstBuy: string;
-  nowSeconds: number;
 }): boolean {
   return (
     isValidProphetLabel(input.prophetLabel) &&
     isValidProphecy(input.prophecy) &&
-    isValidSlug(input.slug) &&
-    isValidDeadline(input.deadlineUnix, input.nowSeconds) &&
-    isValidFirstBuy(input.firstBuy)
+    isValidSlug(input.slug)
   );
 }
 
@@ -155,17 +140,6 @@ export function worldErrorMessage(status: WorldStatus, returningProphet: boolean
 
 export function prophecyName(slug: string, prophetLabel: string, parentName: string): string {
   return `${slug}.${prophetLabel}.${parentName}`;
-}
-
-export function toDatetimeLocalValue(ms: number): string {
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-export function fromDatetimeLocalValue(value: string): number {
-  const ms = new Date(value).getTime();
-  return Number.isFinite(ms) ? Math.floor(ms / 1000) : 0;
 }
 
 const PROPHET_STORAGE_KEY = "prophecy:prophet-label";

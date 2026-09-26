@@ -1,17 +1,25 @@
 /**
- * Additive CCA auction library. Do not import this from existing pages
- * or components — PR 1 has no UI wiring.
+ * CCA auction library. Coin page imports this for the cca-branch flow.
  */
 export { ccaAbi } from "./abi/cca";
 export { ccaLensAbi } from "./abi/ccaLens";
 export { lbpStrategyAbi } from "./abi/lbpStrategy";
-export { launchpadCcaAbi, lockerCcaAbi } from "./abi/launchpadCca";
+export { launchpadCcaAbi, lockerCcaAbi, poolManagerAbi, positionManagerAbi } from "./abi/launchpadCca";
 export { universalRouterAbi } from "./abi/universalRouter";
-export { CCA_SEPOLIA, FUNDS_RECIPIENT } from "./addresses";
+export {
+  CCA_SEPOLIA,
+  FUNDS_RECIPIENT,
+  missingCcaProductKeys,
+  resolveCcaProductAddresses,
+  type CcaProductAddresses,
+} from "./addresses";
 export {
   AUCTION_BLOCKS,
   AUCTION_STEPS_MPS_TOTAL,
+  CCA_AUCTION_SUPPLY,
   CCA_CONFIG,
+  CCA_LP_SUPPLY,
+  CCA_TOTAL_SUPPLY,
   FIRST_BID_ID,
   FLOOR_PRICE_Q96,
   GRADUATION_ETH_WEI,
@@ -27,21 +35,38 @@ export {
   auctionClaimBlock,
   auctionEndBlock,
   auctionMigrationBlock,
+  ccaFeatureFlags,
+  envFlagOn,
   packUniformAuctionSteps,
   resolveCcaConfig,
   type CcaConfig,
+  type CcaFeatureFlags,
 } from "./config";
+export {
+  SEPOLIA_ADD_CHAIN_PARAMS,
+  SEPOLIA_HEX_CHAIN_ID,
+  ensureSepoliaChain,
+  injectedProvider,
+  isSepoliaChainId,
+  isUnrecognizedChainError,
+  parseProviderChainId,
+  readProviderChainId,
+  type Eip1193Provider,
+} from "./sepolia";
 export {
   CCA_BID_ERROR_COPY,
   CCA_CLAIM_ERROR_COPY,
   CCA_COPY,
   CCA_ERROR_COPY,
   CCA_EXIT_ERROR_COPY,
+  CCA_FEE_ERROR_COPY,
   CCA_LAUNCH_ERROR_COPY,
   CCA_LAUNCH_ERROR_MESSAGE,
   CCA_LAUNCH_ERROR_NAMES,
   CCA_MIGRATE_ERROR_COPY,
+  CCA_SWAP_ERROR_COPY,
   FEE_COLLECT_COPY,
+  MISSING_ADDRESS_COPY,
   SWAP_SECTION_COPY,
   auctionLiveCopy,
   auctionStatusCopy,
@@ -49,7 +74,6 @@ export {
   blocksToMmSs,
   ccaErrorCopy,
   claimBlockedCopy,
-  departedReplacesAuctionStatus,
   exitCtaCopy,
   exitDoneCopy,
   exitHelpCopy,
@@ -62,6 +86,8 @@ export {
   raisedProgressCopy,
   refundUnusedCopy,
   swapSectionCopy,
+  swapStepCopy,
+  swapTokenLine,
   yourBidCopy,
   type AuctionCopyStatus,
   type CcaErrorCopyVars,
@@ -75,8 +101,11 @@ export {
   blocksRemaining,
   canOpenMarket,
   ccaLensStateRequest,
+  deriveAuctionCopyStatus,
   deriveAuctionView,
   goalNotReachedEffects,
+  isAuctionFinalized,
+  isAuctionSoldOut,
   readAuctionLensState,
   readAuctionView,
   type AuctionActionVisibility,
@@ -97,12 +126,34 @@ export {
   exitPartiallyFilledBid,
   exitPartiallyFilledBidWrite,
 } from "./exit";
-export { openMarket, openMarketWrite } from "./migrate";
 export {
+  migrateOutcomeFromReceipt,
+  openMarket,
+  openMarketResult,
+  openMarketWrite,
+  type MigrateOutcome,
+} from "./migrate";
+export {
+  PERMIT2,
+  SETTLE_ALL,
+  SWAP_EXACT_IN_SINGLE,
+  TAKE_ALL,
+  UNIVERSAL_ROUTER,
+  V4_SWAP_COMMAND,
+  approvePermit2ForRouter,
+  approveTokenForPermit2,
+  decodeV4ExactInSingle,
+  encodeUniversalRouterExecute,
   encodeV4ExactInSingle,
   ethTokenPoolKey,
+  permit2Abi,
+  permit2ApproveRouterWrite,
   swapExactInSingle,
   swapExactInSingleWrite,
+  tokenApprovePermit2Write,
+  v4SwapActions,
+  v4SwapCommands,
+  type EncodedV4ExactInSingle,
   type ExactInSingleInput,
   type V4PoolKey,
 } from "./swap";
@@ -110,18 +161,41 @@ export {
   INTERFACE_CCA_PENDING,
   INTERFACE_CCA_TBD,
   InterfaceCcaPendingError,
+  auctionBlocksRead,
   auctionOfRead,
   backendLaunchErrorNames,
   collectCcaWrite,
   hookRead,
   initializeDistributionSalt,
   initializerFromAuction,
+  isGraduatedRead,
   launchCcaWrite,
+  lbpStrategyRead,
   lockerCollectActionBytes,
   lockerRead,
   lockerTokenIdBinding,
+  positionManagerRead,
   withdrawAccruedWrite,
 } from "./launchpadCca";
+export {
+  fetchLockerRegisteredTokenIds,
+  fetchPositionManagerMintLogs,
+  findLockerTokenId,
+  findLockerTokenIdReads,
+  isRegisteredRead,
+  lockerProphetOfRead,
+  lockerRegisteredLogsQuery,
+  matchLockerTokenId,
+  matchMintedTokenId,
+  positionManagerMintLogsQuery,
+  positionManagerTransferAbi,
+  registerLocker,
+  registerLockerWrite,
+  registeredTokenIdFromLog,
+  tokenIdFromMigrateReceipt,
+  tokenIdFromRegisteredLogs,
+  tokenIdsMintedToLocker,
+} from "./register";
 export {
   MaxPriceBelowFloorError,
   alignPriceToTick,
@@ -137,8 +211,11 @@ export {
 export {
   assertSuccessfulReceipt,
   sendCcaWrite,
+  sendCcaWriteResult,
+  type CcaReceipt,
   type CcaWriteOptions,
   type CcaWriteRequest,
+  type CcaWriteResult,
 } from "./writes";
 export {
   bidExitedLogsQuery,

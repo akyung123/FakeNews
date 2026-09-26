@@ -183,6 +183,24 @@ async function errorFromResponse(response: Response): Promise<WorldClientError> 
   }
 }
 
+/**
+ * Live World ID stays on the signature server. If that server is down,
+ * only this client falls back to the existing mock World step. Auction
+ * writes stay on the real chain.
+ */
+export async function worldClientWithServerFallback(
+  client: WorldClient = createWorldClient(),
+  createMock: () => WorldClient = () => createWorldClient({ mock: true }),
+): Promise<WorldClient> {
+  if (client.isMock) return client;
+  try {
+    await client.checkHealth();
+    return client;
+  } catch {
+    return createMock();
+  }
+}
+
 export function createWorldClient(options: WorldClientOptions = {}): WorldClient {
   const mock = options.mock ?? isWorldMockEnabled();
   const appId = mock

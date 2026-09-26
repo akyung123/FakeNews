@@ -81,8 +81,8 @@ Who is **not** a target right now:
 
 These are settled. Changing one means a new row in [`DECISIONS.md`](DECISIONS.md), agreed by a person.
 
-1. **No judging.** No oracle, no True / False, no payout. The only status the product shows is **Departed**. The UI computes that as `now >= deadline`; there is no on-chain status. (#1, #9)
-2. **Written once, never edited.** The sentence and deadline live only in that prophecy's own ENS record, and nobody holds the permission to change them. `Launchpad.launch` takes a `deadline` argument and the ENS adapter writes it as the `deadline` text record (unix seconds). It is not stored in Launchpad storage or in the `Launched` event. (#5)
+1. **No judging.** No oracle, no True / False, no payout. There is no status about the sentence. The only stage the product shows is the market stage (auction, graduated or ended), read from the chain. (#1, #18)
+2. **Written once, never edited.** The sentence lives only in that prophecy's own ENS record, and nobody holds the permission to change it. It is not stored in Launchpad storage or in the `Launched` event. The product has no deadline; the legacy on-chain `deadline` argument is always 0 and never shown. (#5, #18)
 3. **The name is the product.** `ringo.prophecy.eth` → the prophet's wallet. `badges-2028.ringo.prophecy.eth` → the prophecy's token. (#8)
 4. **One prophet name per person.** A human check (World ID) happens once, when you create your prophet name. Browsing and buying need no check. (#10)
 5. **Liquidity cannot be pulled.** When a prophecy sells out on the curve, its money moves into a Uniswap pool and is locked. Nobody can withdraw it; only trading fees come out. (#11)
@@ -96,7 +96,7 @@ Life of one prophecy, in five steps.
 1. Verify      A person proves they are human with World ID.       (once per person)
                  └─ they receive a prophet name:  ringo.prophecy.eth → their wallet
 
-2. Issue       The prophet writes one sentence and a deadline.
+2. Issue       The prophet writes one sentence.
                  └─ a prophecy name is created:   badges-2028.ringo.prophecy.eth → token
                  └─ the sentence is locked forever
 
@@ -104,17 +104,12 @@ Life of one prophecy, in five steps.
                  └─ buying raises the price, selling lowers it
                  └─ each trade can carry a one-line memo
 
-4a. Deadline   now >= deadline → the UI shows "Departed".
-                 └─ nothing is deleted; buy and sell do not read the deadline
-
-4b. Sold out   All tokens for sale on the curve are bought → "graduation".
+4. Sold out     All tokens for sale on the curve are bought → "graduation".
                  └─ the money and the rest of the tokens move into a Uniswap pool
                  └─ that pool is locked; trading continues there
 ```
 
-4a and 4b are independent. A prophecy can depart without graduating, graduate before it departs, or both. Buy and sell keep working after the deadline; graduation is what blocks the curve.
-
-**On main today.** `launch(slug, prophecy, deadline, minTokensOut)` writes the deadline to ENS. The prophet page shows Departed from prototype data (`now >= deadline`). The list and detail screens do not show Departed or the deadline. The issue form collects a deadline but does not send `launch`; it still writes a prototype coin in `localStorage`.
+Nothing is ever deleted. The name keeps pointing at the token at every step.
 
 ### The numbers a teammate should know
 
@@ -134,9 +129,9 @@ All of these are demo-sized so people can see things happen during a live event.
 
 ### A visitor (no wallet needed to look)
 
-- See the list of prophecies: newest first, and top by market cap. **Not built on main:** the list does not show a Departed count.
-- Open a prophecy by its name and read the sentence, price and recent trades with their memos. **Not built on main:** the detail screen does not show the deadline or a Departed badge.
-- Open a prophet's page and see everything they have issued, including departed prophecies (prototype data; Departed is `now >= deadline`).
+- See the list of prophecies: newest first, and top by market cap.
+- Open a prophecy by its name and read the sentence, price and recent trades with their memos.
+- Open a prophet's page and see everything they have issued (prototype data).
 
 ### A buyer (wallet, no World ID)
 
@@ -147,11 +142,11 @@ All of these are demo-sized so people can see things happen during a live event.
 ### A prophet (wallet and World ID)
 
 - Verify with World ID once and pick a prophet name (3–16 letters or digits). If verification is cancelled or fails, issuing stays off. Buying and browsing still work.
-- Issue a prophecy: a short name (slug), one sentence (up to 140 characters) and a deadline. Optionally buy first in the same step. **Not built on main:** the issue form collects a deadline and the issue button can turn on, but the app does not send `launch`.
+- Issue a prophecy: a short name (slug), and one sentence (up to 140 characters).
 - Collect their fees at any time from the prophet page.
-- Edit display details such as the avatar. The sentence and deadline cannot be edited.
+- Edit display details such as the avatar. The sentence cannot be edited.
 
-What nobody can do, including the team: edit a sentence, move a name to another wallet, delete a departed prophecy, or withdraw the locked pool money.
+What nobody can do, including the team: edit a sentence, move a name to another wallet, delete a prophecy, or withdraw the locked pool money.
 
 ## 9. Screens
 
@@ -159,12 +154,12 @@ Four screens. Look: black, navy, gold and paper, Fraunces serif (v2 design, supe
 
 | # | Screen | Must show | Must never show |
 |---|---|---|---|
-| 1 | **Prophecy list** | Name, sentence, price, number of Departed | Any "right / wrong" label |
+| 1 | **Prophecy list** | Name, sentence, price | Any "right / wrong" label |
 | 2 | **Issue** | World ID step; the issue button only turns on after verification | An issue button that works without verification |
 | 3 | **Prophecy detail** | Found by name; buy and sell; recent trades with memos | True / False, odds, "probability" |
-| 4 | **Prophet page** | Wallet, prophecies held, departed prophecies next to the next one to buy, claimable fees, sell button | A plain balance screen with nothing to act on |
+| 4 | **Prophet page** | Wallet, every prophecy under the name, claimable fees | A plain balance screen with nothing to act on |
 
-**On main today.** Screen 4 shows Departed from prototype data. Screens 1 and 3 do not show Departed or the deadline. Helpers in `web/src/lib/ens.ts` can read `prophecy` and `deadline` text records; list, detail and prophet pages still use prototype data, not live ENS. Nothing in the app's code is the live sentence: sample copy lives in `web/src/lib/mock.ts` for the prototype only.
+**On main today.** Helpers in `web/src/lib/ens.ts` can read the `prophecy` text record; list, detail and prophet pages still use prototype data, not live ENS. Nothing in the app's code is the live sentence: sample copy lives in `web/src/lib/mock.ts` for the prototype only.
 
 ## 10. Example prophecies
 
@@ -173,7 +168,7 @@ Illustrations for talks, mockups and test data. The live sentences exist only on
 | Prophet | Prophecy name | Sentence | Kind |
 |---|---|---|---|
 | `ringo` | `badges-2028` | Every hackathon badge is an ENS name by 2028 | Tech |
-| `ringo` | `two-min` | A two-minute demo has already left the stage | Demo (already Departed) |
+| `ringo` | `two-min` | A two-minute demo has already left the stage | Demo |
 | `mina` | `agents-pay-2027` | By 2027 most onchain payments are sent by AI agents | Tech |
 | `mina` | `ai-hot100-2027` | A fully AI-generated song tops the Billboard Hot 100 by 2027 | Culture |
 | `jun` | `asia-final-2030` | An Asian team plays in the 2030 World Cup final | Sports |
@@ -187,7 +182,7 @@ Rules these follow (INTERFACE section 1): prophet names are 3–16 characters of
 ### In scope for the hackathon
 
 - Prophet names with World ID, one per person.
-- Issuing prophecies with a locked sentence and deadline (`Launchpad.launch` writes both to ENS). **Not built on main:** the web app does not send that `launch` yet.
+- Issuing prophecies with a locked sentence (`Launchpad.launch` writes it to ENS). **Not built on main:** the web app does not send that `launch` yet.
 - Buy and sell on the bonding curve, with memos. **Not built on main:** the web app does not send real buy or sell transactions.
 - Graduation into a locked Uniswap V4 pool, with fees split to the prophet and the protocol.
 - The four screens. **On main:** issue can send `registerProphet`; list, detail and prophet pages still use prototype data. Reading live names and sentences from ENS on those screens is not built.
@@ -195,7 +190,7 @@ Rules these follow (INTERFACE section 1): prophet names are 3–16 characters of
   1. Verification succeeds and a prophet name is created.
   2. A sentence is issued and its name points to the token. **Not built on main:** no `launch` transaction from the app.
   3. Another wallet buys by name, and selling lowers the price. **Not built on main:** no on-chain buy or sell from the app.
-  4. A departed prophecy sits under the name. **On main:** the prophet page can show this from prototype data (`now >= deadline`). The list's "Departed 1" count is not built.
+  4. The prophet page lists every prophecy under the name.
   5. Failure paths: a second wallet cannot issue, editing the sentence fails, cancelling verification blocks issuing.
 
 ### Later, if there is time
@@ -266,7 +261,6 @@ Please answer these in the PR or bring them to the team. Once one is answered, t
 | The World ID server is asleep when the demo starts (free hosting sleeps) | Wake it with a health check right before recording ([`infra/README.md`](../infra/README.md)) |
 | Scene 1 can only be recorded once per person (one World ID, one name) | Rehearse on a local or forked chain first ([`PLAN.md`](PLAN.md) section 5) |
 | An outside ENS app cannot read Sepolia ENSv2 names yet | Use the lookup script in `infra/` as evidence |
-| Nobody waits for a deadline in a 3-minute demo | Issue a 2-minute prophecy before recording so it is already Departed |
 
 ## 15. Where to go next
 

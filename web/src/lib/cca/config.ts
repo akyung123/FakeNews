@@ -10,6 +10,11 @@ import { encodePacked, parseEther, zeroAddress, type Address, type Hex } from "v
 export const Q96 = 0x1000000000000000000000000n;
 export const WAD = 10n ** 18n;
 
+/** CcaLib 50/50 split. Live auction length is `launchpad.auctionBlocks()`, not a constant. */
+export const CCA_TOTAL_SUPPLY = 1_000_000_000n * WAD;
+export const CCA_AUCTION_SUPPLY = 500_000_000n * WAD;
+export const CCA_LP_SUPPLY = 500_000_000n * WAD;
+
 export type CcaConfig = {
   currency: Address;
   floorPriceQ96: bigint;
@@ -30,8 +35,8 @@ export type CcaConfig = {
 /** Default config. INTERFACE_CCA may replace fields via `resolveCcaConfig`. */
 export const CCA_CONFIG: CcaConfig = {
   currency: zeroAddress,
-  floorPriceQ96: 1000n << 96n,
-  tickSpacingQ96: 100n << 96n,
+  floorPriceQ96: 3_169_126_500_570_573_600n,
+  tickSpacingQ96: 31_691_265_005_705_736n,
   graduationWei: parseEther("0.02"),
   poolFee: 10_000,
   poolTickSpacing: 200,
@@ -64,6 +69,7 @@ export function auctionMigrationBlock(startBlock: bigint, n = CCA_CONFIG.auction
 }
 
 export const NATIVE_ETH = CCA_CONFIG.currency;
+/** CcaLib default only. Live UI reads `launchpad.auctionBlocks()`. */
 export const AUCTION_BLOCKS = CCA_CONFIG.auctionBlocks;
 export const GRADUATION_ETH_WEI = CCA_CONFIG.graduationWei;
 export const POOL_FEE = CCA_CONFIG.poolFee;
@@ -75,6 +81,32 @@ export const FIRST_BID_ID = CCA_CONFIG.firstBidId;
 export const FLOOR_PRICE_Q96 = CCA_CONFIG.floorPriceQ96;
 export const TICK_SPACING_Q96 = CCA_CONFIG.tickSpacingQ96;
 export const AUCTION_STEPS_MPS_TOTAL = CCA_CONFIG.auctionStepsMpsTotal;
+
+/** One flag per later feature. Default on. `0` / `false` hides the section. */
+export type CcaFeatureFlags = {
+  migrate: boolean;
+  swap: boolean;
+  collect: boolean;
+};
+
+export function envFlagOn(value: string | undefined, fallback = true): boolean {
+  if (value === undefined || value.trim() === "") return fallback;
+  return value !== "0" && value !== "false";
+}
+
+export function ccaFeatureFlags(
+  env: {
+    VITE_CCA_MIGRATE?: string;
+    VITE_CCA_SWAP?: string;
+    VITE_CCA_COLLECT?: string;
+  } = import.meta.env,
+): CcaFeatureFlags {
+  return {
+    migrate: envFlagOn(env.VITE_CCA_MIGRATE),
+    swap: envFlagOn(env.VITE_CCA_SWAP),
+    collect: envFlagOn(env.VITE_CCA_COLLECT),
+  };
+}
 
 /**
  * `AuctionParameters.auctionStepsData` = `abi.encodePacked(uint24(1e7/N), uint40(N))`.

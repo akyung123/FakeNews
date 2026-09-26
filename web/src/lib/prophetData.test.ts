@@ -5,18 +5,15 @@ import {
   curveProgress,
   getProphecyByName,
   getProphetPage,
-  isDeparted,
   isMockProphetRecord,
   normalizeProphetLabel,
   prophecyDetailPath,
   prophecyEnsName,
-  prophecyTradeLabel,
   prophetEnsName,
   prophetPageFromChain,
   prototypeCoinFromName,
 } from "./prophetData";
 
-/** After the two departed mock deadlines, before the 2028 open one. */
 const NOW = 1_750_000_000;
 
 describe("normalizeProphetLabel", () => {
@@ -35,8 +32,8 @@ describe("normalizeProphetLabel", () => {
 
 describe("getProphetPage", () => {
   test("loads ringo from a label or ENS name", () => {
-    const byLabel = getProphetPage("ringo", NOW);
-    const byName = getProphetPage("ringo.prophecy.eth", NOW);
+    const byLabel = getProphetPage("ringo");
+    const byName = getProphetPage("ringo.prophecy.eth");
     expect(byLabel).not.toBeNull();
     expect(byName).not.toBeNull();
     expect(byLabel?.prophet.ensName).toBe(prophetEnsName("ringo"));
@@ -45,7 +42,7 @@ describe("getProphetPage", () => {
   });
 
   test("lists slug.name.prophecy.eth children with sentences from the mock", () => {
-    const page = getProphetPage("ringo", NOW);
+    const page = getProphetPage("ringo");
     expect(page).not.toBeNull();
     const ringoRows = MOCK_PROPHECIES.filter((row) => row.prophetLabel === "ringo");
     expect(page!.prophecies).toHaveLength(ringoRows.length);
@@ -59,28 +56,26 @@ describe("getProphetPage", () => {
     }
   });
 
-  test("marks Departed from the deadline, not from graduation", () => {
-    expect(isDeparted(1_700_000_000, NOW)).toBe(true);
-    expect(isDeparted(1_830_297_600, NOW)).toBe(false);
-    const page = getProphetPage("ringo", NOW)!;
-    const departed = page.prophecies.filter((p) => p.departed);
-    const open = page.prophecies.filter((p) => !p.departed);
-    expect(page.departedCount).toBe(2);
-    expect(departed.map((p) => p.slug).sort()).toEqual(["last-talk", "two-min"]);
-    expect(open.map((p) => p.slug).sort()).toEqual(["badges-2028", "curve-out", "sold-out"]);
+  test("lists prophecies by slug and marks graduation from the market only", () => {
+    const page = getProphetPage("ringo")!;
+    expect(page.prophecies.map((p) => p.slug)).toEqual([
+      "badges-2028",
+      "curve-out",
+      "last-talk",
+      "sold-out",
+      "two-min",
+    ]);
     const graduated = page.prophecies.filter((p) => p.complete).map((p) => p.slug).sort();
     expect(graduated).toEqual(["sold-out", "two-min"]);
-    expect(page.prophecies.find((p) => p.slug === "two-min")!.departed).toBe(true);
-    expect(page.prophecies.find((p) => p.slug === "sold-out")!.departed).toBe(false);
     expect(page.prophecies.find((p) => p.slug === "sold-out")!.curveProgress).toBe(1);
   });
 
   test("returns null for an unknown prophet", () => {
-    expect(getProphetPage("nobody", NOW)).toBeNull();
+    expect(getProphetPage("nobody")).toBeNull();
   });
 
   test("keeps mina separate from ringo", () => {
-    const mina = getProphetPage("mina", NOW)!;
+    const mina = getProphetPage("mina")!;
     expect(mina.prophecies).toHaveLength(1);
     expect(mina.prophecies[0].ensName).toBe("name-points.mina.prophecy.eth");
     expect(mina.claimableFeeWei).toBe(0n);
@@ -89,7 +84,7 @@ describe("getProphetPage", () => {
 
 describe("chain vs mock prophet claim", () => {
   test("mock rows hide claim in chain mode; a live own page still claims", () => {
-    const mock = getProphetPage("ringo", NOW)!;
+    const mock = getProphetPage("ringo")!;
     expect(isMockProphetRecord(mock)).toBe(true);
     expect(canClaimCreatorFee(mock, { chain: true })).toBe(false);
     expect(canClaimCreatorFee(mock, { chain: false })).toBe(true);
@@ -115,15 +110,6 @@ describe("curveProgress", () => {
   });
 });
 
-describe("prophecyTradeLabel", () => {
-  test("open rows buy; departed rows sell", () => {
-    const page = getProphetPage("ringo", NOW)!;
-    for (const row of page.prophecies) {
-      expect(prophecyTradeLabel(row)).toBe(row.departed ? "Sell" : "Buy");
-    }
-  });
-});
-
 describe("prophecyDetailPath", () => {
   test("points at the Screen 3 name route", () => {
     expect(prophecyDetailPath("badges-2028.ringo.prophecy.eth")).toBe(
@@ -134,12 +120,12 @@ describe("prophecyDetailPath", () => {
 
 describe("getProphecyByName", () => {
   test("resolves a full ENS name or a slug", () => {
-    const byEns = getProphecyByName("badges-2028.ringo.prophecy.eth", NOW);
-    const bySlug = getProphecyByName("badges-2028", NOW);
+    const byEns = getProphecyByName("badges-2028.ringo.prophecy.eth");
+    const bySlug = getProphecyByName("badges-2028");
     expect(byEns?.sentence).toBe("Every hackathon badge is an ENS name by 2028");
     expect(byEns?.ensName).toBe("badges-2028.ringo.prophecy.eth");
     expect(bySlug?.ensName).toBe(byEns?.ensName);
-    expect(getProphecyByName("missing.ringo.prophecy.eth", NOW)).toBeNull();
+    expect(getProphecyByName("missing.ringo.prophecy.eth")).toBeNull();
   });
 
   test("maps that name onto the prototype Screen 3 coin shape", () => {
@@ -156,14 +142,12 @@ describe("getProphecyByName", () => {
 });
 
 describe("ENS text records", () => {
-  test("sentence and deadline come from getEnsText keys, not from Launched", async () => {
-    const { mockEnsText, parseDeadlineText, ENS_TEXT_DEADLINE, ENS_TEXT_PROPHECY } = await import("./ens");
+  test("the sentence comes from the getEnsText key, not from Launched", async () => {
+    const { mockEnsText, ENS_TEXT_PROPHECY } = await import("./ens");
     const name = "last-talk.ringo.prophecy.eth";
     expect(mockEnsText(name, ENS_TEXT_PROPHECY)).toBe("The last hallway talk is standing room only");
-    expect(parseDeadlineText(mockEnsText(name, ENS_TEXT_DEADLINE))).toBe(1_700_000_000);
-    const row = getProphecyByName(name, NOW)!;
+    expect(mockEnsText(name, "deadline")).toBeNull();
+    const row = getProphecyByName(name)!;
     expect(row.sentence).toBe(mockEnsText(name, ENS_TEXT_PROPHECY));
-    expect(row.deadline).toBe(parseDeadlineText(mockEnsText(name, ENS_TEXT_DEADLINE)));
-    expect(row.departed).toBe(true);
   });
 });

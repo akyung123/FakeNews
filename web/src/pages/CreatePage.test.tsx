@@ -5,12 +5,10 @@ import { UserRejectedRequestError } from "viem";
 import { describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "../lib/issue";
 import type { RegisterProphetInput } from "../lib/launchpad";
-import { LaunchedParseError, WRITE_COPY, ZERO_QUOTE_COPY, type LaunchInput } from "../lib/writes";
+import { LaunchedParseError, WRITE_COPY, launchWrite, type LaunchInput } from "../lib/writes";
 import { MOCK_ISSUE_SESSION, MOCK_RETURNING_SESSION, MOCK_WORLD_HEALTH, MOCK_RP_CONTEXT_RESPONSE, MOCK_WORLD_VERIFY } from "../lib/mock";
 import { WorldClientError, createWorldClient, type WorldClient } from "../lib/world";
 import { IssueScreen } from "./CreatePage";
-
-const NOW = Date.parse("2026-09-26T00:00:00Z");
 
 function renderIssue(
   session = MOCK_ISSUE_SESSION,
@@ -27,7 +25,6 @@ function renderIssue(
       <IssueScreen
         session={session}
         world={extras.world ?? createWorldClient({ mock: true })}
-        now={NOW}
         registerProphet={extras.registerProphet}
         launchProphecy={extras.launchProphecy}
         lookupProphet={extras.lookupProphet}
@@ -404,7 +401,9 @@ describe("Screen 2 button gating", () => {
     await waitFor(() => expect(issued).toEqual([token]));
     expect(seen?.slug).toBe("coffee-last");
     expect(seen?.prophecy).toBe("Coffee lasts until the last pitch");
-    expect(seen?.deadline).toBeGreaterThan(0n);
+    expect(seen).toEqual({ slug: "coffee-last", prophecy: "Coffee lasts until the last pitch" });
+    // The deployed launch still takes a legacy deadline; the Issue screen always sends 0.
+    expect(launchWrite(seen!, token).args[2]).toBe(0n);
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByTestId("write-success")).toHaveTextContent(WRITE_COPY.launchSuccess);
   });
@@ -423,45 +422,9 @@ describe("Screen 2 button gating", () => {
     expect(document.body.textContent).not.toContain("140 left");
   });
 
-  it("keeps Issue enabled with no too-small banner when first buy is empty or 0", async () => {
-    const user = userEvent.setup();
+  it("does not show a first-buy field on the launch form", async () => {
     renderIssue(MOCK_RETURNING_SESSION);
-    await fillReturningForm(user);
-    expect(launchButton()).toBeEnabled();
-    expect(screen.queryByText(ZERO_QUOTE_COPY)).toBeNull();
-
-    const firstBuy = screen.getByLabelText(/First buy/i);
-    await user.clear(firstBuy);
-    expect(screen.queryByText(ZERO_QUOTE_COPY)).toBeNull();
-    expect(screen.queryByText("Amount too small to trade. Try a larger amount.")).toBeNull();
-    expect(launchButton()).toBeEnabled();
-
-    await user.click(firstBuy);
-    await user.paste("0");
-    expect(screen.queryByText(ZERO_QUOTE_COPY)).toBeNull();
-    expect(launchButton()).toBeEnabled();
-  });
-
-  it("disables Issue and shows the exact too-small line when the first-buy quote is 0", async () => {
-    const user = userEvent.setup();
-    const launched: LaunchInput[] = [];
-    renderIssue(MOCK_RETURNING_SESSION, {
-      launchProphecy: async (input) => {
-        launched.push(input);
-        return null;
-      },
-    });
-    await fillReturningForm(user);
-    expect(launchButton()).toBeEnabled();
-    const firstBuy = screen.getByLabelText(/First buy/i);
-    await user.clear(firstBuy);
-    await user.click(firstBuy);
-    await user.paste("0.000000000000000001");
-    expect(screen.getByRole("alert")).toHaveTextContent("Amount too small to trade. Try a larger amount.");
-    expect(screen.getByRole("alert")).toHaveTextContent(ZERO_QUOTE_COPY);
-    expect(launchButton()).toBeDisabled();
-    await user.click(launchButton());
-    expect(launched).toEqual([]);
+    expect(screen.queryByLabelText(/First buy/i)).toBeNull();
   });
 
   it("skips World ID for a returning prophet and enables Issue once the form is valid", async () => {

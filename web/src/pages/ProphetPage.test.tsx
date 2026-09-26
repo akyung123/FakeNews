@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { MOCK_PROPHECIES } from "../lib/mock";
-import { getProphetPage, prophecyDetailPath, prophecyTradeLabel } from "../lib/prophetData";
+import { getProphetPage, prophecyDetailPath } from "../lib/prophetData";
 import { ProphetPage } from "./ProphetPage";
 
 const NOW = 1_750_000_000;
@@ -23,21 +23,19 @@ function renderProphet(name: string): string {
 }
 
 describe("ProphetPage", () => {
-  test("renders the mock prophet with sentences, Departed, fees, and Screen 3 links", () => {
+  test("renders the mock prophet with sentences, fees, and Screen 3 links", () => {
     Date.now = () => NOW * 1000;
     try {
       const html = renderProphet("ringo");
-      const data = getProphetPage("ringo", NOW)!;
+      const data = getProphetPage("ringo")!;
 
       expect(html).toContain(data.prophet.ensName);
       expect(html).toContain(data.prophet.wallet);
       expect(html).toContain("Claimable fees");
       expect(html).toContain("0.0012 ETH");
-      expect(html).toContain("Departed");
       expect(html).toContain("Graduated");
-      expect(html).toContain("Next buy");
-      expect(html).toContain("Sell");
-      expect(html).toContain("Buy");
+      expect(html).not.toContain("Departed");
+      expect(html).not.toContain("Deadline");
 
       for (const row of data.prophecies) {
         expect(html).toContain(row.sentence);
@@ -45,12 +43,8 @@ describe("ProphetPage", () => {
         expect(html).toContain(row.slug);
         expect(html).toContain(prophecyDetailPath(row.ensName));
         expect(html).toContain(row.token.slice(0, 6));
-        expect(prophecyTradeLabel(row)).toBe(row.departed ? "Sell" : "Buy");
       }
-      expect((html.match(/class="btn sell"/g) ?? []).length).toBe(data.departedCount);
-      expect(html).toContain("prophet-row-sell");
-      expect(html).toContain(">Buy</span>");
-      expect(html).toContain(">Sell</span>");
+      expect((html.match(/>Buy<\/span>/g) ?? []).length).toBe(data.prophecies.length);
 
       expect(html).not.toContain(">Copy<");
       expect(html).not.toContain("True");
