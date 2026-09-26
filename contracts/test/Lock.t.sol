@@ -28,8 +28,8 @@ contract LockTest {
     bytes internal parentDns;
 
     string internal constant PROPHET = "ringo";
-    string internal constant SLUG = "lingo-2028";
-    string internal constant SENTENCE = "ETH is 10k before 2028";
+    string internal constant SLUG = "badges-2028";
+    string internal constant SENTENCE = "Every hackathon badge is an ENS name by 2028";
 
     function setUp() public {
         parentDns = abi.encodePacked(uint8(8), bytes("prophecy"), uint8(3), bytes("eth"), bytes1(0));
