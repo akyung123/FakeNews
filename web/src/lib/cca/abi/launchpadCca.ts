@@ -1,6 +1,6 @@
 /**
  * Launchpad / LiquidityLocker names copied from INTERFACE_CCA.md
- * (PR #40 head 3e128b5), section 2. Only names already specified there.
+ * (PR #40 head b02a445), section 2. Only names already specified there.
  *
  * Do not add guessed custom-error names (`LbpNotSet` and the like) —
  * those stay TBD(INTERFACE_CCA).

@@ -1,6 +1,6 @@
 /**
  * Fixed Sepolia addresses — INTERFACE_CCA.md §0.1
- * (PR #40 head 3e128b5, verified on PR #41 fork block 11_784_960).
+ * (PR #40 head b02a445, verified on PR #41 fork block 11_784_960).
  *
  * LBPStrategy v3.3.0, CCA factory v2.1.0, InitializerHook v3.3.0:
  *   https://developers.uniswap.org/docs/liquidity/liquidity-launchpad/deployments

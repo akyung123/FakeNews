@@ -1,6 +1,6 @@
 /**
  * Canonical four-step fork sequence — INTERFACE_CCA.md §8
- * (PR #40 head 3e128b5, source PR #41 `_runHappyPath` at d84aed4).
+ * (PR #40 head b02a445, source PR #41 `_runHappyPath` at d84aed4).
  *
  * Create → 5-arg bid → settle/claim → migrate at end+1 → swap.
  * Swap command bytes stay TBD(INTERFACE_CCA).

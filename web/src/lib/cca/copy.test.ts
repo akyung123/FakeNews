@@ -38,7 +38,7 @@ const BANNED = ["predict", "prediction", "profit", "yield", "moon", "guaranteed"
 describe("designer FINAL CCA copy", () => {
   test("keeps status strings exactly", () => {
     expect(CCA_COPY.notFunded).toBe("Auction is getting ready");
-    expect(CCA_COPY.notStarted).toBe("Auction starts in {n} blocks");
+    expect(CCA_COPY.notStarted).toBe("Auction starts in {startBlock - block} blocks");
     expect(CCA_COPY.auctionLive).toBe("Auction live · ends in {blocks} blocks");
     expect(CCA_COPY.soldOut).toBe("Auction live · all tokens are bid for");
     expect(CCA_COPY.soldOutSub).toBe("New bids are closed. Come back when the auction ends.");
@@ -110,7 +110,7 @@ describe("designer FINAL CCA copy", () => {
     expect(exitCtaCopy(true, parseEther("0.003"))).toBe("Get back unused ETH (0.003 ETH)");
     expect(exitCtaCopy(false, parseEther("0.01"))).toBe("Get your ETH back (0.01 ETH)");
     expect(exitDoneCopy(false)).toBe("ETH returned");
-    expect(exitDoneCopy(true)).toBeUndefined();
+    expect(exitDoneCopy(true)).toBe("ETH returned");
     expect(exitHelpCopy(false, parseEther("0.01"))).toBe(CCA_COPY.goalNotReachedSub);
     expect(exitHelpCopy(true, 0n)).toBe("All of your budget was used.");
     expect(exitHelpCopy(true, parseEther("0.001"))).toBe(CCA_COPY.exitHelp);

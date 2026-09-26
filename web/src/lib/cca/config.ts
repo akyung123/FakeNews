@@ -1,6 +1,6 @@
 /**
  * Confirmed CCA / LBP values — INTERFACE_CCA.md §0.1
- * (PR #40 head 3e128b5, source PR #41 head d84aed4, Sepolia pin 11_784_960).
+ * (PR #40 head b02a445, source PR #41 head d84aed4, Sepolia pin 11_784_960).
  *
  * Keep every product number here so INTERFACE_CCA can override via
  * `resolveCcaConfig`. Do not scatter these values across the CCA lib.

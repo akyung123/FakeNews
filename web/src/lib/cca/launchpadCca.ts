@@ -1,7 +1,7 @@
 /**
  * Our Launchpad / LiquidityLocker surface on the CCA line.
  *
- * Names and arg order come from INTERFACE_CCA.md (PR #40 head 3e128b5)
+ * Names and arg order come from INTERFACE_CCA.md (PR #40 head b02a445)
  * where they are already specified. Items still marked TBD there stay
  * as `TBD(INTERFACE_CCA)` stubs — do not guess them.
  */

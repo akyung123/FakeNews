@@ -1,5 +1,5 @@
 /**
- * Designer FINAL auction copy (aligned to INTERFACE_CCA.md PR #40 @ 3e128b5).
+ * Designer FINAL auction copy (aligned to INTERFACE_CCA.md PR #40 @ b02a445 §7).
  * English only. No wording about profit, yield, or price outlooks.
  * `{n}`, `{blocks}`, `{raised}`, `{amount}`, `{budget}`, `{max}`,
  * `{claimBlock}`, `{migrationBlock}` are interpolated by the helpers below.
@@ -25,7 +25,7 @@ export type CcaErrorCopyVars = {
 
 export const CCA_COPY = {
   notFunded: "Auction is getting ready",
-  notStarted: "Auction starts in {n} blocks",
+  notStarted: "Auction starts in {startBlock - block} blocks",
   auctionLive: "Auction live · ends in {blocks} blocks",
   soldOut: "Auction live · all tokens are bid for",
   soldOutSub: "New bids are closed. Come back when the auction ends.",
@@ -223,7 +223,7 @@ export function auctionStatusCopy(
     case "not_funded":
       return CCA_COPY.notFunded;
     case "not_started":
-      return fill(CCA_COPY.notStarted, { n: Math.max(0, vars.n ?? 0) });
+      return fill(CCA_COPY.notStarted, { "startBlock - block": Math.max(0, vars.n ?? 0) });
     case "live":
       return fill(CCA_COPY.auctionLive, { blocks: Math.max(0, vars.blocks ?? 0) });
     case "sold_out":
@@ -266,8 +266,9 @@ export function exitCtaCopy(goalReached: boolean, amountWei: bigint): string {
   return goalReached ? refundUnusedCopy(amountWei) : getEthBackCopy(amountWei);
 }
 
-export function exitDoneCopy(goalReached: boolean): string | undefined {
-  return goalReached ? undefined : CCA_COPY.ethReturned;
+/** §7.4 and §7.5 both use this done line after exitBid. */
+export function exitDoneCopy(_goalReached?: boolean): string {
+  return CCA_COPY.ethReturned;
 }
 
 export function exitHelpCopy(goalReached: boolean, amountWei: bigint): string {
