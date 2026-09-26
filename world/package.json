@@ -1,0 +1,20 @@
+{
+  "name": "prophecy-world",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "fixture": "bun scripts/write-fixture.ts"
+  },
+  "dependencies": {
+    "@worldcoin/idkit-core": "^4.3.0",
+    "viem": "^2.56.9"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "typescript": "^5.6.0"
+  }
+}

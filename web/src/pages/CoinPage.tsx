@@ -4,6 +4,7 @@ import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
 import { graduated, progress, quoteBuy, quoteSell } from "../lib/curve";
 import { ago, eth, mcap, pct, tokens, trend } from "../lib/format";
+import { prototypeCoinFromName } from "../lib/prophetData";
 import {
   actions,
   changeSinceLaunch,
@@ -16,9 +17,10 @@ import {
 } from "../lib/store";
 
 export function CoinPage() {
-  const { id = "" } = useParams();
+  const { id = "", name = "" } = useParams();
   const s = useStore();
-  const coin = s.coins.find((c) => c.id === id);
+  const lookup = id || name;
+  const coin = s.coins.find((c) => c.id === lookup) ?? prototypeCoinFromName(lookup);
   if (!coin) {
     return (
       <main className="narrow">

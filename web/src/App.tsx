@@ -6,6 +6,7 @@ import { CoinPage } from "./pages/CoinPage";
 import { CreatePage } from "./pages/CreatePage";
 import { HomePage } from "./pages/HomePage";
 import { MyPage } from "./pages/MyPage";
+import { ProphetPage } from "./pages/ProphetPage";
 
 export function App() {
   const s = useStore();
@@ -20,6 +21,9 @@ export function App() {
         <nav className="side-nav" aria-label="Main">
           <NavLink to="/" end>
             Home
+          </NavLink>
+          <NavLink to="/p/ringo">
+            ringo.prophecy.eth
           </NavLink>
           <NavLink to="/me">
             My prophecies <span className="count">{held}</span>
@@ -50,6 +54,8 @@ export function App() {
           <Route path="/me" element={<MyPage />} />
           <Route path="/create" element={<CreatePage />} />
           <Route path="/coin/:id" element={<CoinPage />} />
+          <Route path="/n/:name" element={<CoinPage />} />
+          <Route path="/p/:name" element={<ProphetPage />} />
         </Routes>
       </div>
     </div>
