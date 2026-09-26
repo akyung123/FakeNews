@@ -65,7 +65,7 @@ Verified on a Sepolia fork at block **11_784_960** in [PR #41](https://github.co
 | `fundsRecipient` | **LBPStrategy** (`0x9543…2000`) | official `InvalidFundsRecipient` if anything else | **#41** |
 | `tokensRecipient` | **protocol** (`protocolFeeRecipient`) — **never the prophet**, never LBPStrategy | unsold auction tokens via `sweepUnsoldTokens` | **#41** |
 | `recipient` | **protocol** (`protocolFeeRecipient`) — **never the prophet** | unused currency / recover-on-fail | **#41** |
-| Goal not reached (`raised < 0.02 ETH`) | `exitBid` refunds **full ETH**, **0 tokens**; `claimTokens` reverts `NotGraduated`; **no v4 pool** | UI **Get back unused ETH** | **#41** `test_goalNotReached_refundAndTokenSink` |
+| Goal not reached (`raised < 0.02 ETH`) | `exitBid` refunds **full ETH**, **0 tokens**; `claimTokens` reverts `NotGraduated`; **no v4 pool** | UI **Get your ETH back ({amount} ETH)** | **#41** `test_goalNotReached_refundAndTokenSink` |
 | LP NFT holder | `LiquidityLocker` | `MigratorParameters.positionRecipient` (product). #41 used a temp address — harness only | product |
 | Fee split after the pool | prophet **24** : protocol **76** | locker `collect` | product |
 | Deadline vs auction | **not linked** | ENS `deadline` / Departed stay as today. Auction blocks do not read the deadline | DECISIONS #21 |
@@ -526,9 +526,9 @@ Demo: prefer a bid strictly above final clearing so the UI can `exitBid` without
 - Graduation rule: `currencyRaised >= requiredCurrencyRaised`. “If the auction never graduates, bidders can refund their full bid amount via `exitBid` and all tokens are returned to the tokens recipient.” ([TechnicalDocumentation.md — Protocol Overview](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/docs/TechnicalDocumentation.md#protocol-overview), pin `7d7602d`)
 - Implementation: `exitBid` after `endBlock` — if `!_isGraduated()`, it `_processExit(_bidId, 0, 0)` (zero tokens filled, full currency back). Comment: “Fully refund the bid if the auction did not graduate, since it is over.” ([`ContinuousClearingAuction.sol` L495–L501](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuction.sol#L495-L501))
 - Fork (#41): `exitBid` refunds the **full ETH**; bidder token balance stays **0**. `claimTokens` **reverts `NotGraduated`**. `sweepUnsoldTokens` sends the auction supply to protocol. `LBPStrategy.migrate` does **not** revert: `tryMigrate` fails `NotGraduated`, then the strategy recovers the LP reserve to `recipient` (`FundsRecovered` + `MigrationFailed`). **No v4 pool** is opened.
-- `exitPartiallyFilledBid` after `endBlock` does the same full refund when not graduated ([L525–L529](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuction.sol#L525-L529)). Prefer `exitBid` in the UI (label: **Get back unused ETH**).
+- `exitPartiallyFilledBid` after `endBlock` does the same full refund when not graduated ([L525–L529](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuction.sol#L525-L529)). Prefer `exitBid` in the UI.
 
-UI copy for this state: **Get back unused ETH** → `exitBid(bidId)` on the CCA.
+UI copy for this state: **Get your ETH back ({amount} ETH)** → `exitBid(bidId)` on the CCA (full refund; not “unused”). Goal met uses **Get back unused ETH ({amount} ETH)** (section 7).
 
 ### 4.6 Open market (`migrate`)
 
@@ -640,40 +640,137 @@ Bonding-curve quote vectors (`contracts/test/Curve.vectors.json`, `web/src/lib/C
 
 ## 7. Auction UI states, designer copy, and revert names
 
-CCA has no `getState()` enum. The UI derives a label from blocks + views. Departed (`now >= deadline` from ENS) is independent of these labels.
+Final designer copy. English only. No returns / profit / prediction / “coin” / percent price change (DECISIONS #1, section 11). CCA has no `getState()` enum — the UI derives a label from blocks + views. `block` is the chain’s block-numberish. Sepolia is 12s blocks. 25 blocks is five minutes at that pace.
 
-`block` is the chain’s block-numberish. Sepolia is 12s blocks. 25 blocks is five minutes at that pace.
+Departed (`now >= deadline` from ENS) is its own badge next to any state below (DECISIONS #21). It never replaces the auction header.
 
-Designer draft copy (use these strings; English; no returns / profit / prediction / “coin” / percent price change):
+### 7.1 Status headers
+
+| UI state | Detect on-chain | Header |
+|---|---|---|
+| **Not funded** | No `TokensReceived`; `submitBid` would revert `TokensNotReceived`. After a successful `launch` this should not appear | `Auction is getting ready` |
+| **Not started** | Funded, `block < startBlock()` | `Auction starts in {startBlock - block} blocks` |
+| **Live** | Funded, `startBlock() <= block < endBlock()` | `Auction live · ends in {blocks} blocks` (`{blocks}` = `endBlock - block`) |
+| **Sold out** (still live) | `block < endBlock()` but next `submitBid` reverts `AuctionSoldOut` | `Auction live · all tokens are bid for` · helper: `New bids are closed. Come back when the auction ends.` |
+| **Ended, not finalized** | `block >= endBlock()` and `lastCheckpointedBlock() != endBlock()` | `Auction ended · final price not set yet`. CTA (`checkpoint`): `Set final price` / pending: `Setting final price…` |
+| **Ended, graduated** | `block >= endBlock()`, `isGraduated() == true` after a current checkpoint | `Auction ended · ready to open the market` |
+| **Ended, failed** | `block >= endBlock()` and `isGraduated() == false` after a final checkpoint | `Auction ended · goal not reached` |
+| **Claim blocked** | Graduated and `block < claimBlock()` | `Tokens can be claimed from block {claimBlock}.` |
+| **Claimable** | Graduated, `block >= claimBlock()`, bid already exited | keep **Ended, graduated** header; CTAs in 7.4 |
+| **Migratable** | Graduated, `block >= migrationBlock`, no `Migrated` yet | keep **Ended, graduated** header; CTAs in 7.6 |
+| **Pool open** | `Migrated`, `auctionOf.poolOpened`, or `slot0 != 0` | `Market open on Uniswap v4` |
+
+### 7.2 Clearing price and progress
+
+Shown as `clearingPrice / 2^96` ETH per token (`clearingPrice()` or CCALens `state`). No percent change next to the price.
 
 | Surface | Copy |
 |---|---|
-| Live countdown | `Auction live · ends in {blocks} blocks` |
-| Price while live | `Current clearing price` |
-| Price after `endBlock` | `Final clearing price` |
-| Threshold progress | `{raised} of 0.02 ETH raised to open the market` |
-| Bid budget field | `Budget (ETH)` → `submitBid` `amount` / `msg.value` |
-| Bid max-price field | `Max price per token (ETH)` → `submitBid` `maxPriceQ96` (UI ETH × 2^96) |
-| Bid submit | `Place bid` |
-| Claim | `Claim tokens` → `claimTokens` |
-| Leftover / failed-auction refund | `Get back unused ETH` → `exitBid` |
-| Migrate | `Open market` → `LBPStrategy.migrate` |
+| Label, live | `Current clearing price` |
+| Label, after `endBlock` | `Final clearing price` |
+| Helper | `Bids in the same block pay the same price per token. You never pay more than your max price.` — **`TBD(backend): confirm clearing price is set per block`**. Do not ship until contracts confirms. |
+| Progress | `{raised} of 0.02 ETH raised to open the market` |
 
-| UI state | Detect on-chain | User can | Copy |
-|---|---|---|---|
-| **Not funded** | No `TokensReceived`; `submitBid` would revert `TokensNotReceived`. After a successful `launch` this should not appear (strategy calls `onTokensReceived`) | Nothing | — |
-| **Not started** | Funded, `block < startBlock()` | Wait. Bid reverts `AuctionNotStarted` | — |
-| **Live** | Funded, `startBlock() <= block < endBlock()` | `Place bid`. Price from `clearingPrice()` or CCALens `state(auction)` | `Auction live · ends in {endBlock - block} blocks`. `Current clearing price`. `{raised} of 0.02 ETH raised to open the market` |
-| **Sold out (still live)** | `block < endBlock()` but next `submitBid` reverts `AuctionSoldOut` | Wait for end, then exit / claim if graduated | countdown still live |
-| **Ended, not finalized** | `block >= endBlock()` and `lastCheckpointedBlock() != endBlock()` | Anyone `checkpoint()` | `Final clearing price` after checkpoint |
-| **Ended, graduated** | `block >= endBlock()`, `isGraduated() == true` after a current checkpoint | `Get back unused ETH` / then `Claim tokens` | `Final clearing price`. `{raised} of 0.02 ETH raised to open the market` |
-| **Ended, failed** | `block >= endBlock()` and `isGraduated() == false` after a final checkpoint | **Get back unused ETH** (`exitBid` — full refund, section 4.5). `claimTokens` reverts `NotGraduated`. `migrate` will not open a pool | `{raised} of 0.02 ETH raised to open the market` |
-| **Claimable** | Graduated and `block >= claimBlock()` and `bid.exitedBlock != 0` | `Claim tokens` | — |
-| **Claim blocked** | Graduated but `block < claimBlock()` | Exit after end; claim reverts `NotClaimable` | — |
-| **Migratable** | Graduated and `block >= migrationBlock` and no `Migrated` yet | `Open market` | — |
-| **Pool open** | `Migrated` for that initializer, or `auctionOf.poolOpened`, or `slot0 != 0` | v4 swap (section 4.7) | — |
+### 7.3 Bid form (`submitBid` 5-arg; `BidSubmitted`)
 
-Create-time revert names (factory / constructor, prophet sees these on `launch`): `InvalidTokenAmount`, `InvalidEndBlock`, `ClaimBlockIsBeforeEndBlock`, `InvalidAuctionDataLength`, `StepBlockDeltaCannotBeZero`, `InvalidStepDataMps`, `InvalidEndBlockGivenStepData`, `FloorPriceIsZero`, `FloorPriceTooLow`, `TickSpacingTooSmall`, `FloorPriceAndTickSpacingGreaterThanMaxBidPrice`, `FloorPriceAndTickSpacingTooLarge`, `TotalSupplyIsZero`, `TotalSupplyIsTooLarge`, `TokenIsAddressZero`, `TokenAndCurrencyCannotBeTheSame`, `FundsRecipientIsZero`, `TokensRecipientIsZero`.
+No sell control on this screen.
+
+| Surface | Copy |
+|---|---|
+| Field | `Budget (ETH)` → `amount` / `msg.value` |
+| Field | `Max price per token (ETH)` → `maxPriceQ96` (UI ETH × 2^96) |
+| Helper | `You never pay more than your max price. After the auction ends, you can get back any ETH not used.` |
+| CTA | `Place bid` / pending: `Placing bid…` / done: `Bid placed` |
+| Your bid row | `Your bid · {budget} ETH up to {max} ETH per token` |
+
+| Error | Copy |
+|---|---|
+| `AuctionNotStarted` | `The auction hasn't started yet.` |
+| `TokensNotReceived` | `The auction isn't ready yet. Try again in a moment.` |
+| `AuctionIsOver` | `This auction has ended.` |
+| `AuctionSoldOut` | `All tokens are bid for. New bids are closed.` |
+| `BidMustBeAboveClearingPrice` | `Your max price must be above the current clearing price.` |
+| `InvalidBidPriceTooHigh` | `That max price is too high. Enter a lower one.` |
+| `InvalidBidUnableToClear` | `This bid can't be filled at that price. Raise your max price.` |
+| `BidAmountTooSmall` | `Your budget is too small. Enter a larger amount.` |
+| `InvalidAmount` | `The ETH sent doesn't match your budget. Try again.` |
+| `CurrencyIsNotNative`, `BidOwnerCannotBeZeroAddress` | `Something went wrong with this bid. Try again.` |
+| `TickPreviousPriceInvalid`, `TickPriceNotIncreasing`, `TickPriceNotAtBoundary`, `TickNotInitialized`, `InvalidTickPrice`, `TickHintMustBeGreaterThanNextActiveTickPrice` | `Prices moved. Refresh and try again.` |
+
+### 7.4 After the auction, goal met (Ended, graduated → Claimable)
+
+Order: unused ETH first (`exitBid`; `exitPartiallyFilledBid` for a partial fill, same label), then `claimTokens` (needs the bid exited).
+
+| Surface | Copy |
+|---|---|
+| CTA (`exitBid`) | `Get back unused ETH ({amount} ETH)` / pending: `Sending ETH…` / done: `ETH returned` |
+| Helper | `Do this first, even if all of your budget was used. Then claim your tokens.` |
+| Done, 0 ETH back (`BidExited.currencyRefunded == 0`) | `All of your budget was used.` |
+| CTA (`claimTokens`) | `Claim tokens` / pending: `Claiming…` / done: `Tokens claimed` |
+| Claim blocked | `Tokens can be claimed from block {claimBlock}.` |
+
+### 7.5 After the auction, goal not met (Ended, failed)
+
+Hide `Claim tokens` and `Open market` (`claimTokens` reverts `NotGraduated`; `migrate` opens no pool).
+
+| Surface | Copy |
+|---|---|
+| Header | `Auction ended · goal not reached` |
+| Progress | `{raised} of 0.02 ETH raised to open the market` |
+| Helper | `The goal wasn't reached, so no tokens were issued and the market won't open. Every bid is refunded in full.` |
+| CTA (`exitBid`, full refund) | `Get your ETH back ({amount} ETH)` / pending: `Sending ETH…` / done: `ETH returned` |
+
+Designer override vs the attached §6 (which still said “unused”): failed-auction `exitBid` is **Get your ETH back**, because the refund is the full bid.
+
+### 7.6 Exit / claim / open-market errors
+
+| Error | Copy |
+|---|---|
+| `AuctionIsNotOver` | `You can get your ETH back after the auction ends.` |
+| `BidAlreadyExited` | `You already got the unused ETH back for this bid.` |
+| `CannotExitBid` | `This bid can't be settled this way. Refresh and try again.` |
+| `CannotPartiallyExitBidBeforeGraduation`, `CannotPartiallyExitBidBeforeEndBlock` | `This bid can be settled after the auction ends.` |
+| `InvalidLastFullyFilledCheckpointHint`, `InvalidOutbidBlockCheckpointHint` | `Auction data changed. Refresh and try again.` |
+| `BidIdDoesNotExist` | `We couldn't find this bid.` |
+| `NotGraduated` | `The goal wasn't reached, so there are no tokens to claim.` |
+| `NotClaimable` | `Tokens can't be claimed yet. Try again from block {claimBlock}.` |
+| `AuctionIsNotFinalized` | `The final price isn't set yet. Set it first, then claim.` |
+| `BidNotExited` | `Get back unused ETH first, then claim your tokens.` |
+| `BatchClaimDifferentOwner` | `These bids belong to different wallets. Claim them one by one.` |
+
+Open market (`LBPStrategy.migrate`; Migratable → Pool open). CTA copy is the same whether web calls `migrate` or a Launchpad wrapper (`TBD(backend)` item 9).
+
+| Surface | Copy |
+|---|---|
+| CTA | `Open market` |
+| Helper | `Moves the raised ETH and tokens into a Uniswap v4 pool. Anyone can do this once the auction ends and the goal is reached.` |
+| Before `migrationBlock` | `The market can open from block {migrationBlock}.` |
+| Pending / done | `Opening market…` / `Market open. You can swap now.` (`Migrated`) |
+| `MigrationFailed` + `FundsRecovered` (no pool, no revert) | `The market couldn't open. No pool was created.` |
+
+| Error | Copy |
+|---|---|
+| `MigrationNotYetAllowed` | `Too early. The market can open from block {migrationBlock}.` |
+| `InitializerNotRegistered` | `This auction isn't linked to a market.` |
+| `PoolManagerAlreadyUnlocked`, `CurrencyRaisedMismatch`, `NoPositionsCreated`, `OnlySelfCall` | `The market couldn't open. Try again.` |
+
+### 7.7 Swap `(TBD(backend))`
+
+Whole block is draft until Universal Router 2.1.2 `V4_SWAP` command bytes / inputs are set (section 4.7, TBD item 14). Do not ship these until then. Fee-collect copy is also unset until collect action bytes (TBD item 13).
+
+| Surface | Draft copy |
+|---|---|
+| Section title | `Swap` |
+| CTA | `Swap` / pending: `Swapping…` / done: `Swap complete` |
+| Fee note | `Pool fee 1%. Fees are split 24% to the prophet and 76% to the protocol.` |
+| `TransactionDeadlinePassed` | `This swap took too long. Try again.` |
+| `ExecutionFailed`, `LengthMismatch` | `The swap didn't go through. Try again.` |
+
+### 7.8 Launch-time errors (prophet, on `launch`)
+
+Official create / LBP / CCA constructor names already in section 2 and below (`InvalidEndBlock`, `InvalidFundsRecipient`, `FloorPriceTooLow`, `InvalidTokenAmount`, `ClaimBlockIsBeforeEndBlock`, `InvalidAuctionDataLength`, `StepBlockDeltaCannotBeZero`, `InvalidStepDataMps`, `InvalidEndBlockGivenStepData`, `FloorPriceIsZero`, `TickSpacingTooSmall`, `FloorPriceAndTickSpacingGreaterThanMaxBidPrice`, `FloorPriceAndTickSpacingTooLarge`, `TotalSupplyIsZero`, `TotalSupplyIsTooLarge`, `TokenIsAddressZero`, `TokenAndCurrencyCannotBeTheSame`, `FundsRecipientIsZero`, `TokensRecipientIsZero`): **`Couldn't start the auction. Try again.`**
+
+New Launchpad names (“LBP not set”, “auction already exists”, “not the Launchpad’s token”) stay `TBD(backend)` item 11. No copy until they are named.
 
 ## 8. Four fork-test steps (02:00 KST gate)
 
@@ -722,6 +819,7 @@ Copy these into the contracts PR. Do not invent answers here.
 14. Universal Router 2.1.2 `V4_SWAP` command + inputs encoding.
 15. Whether `receive()` must accept ETH from LBPStrategy / PositionManager when Launchpad is `recipient`.
 16. Hook CREATE2 flags if any permission besides `BEFORE_INITIALIZE` is added.
+17. Confirm clearing price is set per block (designer helper in section 7.2). Do not ship that helper until this is yes.
 
 ## 11. Copy (user-facing)
 
