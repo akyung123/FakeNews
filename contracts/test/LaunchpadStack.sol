@@ -35,8 +35,17 @@ contract LaunchpadStack is LaunchpadTestBase {
         ProphecyHook h = new ProphecyHook{salt: salt}(pm, address(pad));
         LiquidityLocker loc = new LiquidityLocker(pm, address(pad), IHooks(address(h)));
         pad.setUniswap(pm, address(h), address(loc));
+        assertEq(address(pad.poolManager()), address(pm));
+        assertEq(address(pad.hook()), address(h));
+        assertEq(address(pad.locker()), address(loc));
         manager = pm;
         hook = h;
         locker = loc;
+    }
+
+    /// registerProphet → launch → sell out the curve → graduate.
+    function _registerLaunchAndGraduate() internal returns (address token) {
+        token = _registerAndLaunch();
+        _sellOut(token);
     }
 }

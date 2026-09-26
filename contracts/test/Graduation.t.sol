@@ -22,6 +22,7 @@ contract GraduationTest is LaunchpadStack {
     function setUp() public {
         _deployStack();
         vm.deal(prophet, 10 ether);
+        vm.deal(buyer, 10 ether);
     }
 
     function test_fullRangeTicksMatchSpacing200() public pure {
@@ -45,8 +46,7 @@ contract GraduationTest is LaunchpadStack {
 
     function test_specGraduationReservesGapUnderLimit() public {
         address token = _registerAndLaunch();
-        vm.prank(prophet);
-        launchpad.buy{value: 1 ether}(token, 0, "");
+        _sellOut(token);
 
         (uint256 vEth, uint256 vToken, uint256 realEth, uint256 sold, bool complete) = launchpad.curve(token);
         assertTrue(complete);
@@ -61,8 +61,7 @@ contract GraduationTest is LaunchpadStack {
 
     function test_seedFullRangeAtVirtualReservePrice() public {
         address token = _registerAndLaunch();
-        vm.prank(prophet);
-        launchpad.buy{value: 1 ether}(token, 0, "");
+        _sellOut(token);
         (uint256 vEth, uint256 vToken,,, bool complete) = launchpad.curve(token);
         assertTrue(complete);
 

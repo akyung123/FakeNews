@@ -12,17 +12,11 @@ import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {PoolSwapTest} from "v4-core/src/test/PoolSwapTest.sol";
 import {PoolDonateTest} from "v4-core/src/test/PoolDonateTest.sol";
 
-import {IProphecyEns} from "../src/ens/IProphecyEns.sol";
 import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
 import {Graduation} from "../src/uniswap/Graduation.sol";
 import {LiquidityLocker} from "../src/uniswap/LiquidityLocker.sol";
 import {LaunchpadStack} from "./LaunchpadStack.sol";
-import {MockProphecyEns} from "./LaunchpadHelpers.sol";
-
-contract RejectEth {
-    // no receive / fallback
-}
 
 contract ToggleWallet {
     bool public accept;
@@ -38,10 +32,6 @@ contract ToggleWallet {
     function withdraw(LiquidityLocker loc) external {
         loc.withdrawAccrued();
     }
-
-    function launch(Launchpad pad, string memory slug) external returns (address token) {
-        token = pad.launch(slug, "", 0, 0);
-    }
 }
 
 contract LaunchpadGraduationTest is LaunchpadStack {
@@ -56,24 +46,8 @@ contract LaunchpadGraduationTest is LaunchpadStack {
         vm.deal(buyer, 10 ether);
     }
 
-    function _issue(address wallet, string memory label, string memory slug) internal returns (address token) {
-        _registerProphet(wallet, label);
-        vm.prank(wallet);
-        token = launchpad.launch(slug, "a prophecy sentence", 0, 0);
-    }
-
-    function _launch() internal returns (address token) {
-        token = _issue(prophet, "ringo", "lingo-2028");
-    }
-
-    function _graduate() internal returns (address token) {
-        token = _launch();
-        vm.prank(buyer);
-        launchpad.buy{value: 1 ether}(token, 0, "");
-    }
-
     function test_fullCurveBuyGraduatesPoolAtCurvePrice() public {
-        address token = _graduate();
+        address token = _registerLaunchAndGraduate();
         (uint256 vEth, uint256 vToken, uint256 realEth, uint256 sold, bool complete) = launchpad.curve(token);
         assertTrue(complete);
         assertEq(sold, launchpad.CURVE_SUPPLY());
@@ -94,7 +68,7 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     }
 
     function test_liquidityLockedNoWithdraw() public {
-        address token = _graduate();
+        address token = _registerLaunchAndGraduate();
         PoolKey memory key = Graduation.poolKey(token, IHooks(address(hook)));
         (uint128 liquidity,,) = manager.getPositionInfo(
             key.toId(), address(locker), Graduation.tickLower(), Graduation.tickUpper(), bytes32(0)
@@ -112,7 +86,7 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     }
 
     function test_curveBuySellRevertAfterGraduation() public {
-        address token = _graduate();
+        address token = _registerLaunchAndGraduate();
         vm.prank(buyer);
         vm.expectRevert(Launchpad.CurveComplete.selector);
         launchpad.buy{value: 0.001 ether}(token, 0, "");
@@ -126,7 +100,7 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     }
 
     function test_swapsWorkAfterGraduation() public {
-        address token = _graduate();
+        address token = _registerLaunchAndGraduate();
         PoolKey memory key = Graduation.poolKey(token, IHooks(address(hook)));
         PoolSwapTest swapper = new PoolSwapTest(manager);
         address trader = address(0x5A0);
@@ -163,7 +137,7 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     }
 
     function test_collectSplitsProphet24Protocol76() public {
-        address token = _graduate();
+        address token = _registerLaunchAndGraduate();
         PoolKey memory key = Graduation.poolKey(token, IHooks(address(hook)));
         PoolDonateTest donor = new PoolDonateTest(manager);
         uint256 ethFee = 100;
@@ -193,9 +167,8 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     function test_rejectingProphetAccruesAndProtocolIsPaid() public {
         ToggleWallet prophetC = new ToggleWallet();
         vm.deal(address(prophetC), 1 ether);
-        address token = _issue(address(prophetC), "rejector", "reject-eth");
-        vm.prank(buyer);
-        launchpad.buy{value: 1 ether}(token, 0, "");
+        address token = _registerAndLaunchAs(address(prophetC), "rejector", "reject-eth");
+        _sellOut(token);
 
         PoolKey memory key = Graduation.poolKey(token, IHooks(address(hook)));
         PoolDonateTest donor = new PoolDonateTest(manager);
@@ -211,9 +184,8 @@ contract LaunchpadGraduationTest is LaunchpadStack {
         assertGt(accrued, 0);
 
         // A later graduation must not sweep the accrued ETH to the next seed refund.
-        address other = _issue(prophet, "ringo", "second-grad");
-        vm.prank(buyer);
-        launchpad.buy{value: 1 ether}(other, 0, "");
+        address other = _registerAndLaunchAs(prophet, "ringo", "second-grad");
+        _sellOut(other);
         assertEq(locker.accruedEth(address(prophetC)), accrued);
         assertEq(locker.totalAccruedEth(), accrued);
 
@@ -247,7 +219,7 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     }
 
     function test_receiveRefundPath() public {
-        _graduate();
+        _registerLaunchAndGraduate();
         uint256 fees = launchpad.protocolFees() + launchpad.creatorFeeOf(prophet);
         assertGe(address(launchpad).balance, fees);
 
@@ -268,10 +240,9 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     }
 
     function test_graduatedEventHasPoolKey() public {
-        address token = _launch();
+        address token = _registerAndLaunch();
         vm.recordLogs();
-        vm.prank(buyer);
-        launchpad.buy{value: 1 ether}(token, 0, "");
+        _sellOut(token);
         PoolKey memory key = Graduation.poolKey(token, IHooks(address(hook)));
         bytes32 poolId = PoolId.unwrap(key.toId());
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -287,10 +258,9 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     }
 
     function test_overshootRefundsThenGraduates() public {
-        address token = _launch();
+        address token = _registerAndLaunch();
         uint256 before = buyer.balance;
-        vm.prank(buyer);
-        launchpad.buy{value: 1 ether}(token, 0, "");
+        _sellOut(token);
         assertLt(before - buyer.balance, 1 ether);
         (,,,, bool complete) = launchpad.curve(token);
         assertTrue(complete);
@@ -306,27 +276,22 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     }
 
     function test_setUniswapNonDeployerReverts() public {
-        Launchpad pad = new Launchpad(protocol, signer, IProphecyEns(address(new MockProphecyEns())));
+        Launchpad pad = _newLaunchpad(protocol, signer);
         vm.prank(buyer);
         vm.expectRevert(Launchpad.NotDeployer.selector);
         pad.setUniswap(manager, address(hook), address(locker));
     }
 
     function test_graduationBeforeSetUniswapReverts() public {
-        MockProphecyEns ensAd = new MockProphecyEns();
-        Launchpad pad = new Launchpad(protocol, signer, IProphecyEns(address(ensAd)));
-        uint256 n = 7;
-        vm.prank(prophet);
-        pad.registerProphet("ringo", n, signRegister(address(pad), prophet, n, block.chainid, SIGNER_PK));
-        vm.prank(prophet);
-        address token = pad.launch("no-uniswap", "a prophecy sentence", 0, 0);
-        vm.prank(buyer);
+        Launchpad pad = _newLaunchpad(protocol, signer);
+        _registerProphetOn(pad, prophet, "ringo");
+        address token = _launchOn(pad, prophet, "no-uniswap");
         vm.expectRevert(Launchpad.UniswapNotSet.selector);
-        pad.buy{value: 1 ether}(token, 0, "");
+        _sellOutOn(pad, buyer, token);
     }
 
     function test_setUniswapRejectsZero() public {
-        Launchpad pad = new Launchpad(protocol, signer, IProphecyEns(address(new MockProphecyEns())));
+        Launchpad pad = _newLaunchpad(protocol, signer);
         vm.expectRevert(Launchpad.ZeroAddress.selector);
         pad.setUniswap(IPoolManager(address(0)), address(hook), address(locker));
         vm.expectRevert(Launchpad.ZeroAddress.selector);
