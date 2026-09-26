@@ -21,6 +21,7 @@ import {
 import { createReadProphetOf, createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_ISSUE_SESSION, MOCK_PARENT_NAME, MOCK_RETURNING_SESSION } from "../lib/mock";
 import { actions } from "../lib/store";
+import { MAX_PROPHECY_BYTES, utf8ByteLength } from "../lib/limits";
 import {
   createLaunch,
   ethInputToWei,
@@ -241,12 +242,11 @@ export function IssueScreen({
           <textarea
             aria-label="Prophecy"
             rows={3}
-            maxLength={140}
             value={prophecy}
             placeholder={MOCK_ISSUE_PLACEHOLDER.prophecy}
             onChange={(e) => setProphecy(e.target.value)}
           />
-          <span className="faint small">{prophecy.length}/140 · written once, then locked</span>
+          <span className="faint small">{utf8ByteLength(prophecy)}/{MAX_PROPHECY_BYTES} · written once, then locked</span>
         </label>
 
         <div className="row2">

@@ -90,7 +90,7 @@ event UniswapSet(address poolManager, address hook, address locker);
 - Deploy order: Launchpad, then Hook (CREATE2 using the Launchpad address), then Locker, then a deployer-only one-time `setUniswap(poolManager, hook, locker)`. A second call or a non-deployer call reverts. Graduation reverts if Uniswap is not set.
 - `receive()` accepts leftover seed ETH only from the locker and the PoolManager.
 - Constants are exactly the "Constants" section of SPEC.md.
-- `memo` is only emitted, never stored. `buy`/`sell` revert if it is longer than 140 bytes (DECISIONS #15).
+- `memo` is only on `buy` / `sell` (INTERFACE / DECISIONS #15). `launch` has no memo argument; the first buy inside `launch` goes without a memo. `buy` / `sell` revert if the memo is longer than 140 UTF-8 bytes. Launchpad `MAX_MEMO` is internal (not a view) — the web hardcodes 140. The prophecy sentence is 1–140 UTF-8 bytes (`BadProphecy`).
 - Rounding:
   - Buy: fee rounds up, tokens out round down.
   - Sell: fee rounds up, ETH out rounds down.

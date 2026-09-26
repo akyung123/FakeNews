@@ -164,6 +164,7 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(ISSUE_COPY.registerSuccess).not.toContain("Prophet name is on Sepolia");
     const create = renderApp("/create");
     expect(create).toContain("Issue a prophecy");
+    expect(create).not.toContain("140 left");
     expect(create).toContain("It becomes a token.");
     expect(create).not.toContain("Confirm the prophet name in your wallet.");
     expect(create).not.toContain("Prophet name is on Sepolia.");

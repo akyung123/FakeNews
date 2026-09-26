@@ -34,7 +34,7 @@ describe("issue field rules", () => {
     expect(isValidSlug("lingo-")).toBe(false);
   });
 
-  it("requires a one-line prophecy of 1–140 characters and 1–140 UTF-8 bytes", () => {
+  it("requires a one-line prophecy of 1–140 UTF-8 bytes", () => {
     expect(isValidProphecy("x")).toBe(true);
     expect(isValidProphecy("")).toBe(false);
     expect(isValidProphecy("  ")).toBe(false);

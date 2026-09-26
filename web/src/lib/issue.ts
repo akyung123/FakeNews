@@ -42,8 +42,7 @@ export function isValidSlug(value: string): boolean {
 }
 
 export function isValidProphecy(value: string): boolean {
-  const text = value.trim();
-  return text.length >= 1 && text.length <= 140 && isProphecyWithinLimit(text, MAX_PROPHECY_BYTES);
+  return isProphecyWithinLimit(value.trim(), MAX_PROPHECY_BYTES);
 }
 
 export function isValidDeadline(unixSeconds: number, nowSeconds: number): boolean {

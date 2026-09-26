@@ -13,7 +13,7 @@ import {
 describe("UTF-8 byte limits from Launchpad.sol", () => {
   it("counts multibyte characters as more than one byte near the memo limit", () => {
     expect(MAX_MEMO_BYTES).toBe(140);
-    expect(MAX_PROPHECY_BYTES).toBe(140);
+    expect(MAX_PROPHECY_BYTES).toBe(MAX_MEMO_BYTES);
     expect(utf8ByteLength("a")).toBe(1);
     expect(utf8ByteLength("한")).toBe(3);
     const near = "한".repeat(46);

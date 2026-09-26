@@ -1,11 +1,11 @@
 /**
- * On-chain string limits from Launchpad.sol.
- * Memo: `MAX_MEMO = 140` and `_requireMemo` uses `bytes(memo).length`.
- * Prophecy: `_requireProphecy` uses `bytes(prophecy).length` in `[1, 140]`.
+ * Launchpad `MAX_MEMO` is an internal constant, not a view.
+ * Hardcoded here from INTERFACE / DECISIONS #15.
+ * Prophecy uses the same 140 UTF-8 bytes (`BadProphecy`: 1..140).
  * Solidity `bytes(string).length` is UTF-8 byte length, not JS characters.
  */
 export const MAX_MEMO_BYTES = 140;
-export const MAX_PROPHECY_BYTES = 140;
+export const MAX_PROPHECY_BYTES = MAX_MEMO_BYTES;
 
 export const MEMO_COPY = {
   tooLong: "Memo is too long. Shorten it to trade.",

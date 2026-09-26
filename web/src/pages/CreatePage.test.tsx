@@ -409,6 +409,20 @@ describe("Screen 2 button gating", () => {
     expect(screen.getByTestId("write-success")).toHaveTextContent(WRITE_COPY.launchSuccess);
   });
 
+  it("does not show a memo remaining counter on the launch form", async () => {
+    renderIssue(MOCK_RETURNING_SESSION);
+    expect(screen.queryByTestId("memo-left")).toBeNull();
+    expect(screen.queryByLabelText(/^Memo$/i)).toBeNull();
+    expect(document.body.textContent).not.toContain("140 left");
+  });
+
+  it("does not show a memo remaining counter on the launch form", () => {
+    renderIssue(MOCK_RETURNING_SESSION);
+    expect(screen.queryByTestId("memo-left")).toBeNull();
+    expect(screen.queryByLabelText(/^Memo$/i)).toBeNull();
+    expect(document.body.textContent).not.toContain("140 left");
+  });
+
   it("skips World ID for a returning prophet and enables Issue once the form is valid", async () => {
     const user = userEvent.setup();
     renderIssue(MOCK_RETURNING_SESSION);
