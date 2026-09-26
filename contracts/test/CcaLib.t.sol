@@ -112,8 +112,8 @@ contract CcaLibTest is Test {
     function test_floorGraduationLeftoverEthIsDust() public pure {
         uint256 raised = CcaLib.AUCTION_SUPPLY * CcaLib.FLOOR_PRICE_Q96 / CcaLib.Q96;
         (uint256 leftoverEth, uint256 leftoverTok) = _lbpFullRangeLeftover(CcaLib.FLOOR_PRICE_Q96, raised, CcaLib.LP_SUPPLY);
+        // Observed LBP-style mint leftover at these constants: 171 wei ETH, 499 token-wei.
         assertLe(leftoverEth, 1 gwei);
-        // Token leftover may be a few wei from round-up quotes; must not dwarf ETH.
         assertLe(leftoverTok, 1e12);
     }
 
