@@ -46,7 +46,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - [x] Lock tests: editing the sentence reverts, transfer reverts, swapping the resolver reverts, `hasAssignees(ROOT, UNREGISTER) == false` @cursor
   - [ ] Three fuzz tests: solvency (done @cursor-agent), a round trip never gains (done @cursor-agent), graduation vs pool start price gap < 0.0068%
   - [ ] World: reusing a nullifier reverts, a bad signature reverts
-- [ ] Sepolia deploy script (skill `deploy-sepolia`)
+- [x] Sepolia deploy script (skill `deploy-sepolia`) @cursor-agent
 
 ## 3. Web (`web/`)
 

@@ -15,6 +15,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      # No lint/typecheck scripts on the current web skeleton. tsc is the check.
+      - name: Typecheck
+        run: bunx tsc --noEmit
       - run: bun run build
 
   contracts:
@@ -27,5 +30,42 @@ jobs:
         with:
           submodules: recursive
       - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge --version
       - run: forge build
-      - run: forge test -vv
+      # PR #19 LockReal tests skip when this is empty. Missing secret must not fail CI.
+      # Fork PRs do not receive Actions secrets, so those runs stay skipped and still pass.
+      - name: Test
+        env:
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+        run: forge test -vv
+
+  detect-world:
+    # hashFiles is not valid on a job-level if. Detect after checkout instead.
+    runs-on: ubuntu-latest
+    outputs:
+      present: ${{ steps.detect.outputs.present }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect
+        run: |
+          if [[ -f world/package.json ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "world/ is not in the repo yet."
+          fi
+
+  world:
+    # Skipped (not a fake pass) until world/package.json exists.
+    needs: detect-world
+    if: needs.detect-world.outputs.present == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: world
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      # world/package.json has test only (no lint / typecheck / build).
+      - run: bun test
