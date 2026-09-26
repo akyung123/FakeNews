@@ -32,8 +32,12 @@ contract Deploy is Script {
         console.log("hookSalt");
         console.logBytes32(hookSalt);
 
-        // Without --broadcast this only simulates. Do not pass --broadcast from an agent.
-        vm.startBroadcast();
+        // Simulation unless the person passes the send flag. Key stays in env, not on argv.
+        if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
+            vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
+        } else {
+            vm.startBroadcast();
+        }
         ProphecyFactory factory = new ProphecyFactory();
         vm.stopBroadcast();
 

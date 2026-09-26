@@ -51,19 +51,17 @@ contract RegisterParent is Script {
         (string memory label, address owner, bytes32 secret, uint64 duration) = _params();
         IETHRegistrar registrar = IETHRegistrar(SepoliaConfig.ETH_REGISTRAR);
 
-        bool available = registrar.isAvailable(label);
+        require(registrar.isAvailable(label), "label not available");
         bytes32 commitment = registrar.makeCommitment(
             label, owner, secret, address(0), address(0), duration, bytes32(0)
         );
 
         console.log("label", label);
         console.log("owner", owner);
-        console.log("available", available);
         console.log("commitment");
         console.logBytes32(commitment);
-        console.log("commitmentAt", uint256(registrar.commitmentAt(commitment)));
 
-        vm.startBroadcast();
+        _start();
         registrar.commit(commitment);
         vm.stopBroadcast();
     }
@@ -76,14 +74,23 @@ contract RegisterParent is Script {
         bytes32 commitment = registrar.makeCommitment(
             label, owner, secret, address(0), address(0), duration, bytes32(0)
         );
-        console.log("commitmentAt", uint256(registrar.commitmentAt(commitment)));
-        console.log("wait until this is at least 60 seconds old, then broadcast");
+        uint64 committedAt = registrar.commitmentAt(commitment);
+        require(committedAt != 0, "commit first");
+        require(block.timestamp >= uint256(committedAt) + 60, "wait 60s after commit");
 
-        vm.startBroadcast();
+        _start();
         // Person mints MockUSDC first (docs/INFRA.md). Approve is part of register.
         usdc.approve(address(registrar), type(uint256).max);
         registrar.register(label, owner, secret, address(0), address(0), duration, address(usdc), bytes32(0));
         vm.stopBroadcast();
+    }
+
+    function _start() internal {
+        if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
+            vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
+        } else {
+            vm.startBroadcast();
+        }
     }
 
     function _params() internal view returns (string memory label, address owner, bytes32 secret, uint64 duration) {
