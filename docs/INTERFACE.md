@@ -137,7 +137,7 @@ Live IDKit uses `app_id`, `action`, and `environment` from this envelope so the 
 ```json
 {
   "app_id": "app_...",
-  "action": "register-prophet",
+  "action": "register-prophet-v2",
   "environment": "production",
   "rp_context": {
     "rp_id": "rp_...",
