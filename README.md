@@ -126,17 +126,17 @@ Our code is MIT ([`LICENSE`](LICENSE)); everything above keeps its own license. 
 
 ## AI tools used
 
-Counted on `main` at [`0309a64`](https://github.com/prism-toggle-ai/Prophit/commit/0309a64) (2026-09-26): 375 commits, 251 of them not merge commits. The commit author and the `Co-Authored-By` trailer say which tool wrote each one.
+Counted on `main` at [`c383e8e`](https://github.com/prism-toggle-ai/Prophit/commit/c383e8e) (2026-09-26): 377 commits, 252 of them not merge commits. The commit author and the `Co-Authored-By` trailer say which tool wrote each one.
 
 | Who | Non-merge commits | Share | Main areas |
 |-----|------------------:|------:|------------|
 | Cursor Agent | 206 | 82% | Contracts: the CCA Launchpad, `LiquidityLocker`, `ProphecyHook`, the ENS adapter and lock tests, Foundry unit tests and Sepolia fork tests, deploy scripts. Web: the CCA library (`web/src/lib/cca/`) and UI wiring for bid, claim, migrate and swap. The `world/` server. Infra scripts, CI and the Pages workflow |
-| Claude Code | 29 | 12% | Repo setup, docs (PRD, README, `PRODUCTION.md`, DECISIONS and PLAN updates), agent settings (`AGENTS.md`, `CLAUDE.md`, `.claude/`). Web features: follow prophets, prophet profile, the Following page, wallet balances, pool price chart, Sepolia RPC budget, World ID widget fix |
+| Claude Code | 30 | 12% | Repo setup, docs (PRD, README, `PRODUCTION.md`, DECISIONS and PLAN updates), agent settings (`AGENTS.md`, `CLAUDE.md`, `.claude/`). Web features: follow prophets, prophet profile, the Following page, wallet balances, pool price chart, Sepolia RPC budget, World ID widget fix |
 | Humans only (no AI trailer) | 16 | 6% | The initial commit, the Sepolia deployment record, and edits made in the GitHub editor (merge-conflict fixes, doc citations) |
 
 - **Cursor Agent:** 203 commits it authored, plus 3 squash-merged PRs ([#7](https://github.com/prism-toggle-ai/Prophit/pull/7), [#10](https://github.com/prism-toggle-ai/Prophit/pull/10), [#16](https://github.com/prism-toggle-ai/Prophit/pull/16)) that carry its co-author trailer.
-- **Claude Code:** 9 commits it authored, plus 20 committed by akyung123 with a Claude co-author trailer.
-- **Merge commits (124):** 62 PR merges, all by akyung123, and 62 merges of `main` into feature branches (48 by Cursor Agent, 9 by akyung123, 5 by Claude Code).
+- **Claude Code:** 10 commits it authored, plus 20 committed by akyung123 with a Claude co-author trailer.
+- **Merge commits (125):** 63 PR merges, all by akyung123, and 62 merges of `main` into feature branches (48 by Cursor Agent, 9 by akyung123, 5 by Claude Code).
 - **Humans (akyung123 and team):** product spec, design direction, decisions, reviewing and merging every PR, live testing on Sepolia and in World App.
 - **Spec and planning artifacts in the repo:** [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md), [`.claude/`](.claude/) (settings, hooks, skills, the `contract-reviewer` agent), [`docs/PRD.md`](docs/PRD.md), [`docs/SPEC.md`](docs/SPEC.md), [`docs/PLAN.md`](docs/PLAN.md), [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/INTERFACE.md`](docs/INTERFACE.md), [`docs/INTERFACE_CCA.md`](docs/INTERFACE_CCA.md).
 
