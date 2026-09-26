@@ -6,7 +6,7 @@ Allowed files for this lane: `.github/`, `contracts/script/`, hosting workflows,
 
 ## Preview (`web/`)
 
-GitHub Pages workflow is a **separate PR**. Expected URL: `https://akyung123.github.io/Prophecy/`
+GitHub Pages workflow is a **separate PR**. Expected URL: `https://prism-toggle-ai.github.io/FakeNews/` (base path follows the repo name).
 
 A person must enable Settings → Pages → source **GitHub Actions**. Until that is on, the deploy job fails. Zero extra secrets. Public `VITE_*` go in Actions variables.
 
@@ -193,7 +193,7 @@ Never commit `WORLD_SIGNER_KEY`. Never print it in CI logs. A person pastes it f
 | `VITE_UNIVERSAL_RESOLVER` | ENSv2.md section 0 |
 | `VITE_WALLETCONNECT_PROJECT_ID` | Optional, public. Empty is fine |
 
-Before recording, open https://akyung123.github.io/Prophecy/ and confirm mock is OFF: no "Simulate failure" button and no "Mock World ID" notice. Recording with mock ON is not valid World ID evidence.
+Before recording, open https://prism-toggle-ai.github.io/FakeNews/ and confirm mock is OFF: no "Simulate failure" button and no "Mock World ID" notice. Recording with mock ON is not valid World ID evidence.
 
 ## Human-input checklist (names only)
 
