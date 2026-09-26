@@ -8,6 +8,7 @@ Who reads what. Nobody needs to read everything.
 | Contracts | [`INTERFACE.md`](INTERFACE.md) | [`ENSV2.md`](ENSV2.md), [`PLAN.md`](PLAN.md) sections 1–2 |
 | Web | [`INTERFACE.md`](INTERFACE.md) | [`PLAN.md`](PLAN.md) section 3 |
 | World server | [`INTERFACE.md`](INTERFACE.md) | [`PLAN.md`](PLAN.md) section 4 |
+| Infra (CI, Sepolia, hosting) | [`INFRA.md`](INFRA.md) | [`INTERFACE.md`](INTERFACE.md) section 5, [`PLAN.md`](PLAN.md) section 6 |
 | "Why is it like this?" | [`DECISIONS.md`](DECISIONS.md) | — |
 
 ## Rules

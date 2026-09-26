@@ -23,6 +23,7 @@ A launchpad where every token is a one-line prophecy. Buying raises the price an
 - **Agents:** [`AGENTS.md`](AGENTS.md)
 - **Product:** [`docs/SPEC.md`](docs/SPEC.md)
 - **Tasks:** [`docs/PLAN.md`](docs/PLAN.md)
+- **Infra:** [`docs/INFRA.md`](docs/INFRA.md) (Sepolia deploy, hosting, human inputs)
 
 ## Commands
 
