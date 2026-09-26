@@ -62,6 +62,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - no True / False
   - optional one-line memo on buy and sell; recent trades listed with their memos
   - [x] replace the prototype's holder talk with trade memos @cursor
+  - [x] hide Buy/Sell after graduation; Uniswap V4 panel @cursor-agent
 - [x] Screen 4: prophet page. Departed prophecies next to the next buy, claimable fees, sell button @cursor
 - [ ] Every sentence is read from ENS. Nothing hardcoded
 - [ ] Republish the demo page (skill `demo-publish`)

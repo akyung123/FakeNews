@@ -25,6 +25,19 @@ export function registerProphetWrite(input: RegisterProphetInput, address = cont
   };
 }
 
+/** curve(token) → complete is the on-chain graduation flag (PR #26). */
+export function curveRead(token: `0x${string}`, address = contracts.launchpad) {
+  if (!address) {
+    throw new Error("Launchpad address is not set");
+  }
+  return {
+    address,
+    abi: launchpadAbi,
+    functionName: "curve" as const,
+    args: [token] as const,
+  };
+}
+
 /** Adapter address. Deploy uses ENS_ADAPTER_ADDRESS; the web calls this view. */
 export function ensAdapterRead(address = contracts.launchpad) {
   if (!address) {

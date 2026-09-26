@@ -239,4 +239,13 @@ export const MOCK_PROPHECIES: readonly MockProphecy[] = [
     sold: 79_310_000n * 10n ** 18n, // 10% of curve supply
     complete: false,
   },
+  {
+    slug: "sold-out",
+    prophetLabel: "ringo",
+    sentence: "The last curve token sells before the lights go up",
+    deadline: 1_893_456_000, // 2030-01-01 — still open, already graduated
+    token: "0xa555555555555555555555555555555555555555",
+    sold: 793_100_000n * 10n ** 18n,
+    complete: true,
+  },
 ];

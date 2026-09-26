@@ -17,6 +17,7 @@ export default defineConfig({
       "src/lib/curve.vectors.test.ts",
       "src/lib/ensName.test.ts",
       "src/lib/prophetData.test.ts",
+      "src/lib/graduation.test.ts",
       "src/pages/CoinPage.test.tsx",
       "src/pages/ProphetPage.test.tsx",
       "src/copy.test.tsx",

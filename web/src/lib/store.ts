@@ -19,6 +19,8 @@ export type Coin = CurveState & {
   creator: string;
   createdAt: number;
   history: { at: number; mcap: number }[];
+  /** Token address when known (ENS / Launchpad). Used to read curve().complete. */
+  token?: `0x${string}`;
 };
 
 /** A one-line memo attached to a trade. */
