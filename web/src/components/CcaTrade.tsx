@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { parseEther, type Address } from "viem";
+import type { Address } from "viem";
 import { getAccount } from "wagmi/actions";
 import {
   CCA_COPY,
@@ -36,8 +36,15 @@ import { ccaFeatureFlags, type CcaFeatureFlags } from "../lib/cca/config";
 import { loadCcaAuction, type CcaAuctionSnapshot } from "../lib/cca/loadAuction";
 import { SEPOLIA_CHAIN_ID } from "../lib/env";
 import { isTxHash } from "../lib/explorer";
-import { graduated } from "../lib/curve";
-import { eth, ethToWei, formatPrice, tokens } from "../lib/format";
+import { graduated, quoteBuy as curveQuoteBuy, quoteSell as curveQuoteSell } from "../lib/curve";
+import {
+  parseSwapAmount,
+  quoteExactIn,
+  quoteWithSlippage,
+  type SwapQuote,
+  type SwapQuoteInput,
+} from "../lib/cca/quote";
+import { eth, ethToWei, formatEthAmount, formatPrice, formatTokenAmount } from "../lib/format";
 import { GRADUATION_ETH } from "../lib/mock";
 import { isCcaDemoMode } from "../lib/mode";
 import { actions, type Coin } from "../lib/store";
@@ -55,7 +62,12 @@ export type CcaTradeProps = {
   chainId?: number;
   loadAuction?: (token: Address) => Promise<CcaAuctionSnapshot>;
   writes?: CcaWriteOptions;
+  /** V4 Quoter amountOut. Default: quoteExactInputSingle through the shared client. */
+  quoteSwap?: (input: SwapQuoteInput) => Promise<bigint>;
 };
+
+export const QUOTE_UNAVAILABLE = "Quote unavailable";
+export const QUOTE_LOADING = "Getting a quote…";
 
 export function CcaTrade({
   coin,
@@ -67,6 +79,7 @@ export function CcaTrade({
   chainId,
   loadAuction = loadCcaAuction,
   writes,
+  quoteSwap = quoteExactIn,
 }: CcaTradeProps) {
   const demo = demoOverride ?? isCcaDemoMode();
   const flags = features ?? ccaFeatureFlags();
@@ -138,6 +151,47 @@ export function CcaTrade({
   const showSwapHint = flags.swap && !showSwap && (copyStatus === "live" || copyStatus === "graduated" || copyStatus === "failed");
   const showFeeHint = !showFees && flags.collect;
   const refundWei = snap?.refundWei ?? 0n;
+  const swapAmountIn = parseSwapAmount(swapAmount);
+  const mockSwap = demo && (prototype || !token || !snap?.hook);
+  const [quote, setQuote] = useState<SwapQuote>({ status: "idle" });
+
+  useEffect(() => {
+    if (!showSwap || swapAmountIn == null) {
+      setQuote({ status: "idle" });
+      return;
+    }
+    if (mockSwap) {
+      // Demo store only: the local curve is the market there.
+      const human = Number(swapAmount);
+      const out = swapSide === "buy" ? ethToWei(curveQuoteBuy(coin, human).tokens) : ethToWei(curveQuoteSell(coin, human).eth);
+      setQuote(out > 0n ? quoteWithSlippage(out) : { status: "unavailable" });
+      return;
+    }
+    if (!token || !snap?.hook) {
+      setQuote({ status: "unavailable" });
+      return;
+    }
+    const hooks = snap.hook;
+    let cancelled = false;
+    setQuote({ status: "loading" });
+    const timer = setTimeout(() => {
+      quoteSwap({ token, hooks, zeroForOne: swapSide === "buy", amountIn: swapAmountIn })
+        .then((out) => {
+          if (!cancelled) setQuote(quoteWithSlippage(out));
+        })
+        .catch(() => {
+          if (!cancelled) setQuote({ status: "unavailable" });
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // swapAmountIn is derived from swapAmount; coin only matters for the demo curve.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSwap, swapSide, swapAmount, mockSwap, token, snap?.hook, quoteSwap]);
+
+  const quoteAmount = (wei: bigint) => (swapSide === "buy" ? formatTokenAmount(wei) : formatEthAmount(wei));
   const openBids = (snap?.bids ?? []).filter((row) => row.bid.exitedBlock === 0n);
 
   async function run(label: string, work: () => Promise<unknown>, done: string) {
@@ -358,11 +412,29 @@ export function CcaTrade({
             <span>{swapSide === "buy" ? SWAP_SECTION_COPY.youPayEth : swapTokenLine(SWAP_SECTION_COPY.youSellToken, symbol)}</span>
             <input inputMode="decimal" value={swapAmount} onChange={(e) => setSwapAmount(e.target.value)} />
           </label>
-          <p className="faint">
-            {swapSide === "buy"
-              ? swapTokenLine(SWAP_SECTION_COPY.youGetAboutToken, symbol, tokens(Number(swapAmount) || 0))
-              : swapTokenLine(SWAP_SECTION_COPY.youGetAboutEth.replace("{amount} ETH", "{amount} ETH"), symbol, swapAmount)}
-          </p>
+          {quote.status === "ok" ? (
+            <>
+              <p className="faint" data-testid="swap-quote">
+                {swapTokenLine(
+                  swapSide === "buy" ? SWAP_SECTION_COPY.youGetAboutToken : SWAP_SECTION_COPY.youGetAboutEth,
+                  symbol,
+                  quoteAmount(quote.amountOut),
+                )}
+              </p>
+              <p className="faint small" data-testid="swap-min">
+                {swapTokenLine(
+                  swapSide === "buy" ? SWAP_SECTION_COPY.atLeastToken : SWAP_SECTION_COPY.atLeastEth,
+                  symbol,
+                  undefined,
+                  quoteAmount(quote.minOut),
+                )}
+              </p>
+            </>
+          ) : quote.status === "loading" ? (
+            <p className="faint" data-testid="swap-quote">{QUOTE_LOADING}</p>
+          ) : quote.status === "unavailable" ? (
+            <p className="faint" data-testid="swap-quote">{QUOTE_UNAVAILABLE}</p>
+          ) : null}
           {swapSide === "sell" && chain && writeTarget ? (
             <>
               <p className="faint small">{swapTokenLine(SWAP_SECTION_COPY.allowHelper, symbol)}</p>
@@ -402,21 +474,19 @@ export function CcaTrade({
           <button
             type="button"
             className={`btn ${swapSide === "buy" ? "primary" : "sell"} full`}
-            disabled={writesBlocked || !(Number(swapAmount) > 0) || (!demo && (!token || !snap?.hook))}
+            disabled={writesBlocked || swapAmountIn == null || quote.status !== "ok" || (!demo && (!token || !snap?.hook))}
             onClick={() => {
+              if (swapAmountIn == null || quote.status !== "ok") return;
               const amount = Number(swapAmount) || 0;
-              if (demo && (prototype || !token || !snap?.hook)) {
+              const bought = swapTokenLine(SWAP_SECTION_COPY.bought, symbol, formatTokenAmount(quote.amountOut));
+              const sold = swapTokenLine(SWAP_SECTION_COPY.sold, symbol, formatTokenAmount(swapAmountIn));
+              if (mockSwap) {
                 if (swapSide === "buy") actions.buy(coin.id, Math.min(amount, balance));
                 else actions.sell(coin.id, Math.min(held, amount));
-                setSuccess(
-                  swapSide === "buy"
-                    ? swapTokenLine(SWAP_SECTION_COPY.bought, symbol, tokens(amount))
-                    : swapTokenLine(SWAP_SECTION_COPY.sold, symbol, String(amount)),
-                );
+                setSuccess(swapSide === "buy" ? bought : sold);
                 return;
               }
               if (!token || !snap?.hook) return;
-              const amountIn = parseEther(swapAmount || "0");
               if (swapSide === "buy" && amount > balance) {
                 setError(SWAP_SECTION_COPY.notEnoughEth);
                 return;
@@ -427,13 +497,12 @@ export function CcaTrade({
                   token,
                   hooks: snap.hook!,
                   zeroForOne: swapSide === "buy",
-                  amountIn,
-                  amountOutMinimum: 0n,
+                  amountIn: swapAmountIn,
+                  // 1% under the Quoter's amountOut.
+                  amountOutMinimum: quote.minOut,
                   deadline: BigInt(Math.floor(Date.now() / 1000) + 600),
                 }, writes),
-                swapSide === "buy"
-                  ? swapTokenLine(SWAP_SECTION_COPY.bought, symbol, tokens(amount))
-                  : swapTokenLine(SWAP_SECTION_COPY.sold, symbol, swapAmount),
+                swapSide === "buy" ? bought : sold,
               );
             }}
           >
