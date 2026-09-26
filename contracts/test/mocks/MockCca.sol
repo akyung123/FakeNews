@@ -121,19 +121,40 @@ contract MockPositionManager {
     }
 
     function mintTo(address to, address token, address hook) external returns (uint256 id) {
-        id = nextId++;
-        _keys[id] = PoolKey({
-            currency0: CurrencyLibrary.ADDRESS_ZERO,
-            currency1: Currency.wrap(token),
-            fee: 10_000,
-            tickSpacing: 200,
-            hooks: IHooks(hook)
-        });
-        ownerOf[id] = to;
+        id = _store(to, _ethTokenKey(token, hook, 10_000, 200));
         (bool ok,) = to.call(
             abi.encodeWithSignature("onERC721Received(address,address,uint256,bytes)", msg.sender, address(this), id, "")
         );
         require(ok, "onERC721Received");
+    }
+
+    /// Official PositionManager `_mint` — no ERC-721 receiver callback.
+    function mintSilent(address to, address token, address hook) external returns (uint256 id) {
+        return _store(to, _ethTokenKey(token, hook, 10_000, 200));
+    }
+
+    function mintSilentWithKey(address to, PoolKey memory key) external returns (uint256 id) {
+        return _store(to, key);
+    }
+
+    function _ethTokenKey(address token, address hook, uint24 fee, int24 tickSpacing)
+        internal
+        pure
+        returns (PoolKey memory)
+    {
+        return PoolKey({
+            currency0: CurrencyLibrary.ADDRESS_ZERO,
+            currency1: Currency.wrap(token),
+            fee: fee,
+            tickSpacing: tickSpacing,
+            hooks: IHooks(hook)
+        });
+    }
+
+    function _store(address to, PoolKey memory key) internal returns (uint256 id) {
+        id = nextId++;
+        _keys[id] = key;
+        ownerOf[id] = to;
     }
 
     function getPoolAndPositionInfo(uint256 tokenId) external view returns (PoolKey memory, uint256) {

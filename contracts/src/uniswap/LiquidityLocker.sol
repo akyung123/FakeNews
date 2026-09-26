@@ -13,6 +13,7 @@ interface IPositionManagerLite {
     function modifyLiquidities(bytes calldata unlockData, uint256 deadline) external payable;
     function getPoolAndPositionInfo(uint256 tokenId) external view returns (PoolKey memory, uint256);
     function getPositionLiquidity(uint256 tokenId) external view returns (uint128);
+    function ownerOf(uint256 tokenId) external view returns (address);
 }
 
 /// Holds the v4 PositionManager LP NFT. No path to take the principal out.
@@ -45,6 +46,7 @@ contract LiquidityLocker {
     uint256 public totalAccruedEth;
 
     event Prepared(address indexed token, address indexed prophet, address indexed protocolFeeRecipient);
+    event Registered(address indexed token, uint256 indexed tokenId);
     event PositionReceived(address indexed token, uint256 indexed tokenId);
     event Collected(
         address indexed token,
@@ -71,6 +73,7 @@ contract LiquidityLocker {
     error Reentrant();
     error NothingAccrued();
     error UnexpectedEth();
+    error NotNftOwner();
 
     modifier nonReentrant() {
         if (_status == _ENTERED) revert Reentrant();
@@ -112,11 +115,31 @@ contract LiquidityLocker {
         emit Prepared(token, prophet, protocolFeeRecipient);
     }
 
+    /// Official PositionManager `_mint` does not call `onERC721Received`. Anyone
+    /// may bind the NFT the locker already owns after `prepare`.
+    function register(address token, uint256 tokenId) external {
+        if (token == address(0)) revert ZeroAddress();
+        _register(token, tokenId);
+    }
+
     function onERC721Received(address, address, uint256 tokenId, bytes calldata) external returns (bytes4) {
         if (msg.sender != address(positionManager)) revert NotPositionManager();
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
-        if (Currency.unwrap(key.currency0) != address(0) || address(key.hooks) != address(hook)) revert BadPoolKey();
-        address token = Currency.unwrap(key.currency1);
+        _register(Currency.unwrap(key.currency1), tokenId);
+        return this.onERC721Received.selector;
+    }
+
+    function _register(address token, uint256 tokenId) internal {
+        if (address(positionManager) == address(0)) revert PositionManagerNotSet();
+        if (positionManager.ownerOf(tokenId) != address(this)) revert NotNftOwner();
+        (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
+        if (
+            Currency.unwrap(key.currency0) != address(0) || Currency.unwrap(key.currency1) != token
+                || address(key.hooks) != address(hook) || key.fee != Graduation.POOL_FEE
+                || key.tickSpacing != Graduation.TICK_SPACING
+        ) {
+            revert BadPoolKey();
+        }
         Position storage p = positions[token];
         if (!p.prepared) revert UnknownLock();
         if (p.received) revert AlreadyReceived();
@@ -124,8 +147,8 @@ contract LiquidityLocker {
         p.currency0 = key.currency0;
         p.currency1 = key.currency1;
         p.received = true;
+        emit Registered(token, tokenId);
         emit PositionReceived(token, tokenId);
-        return this.onERC721Received.selector;
     }
 
     /// Anyone may call. Fees go only to the two recipients stored at prepare.

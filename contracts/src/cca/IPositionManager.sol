@@ -10,4 +10,6 @@ interface IPositionManager {
     function getPoolAndPositionInfo(uint256 tokenId) external view returns (PoolKey memory poolKey, uint256 info);
 
     function getPositionLiquidity(uint256 tokenId) external view returns (uint128 liquidity);
+
+    function ownerOf(uint256 tokenId) external view returns (address owner);
 }

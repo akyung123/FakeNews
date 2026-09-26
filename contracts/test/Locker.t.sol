@@ -6,6 +6,8 @@ import {Test} from "forge-std/Test.sol";
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolManager} from "v4-core/src/PoolManager.sol";
+import {PoolKey} from "v4-core/src/types/PoolKey.sol";
+import {Currency, CurrencyLibrary} from "v4-core/src/types/Currency.sol";
 
 import {ProphecyToken} from "../src/ProphecyToken.sol";
 import {Graduation} from "../src/uniswap/Graduation.sol";
@@ -141,6 +143,127 @@ contract LockerTest is Test {
     function test_withdrawAccruedRevertsWhenEmpty() public {
         vm.expectRevert(LiquidityLocker.NothingAccrued.selector);
         locker.withdrawAccrued();
+    }
+
+    function _assertSplit(uint256 prophetShare, uint256 protocolShare) internal pure {
+        (uint256 expP, uint256 expR) = Graduation.splitFees(prophetShare + protocolShare);
+        assertEq(prophetShare, expP);
+        assertEq(protocolShare, expR);
+    }
+}
+
+/// Official v4 PositionManager `_mint` does not call `onERC721Received`.
+contract LockerRegisterTest is Test {
+    IPoolManager internal manager;
+    LiquidityLocker internal locker;
+    MockPositionManager internal posm;
+    ProphecyToken internal token;
+    address internal hook = address(uint160(0x400C));
+
+    address internal prophet = address(0xA11CE);
+    address internal protocol = address(0xFEE);
+
+    receive() external payable {}
+
+    function setUp() public {
+        manager = new PoolManager(address(this));
+        token = new ProphecyToken("lingo-2028.prophecy.eth", "LINGO-2028", address(this));
+        locker = new LiquidityLocker(manager, address(this), IHooks(hook));
+        posm = new MockPositionManager();
+        locker.setPositionManager(address(posm));
+        locker.prepare(address(token), prophet, protocol);
+    }
+
+    function test_collectRevertsUnknownLockBeforeRegister() public {
+        uint256 id = posm.mintSilent(address(locker), address(token), hook);
+        assertEq(posm.ownerOf(id), address(locker));
+        vm.expectRevert(LiquidityLocker.UnknownLock.selector);
+        locker.collect(address(token));
+    }
+
+    function test_registerThenCollectSplits24_76() public {
+        uint256 id = posm.mintSilent(address(locker), address(token), hook);
+        locker.register(address(token), id);
+        assertEq(locker.tokenIdOf(address(token)), id);
+
+        uint256 ethFee = 100;
+        uint256 tokFee = 100;
+        token.transfer(address(posm), tokFee);
+        vm.deal(address(posm), ethFee);
+        posm.setFees(ethFee, address(token), tokFee);
+
+        locker.collect(address(token));
+        _assertSplit(prophet.balance, protocol.balance);
+        _assertSplit(token.balanceOf(prophet), token.balanceOf(protocol));
+        assertEq(prophet.balance + protocol.balance, ethFee);
+        assertEq(token.balanceOf(prophet) + token.balanceOf(protocol), tokFee);
+    }
+
+    function test_registerRevertsWrongOwner() public {
+        uint256 id = posm.mintSilent(address(this), address(token), hook);
+        vm.expectRevert(LiquidityLocker.NotNftOwner.selector);
+        locker.register(address(token), id);
+    }
+
+    function test_registerRevertsWrongCurrency() public {
+        ProphecyToken other = new ProphecyToken("other.prophecy.eth", "OTHER", address(this));
+        uint256 id = posm.mintSilent(address(locker), address(other), hook);
+        vm.expectRevert(LiquidityLocker.BadPoolKey.selector);
+        locker.register(address(token), id);
+    }
+
+    function test_registerRevertsWrongHook() public {
+        uint256 id = posm.mintSilent(address(locker), address(token), address(uint160(0xBEEF)));
+        vm.expectRevert(LiquidityLocker.BadPoolKey.selector);
+        locker.register(address(token), id);
+    }
+
+    function test_registerRevertsWrongFeeOrTick() public {
+        uint256 badFee = posm.mintSilentWithKey(
+            address(locker),
+            PoolKey({
+                currency0: CurrencyLibrary.ADDRESS_ZERO,
+                currency1: Currency.wrap(address(token)),
+                fee: 3000,
+                tickSpacing: 200,
+                hooks: IHooks(hook)
+            })
+        );
+        vm.expectRevert(LiquidityLocker.BadPoolKey.selector);
+        locker.register(address(token), badFee);
+
+        uint256 badTick = posm.mintSilentWithKey(
+            address(locker),
+            PoolKey({
+                currency0: CurrencyLibrary.ADDRESS_ZERO,
+                currency1: Currency.wrap(address(token)),
+                fee: 10_000,
+                tickSpacing: 60,
+                hooks: IHooks(hook)
+            })
+        );
+        vm.expectRevert(LiquidityLocker.BadPoolKey.selector);
+        locker.register(address(token), badTick);
+    }
+
+    function test_registerRevertsNotPrepared() public {
+        ProphecyToken other = new ProphecyToken("other.prophecy.eth", "OTHER", address(this));
+        uint256 id = posm.mintSilent(address(locker), address(other), hook);
+        vm.expectRevert(LiquidityLocker.UnknownLock.selector);
+        locker.register(address(other), id);
+    }
+
+    function test_registerRevertsDoubleRegister() public {
+        uint256 id = posm.mintSilent(address(locker), address(token), hook);
+        locker.register(address(token), id);
+        vm.expectRevert(LiquidityLocker.AlreadyReceived.selector);
+        locker.register(address(token), id);
+    }
+
+    function test_registerRevertsAfterCallbackMint() public {
+        uint256 id = posm.mintTo(address(locker), address(token), hook);
+        vm.expectRevert(LiquidityLocker.AlreadyReceived.selector);
+        locker.register(address(token), id);
     }
 
     function _assertSplit(uint256 prophetShare, uint256 protocolShare) internal pure {
