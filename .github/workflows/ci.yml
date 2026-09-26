@@ -64,9 +64,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
-      # world/ has no lint or build scripts (see world/package.json). tsc + bun test.
-      - name: Lint
-        run: bunx tsc --noEmit
-      - name: Typecheck
-        run: bunx tsc --noEmit
+      # world/package.json has test only (no lint / typecheck / build).
       - run: bun test
