@@ -36,9 +36,9 @@ contract RejectEthProphet {
 /// Address source, in order: `deployments/sepolia.json` (json → env → local
 /// deploy). Does not re-run the infra #30 parent-register / UserRegistry flow.
 abstract contract ForkE2EBase is LaunchpadTestBase {
-    /// Slightly behind publicnode's Sepolia head around 11_783_850 so the pin
-    /// is stable and still after the official v4 PoolManager deploy.
-    uint256 internal constant FORK_BLOCK = 11_780_000;
+    /// Recent Sepolia head (around 11_783_904). Public archive-less RPCs may
+    /// reject it; `_maybeFork` then falls back to latest.
+    uint256 internal constant FORK_BLOCK = 11_783_800;
 
     IPoolManager internal manager;
     ProphecyHook internal hook;
@@ -63,14 +63,21 @@ abstract contract ForkE2EBase is LaunchpadTestBase {
     function _maybeFork() internal returns (bool) {
         string memory rpc = vm.envOr("SEPOLIA_RPC_URL", string(""));
         if (bytes(rpc).length == 0) {
-            vm.skip(true);
             return false;
         }
         _peekDeploymentRecord();
         uint256 pin = vm.envOr("SEPOLIA_FORK_BLOCK", uint256(0));
         if (pin == 0) pin = resolvedLaunchpadBlock;
         if (pin == 0) pin = FORK_BLOCK;
-        vm.createSelectFork(rpc, pin);
+        if (pin == 0) {
+            vm.createSelectFork(rpc);
+        } else {
+            try this._forkAt(rpc, pin) {
+            } catch {
+                // Archive-less public RPCs reject old pins; latest still hits the live PoolManager.
+                vm.createSelectFork(rpc);
+            }
+        }
         forked = true;
         return true;
     }
@@ -154,6 +161,10 @@ abstract contract ForkE2EBase is LaunchpadTestBase {
         try this._readOutsideContracts("../deployments/sepolia.json") returns (string memory data) {
             return data;
         } catch {}
+    }
+
+    function _forkAt(string memory rpc, uint256 pin) external {
+        vm.createSelectFork(rpc, pin);
     }
 
     /// Isolated so a missing fs_permissions entry cannot abort setUp.

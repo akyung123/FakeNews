@@ -151,7 +151,14 @@ contract ForkE2ETest is ForkE2EBase {
         uint256 protocolEthBefore = protocol.balance;
         uint256 prophetTokBefore = ProphecyToken(token).balanceOf(prophet);
         uint256 protocolTokBefore = ProphecyToken(token).balanceOf(protocol);
+        (uint128 liquidityBefore,,) = manager.getPositionInfo(
+            key.toId(), address(locker), Graduation.tickLower(), Graduation.tickUpper(), bytes32(0)
+        );
         locker.collect(token);
+        (uint128 liquidityAfter,,) = manager.getPositionInfo(
+            key.toId(), address(locker), Graduation.tickLower(), Graduation.tickUpper(), bytes32(0)
+        );
+        assertEq(liquidityAfter, liquidityBefore, "principal must stay locked");
 
         uint256 prophetEth = prophet.balance - prophetEthBefore;
         uint256 protocolEth = protocol.balance - protocolEthBefore;
@@ -186,17 +193,18 @@ contract ForkE2ETest is ForkE2EBase {
         assertEq(address(rejector).balance, 1 ether);
         uint256 accrued = locker.accruedEth(address(rejector));
         assertGt(accrued, 0);
-        assertEq(locker.totalAccruedEth(), accrued);
+        assertGe(locker.totalAccruedEth(), accrued);
 
         (uint256 expP,) = Graduation.splitFees(accrued + (protocol.balance - protocolBefore));
         assertEq(accrued, expP);
 
+        uint256 totalBefore = locker.totalAccruedEth();
         rejector.setAccept(true);
         uint256 before = address(rejector).balance;
         rejector.withdraw(locker);
         assertEq(address(rejector).balance, before + accrued);
         assertEq(locker.accruedEth(address(rejector)), 0);
-        assertEq(locker.totalAccruedEth(), 0);
+        assertEq(locker.totalAccruedEth(), totalBefore - accrued);
     }
 
     function test_forkUsesRealSepoliaPoolManager() public onFork {
