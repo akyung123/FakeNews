@@ -19,14 +19,15 @@ One row per decision, with the reason.
 | 6 | 09-25 | Record permissions are granted **per key** (e.g. the prophet may edit `avatar` only) | Only the display records stay editable; everything else is locked |
 | 7 | 09-26 | Curve and fees use **the constants in SPEC.md exactly**: supply 1B, curve 793.1M, LP 206.9M, virtual token 1.073B, `VIRTUAL_ETH = 7_058_378_514_689_194` wei (graduation at 0.02 ETH), fee 1.25% = prophet 0.30 + protocol 0.95 | Recomputed and matched: graduation 0.02 ETH, 14.70× price, 0.001 ETH buys 16.6% of supply, round trip returns ~0.000975, LP gap 0.0068% |
 | 8 | 09-26 | Names nest: **prophet name, then prophecy name**. `ringo.prophecy.eth` → wallet, `lingo-2028.ringo.prophecy.eth` → token | The address book is the core feature |
-| 9 | 09-26 | Prophecies have a **deadline**. After it, the screen shows **Departed**. Still no judging | A departed prophecy stays next to the next buy |
+| 9 | 09-26 | ~~Prophecies have a **deadline**. After it, the screen shows **Departed**. Still no judging~~ → #18 | A departed prophecy stays next to the next buy |
 | 10 | 09-26 | **World ID (Proof of Human) only when creating a prophet name.** Store the nullifier: one prophet name per person. Buying and browsing are not verified | Issuing creates a lasting public record; the same person must not be able to reset it |
 | 11 | 09-26 | On graduation, open a Uniswap V4 pool (ETH/token, 1%, tickSpacing 200, `ProphecyHook`) and lock the position in `LiquidityLocker`. `collect` only pays prophet 24 : protocol 76 | Principal can never be withdrawn; fees keep flowing |
 | 12 | 09-26 | ~~(Proposed) Prophecy names never expire in ENS either~~ → #14 | |
 | 13 | 09-26 | ~~(Needs team confirmation) Holder talk and trade memos~~ → #15 | |
-| 14 | 09-26 | **Prophecy names never expire in ENS** (`type(uint64).max`), like prophet names. The deadline lives only in the `deadline` text record, and Departed is computed from it | Review A: an expired name stops pointing at the token and its label could be registered again. A departed prophecy must keep its name and token |
+| 14 | 09-26 | **Prophecy names never expire in ENS** (`type(uint64).max`), like prophet names. ~~The deadline lives only in the `deadline` text record, and Departed is computed from it~~ → #18 | Review A: an expired name stops pointing at the token and its label could be registered again. A departed prophecy must keep its name and token |
 | 15 | 09-26 | **Trade memos: yes.** `buy` and `sell` take an optional one-line `memo` (at most 140 bytes) that is emitted in the `Trade` event and shown on the prophecy detail screen next to the trade. **Holder talk (a separate board for holders): not now**, possibly later | A memo rides on a transaction the trader sends anyway: no extra wallet prompt, no server, and every note is backed by a real trade. A holder board would need its own server |
 | 17 | 2026-09-26 10:38 KST | **UI v2** (user approved; supersedes #2): home grid with a Closest to graduation featured slot; gold Buy / navy Sell and no red on the trade screen; no Prophet tag or badge; no holder share %. Sample data badge only in mock mode. | The board has to scan like a live list people can click through, and Sell must not look like a warning. Holder share and a Prophet badge add status the product does not judge. |
+| 18 | 2026-09-27 | **No deadline and no Departed** (user approved; supersedes #9 and the deadline part of #14). `launch(slug, prophecy)` takes no deadline, and the prophecy resolver has no `deadline` text record. The only stage on screen is the market stage (auction, graduated or ended), read from the chain. There is still no status about whether a sentence came true | A deadline read like a verdict date even though nothing is judged, and it added a step to issuing. A slug such as `lingo-2028` already carries a date when the prophet wants one. The market stage tells a buyer what they can do right now (bid, swap or get a refund) |
 
 ## Not decided yet
 
@@ -44,7 +45,7 @@ Checked against `PermissionedRegistry.sol` and `PermissionedResolver.sol` at `71
 - Resolution then falls back to the nearest ancestor's resolver. `lingo-2028.ringo...` could resolve through the prophet's resolver and return **the wrong address**.
 - An expired label becomes `AVAILABLE`. The launchpad, which holds `ROLE_REGISTRAR`, could register the same label again.
 - The 28-day grace period is a rule of the `.eth` registrar (second-level names). Our UserRegistry has no grace period; expiry is immediate.
-- **So:** prophecy names never expire, and the deadline lives in a text record.
+- **So:** prophecy names never expire.
 
 ### B. `expiry = 0`
 
@@ -55,7 +56,7 @@ Checked against `PermissionedRegistry.sol` and `PermissionedResolver.sol` at `71
 
 - The role is `ROLE_SET_TEXT = 1 << 4`. The per-key resource is `keccak256(bytes(key))`.
 - The `calls` in the resolver's `initialize(grants, calls)` run **without role checks**.
-- **So:** write the sentence and deadline during initialization and never grant roles for those keys. There is no role to remove afterwards.
+- **So:** write the sentence during initialization and never grant roles for those keys. There is no role to remove afterwards.
 - Display records (`avatar`, `description`) go to the prophet via `grantSetterRoles`.
 - In the demo, editing the sentence reverts with `EACUnauthorizedAccountRoles`.
 - Resolver roles cannot be scoped per name (only per argument). That is why **each prophecy gets its own resolver**.
@@ -75,10 +76,10 @@ Checked against `PermissionedRegistry.sol` and `PermissionedResolver.sol` at `71
 - The registry is then `isEmancipated() == true` from birth.
 - The prophet owns `ringo` with a role bitmap of 0: they cannot change the subregistry or resolver, and cannot transfer it.
 
-### F. Counting Departed
+### F. ~~Counting Departed~~ (no longer needed → #18)
 
 - Registries cannot enumerate children.
-- Count from `LabelRegistered` events or launchpad storage. Read each deadline from its resolver's text record.
+- ~~Count from `LabelRegistered` events or launchpad storage. Read each deadline from its resolver's text record.~~
 
 ### G. Putting the World ID nullifier on chain
 

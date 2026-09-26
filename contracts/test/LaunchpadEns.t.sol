@@ -33,7 +33,6 @@ contract LaunchpadEnsTest is LaunchpadTestBase {
     string internal constant PROPHET = "ringo";
     string internal constant SLUG = "badges-2028";
     string internal constant SENTENCE = "Every hackathon badge is an ENS name by 2028";
-    uint64 internal constant DEADLINE = 1893456000;
 
     event Launched(
         address indexed token, address indexed prophet, address indexed auction, string prophetLabel, string slug
@@ -75,7 +74,7 @@ contract LaunchpadEnsTest is LaunchpadTestBase {
         emit Launched(predictedToken, address(actor), address(0), PROPHET, SLUG);
 
         vm.prank(address(actor));
-        address token = launchpad.launch(SLUG, SENTENCE, DEADLINE);
+        address token = launchpad.launch(SLUG, SENTENCE);
         assertTrue(launchpad.auctionOf(token) != address(0));
 
         assertEq(token, predictedToken);
@@ -85,7 +84,7 @@ contract LaunchpadEnsTest is LaunchpadTestBase {
         address prophecyResolver = parent.getSubregistry(PROPHET).getResolver(SLUG);
         bytes memory name = DnsCodec.join(SLUG, DnsCodec.join(PROPHET, parentDns));
         assertEq(_text(prophecyResolver, name, "prophecy"), SENTENCE);
-        assertEq(_text(prophecyResolver, name, "deadline"), "1893456000");
+        assertEq(_text(prophecyResolver, name, "deadline"), "");
         assertEq(_addr(prophecyResolver, name), token);
 
         try actor.setText(prophecyResolver, name, "prophecy", "rewritten") {
@@ -118,16 +117,16 @@ contract LaunchpadEnsTest is LaunchpadTestBase {
 
     function test_launchByNonProphetReverts() public {
         vm.expectRevert(Launchpad.NotProphet.selector);
-        launchpad.launch(SLUG, SENTENCE, DEADLINE);
+        launchpad.launch(SLUG, SENTENCE);
     }
 
     function test_reusedSlugReverts() public {
         _registerActor();
         vm.prank(address(actor));
-        launchpad.launch(SLUG, SENTENCE, DEADLINE);
+        launchpad.launch(SLUG, SENTENCE);
         vm.prank(address(actor));
         vm.expectRevert(Launchpad.SlugTaken.selector);
-        launchpad.launch(SLUG, "a different sentence", DEADLINE);
+        launchpad.launch(SLUG, "a different sentence");
     }
 
     function _registerActor() internal {

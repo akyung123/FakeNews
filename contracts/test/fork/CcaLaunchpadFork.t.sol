@@ -92,7 +92,7 @@ contract CcaLaunchpadForkTest is CcaSepoliaForkBase {
         pad.registerProphet("ringo", n, abi.encodePacked(r, s, v));
 
         vm.prank(prophet);
-        address token = pad.launch("lingo-2028", "a prophecy sentence", 1_800_000_000);
+        address token = pad.launch("lingo-2028", "a prophecy sentence");
         address auctionAddr = pad.auctionOf(token);
         assertTrue(auctionAddr.code.length > 0, "auction");
         ICcaFork auction = ICcaFork(auctionAddr);

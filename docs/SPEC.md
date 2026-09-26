@@ -17,7 +17,7 @@ The address book is the core feature. Type a name and you get an address.
 
 Locking is a rule layered on top of the address book so it cannot be abandoned. It does not replace the address book.
 
-The contracts never judge whether a prophecy came true. There is no oracle, and no True or False. The price falls because many people sell, not because a contract marked the prophecy wrong. A correct prophecy falls if people sell it, and a wrong one holds if nobody sells. The only status on screen is **Departed**.
+The contracts never judge whether a prophecy came true. There is no oracle, and no True or False. The price falls because many people sell, not because a contract marked the prophecy wrong. A correct prophecy falls if people sell it, and a wrong one holds if nobody sells. There is no status about the sentence. The only stage on screen is the market stage (auction, graduated or ended), read from the chain.
 
 The price says "people are here", not "this sentence is true". We never describe the price as recording truth.
 
@@ -35,13 +35,11 @@ ENS address book
        ▼
 Bonding curve      price is the ratio of two reserves. No judgment
        │
-       ├─ deadline ──►  prophecy shows Departed. The name is never removed; it still points to the token
-       │
        └─ curve supply sold out ──►  V4 pool ──►  position locked
                                                    liquidity cannot be withdrawn, only fees collected
 ```
 
-A falling price and a passing deadline are separate events. The name stays alive when the price falls, and it keeps pointing to the token after the deadline.
+The name stays alive when the price falls. It keeps pointing to the token forever.
 
 ## Constants
 
@@ -241,13 +239,13 @@ eth
     │     │
     │     ├── badges-2028                prophecy. A coin in the address book
     │     │     points to: token
-    │     │     text: sentence, deadline
+    │     │     text: sentence
     │     │     sentence: Every hackathon badge is an ENS name by 2028
-    │     │     expiry: none (deadline is a text record)
+    │     │     expiry: none
     │     │     transfer: not allowed
     │     │     edit sentence: not allowed
     │     │
-    │     └── two-min                    Departed
+    │     └── two-min                    another prophecy
     │           sentence: A two-minute demo has already left the stage
     │
     └── mina                             someone else. Requires a different World ID
@@ -265,9 +263,7 @@ Curve balances, price and graduation live in the contracts. ENS only points at t
 
 No name expires. A prophet name that expired would leave fees with nowhere to go, and a prophecy name that expired would stop pointing at its token (DECISIONS #14). Every name uses `type(uint64).max`; `expiry = 0` reverts (DECISIONS review B).
 
-The screen does not rely on ENS expiry for Departed. It reads the `deadline` text record. ENS expiry is about ownership.
-
-Names are never unregistered after the deadline. Unregistering would let another sentence claim the label. The name keeps pointing at the token, and the child stays under its parent so the next prophecy screen can count it.
+Names are never unregistered. Unregistering would let another sentence claim the label. The name keeps pointing at the token, and the child stays under its parent so the next prophecy screen can count it.
 
 ### Permissions
 
@@ -286,7 +282,7 @@ Only the sentence record is locked at issue. Display records such as `avatar` st
 | Transfer a name | no role | no role | no |
 | Edit sentence | never granted | no | no |
 | Display records | yes | yes | no |
-| Delete a departed prophecy | no function | no role | no |
+| Delete a prophecy | no function | no role | no |
 | Resolve name to address | anyone | anyone | anyone |
 
 Names must be minted on Sepolia for real. Nothing on screen is hardcoded.
@@ -317,7 +313,7 @@ ringo.prophecy.eth
         ▼
 Issue a sentence
   create the child name
-  write sentence and deadline as text records
+  write the sentence as a text record
   nobody can write those records afterwards
   mint 1,000,000,000 tokens
   record the token address on the name
@@ -325,11 +321,8 @@ Issue a sentence
         ▼
 Bonding curve buy / sell
         │
-        ├─ deadline ──► screen shows Departed. The name is not unregistered
         └─ supply sold out ──► initialize pool, add liquidity, lock position
 ```
-
-Nobody should wait for a deadline during the demo. Create a 2-minute prophecy beforehand, let it pass, and show that transaction. If an admin fast-forward is used, say it is for the demo.
 
 ## Contracts
 
@@ -357,12 +350,12 @@ Checklist:
 
 Four screens:
 
-1. **Prophecy list.** Name, sentence, price, number of Departed.
+1. **Prophecy list.** Name, sentence, price.
 2. **Issue.** World verification; cancelling disables the issue button.
 3. **Prophecy detail.** Find the token by name; buy and sell. No True or False. Recent trades are listed with their memos: a buyer or seller can attach one line to the trade ("0.1 ETH in · here we go", "sold at −42% · why is it dropping again"). The memo is part of the trade transaction, so every note is backed by a real trade. A separate holder-only board may come later.
-4. **Prophet page.** Wallet address, prophecies held, departed prophecies, sell button, claimable fees.
+4. **Prophet page.** Wallet address, every prophecy under the name, claimable fees.
 
-The prophet page is not a balance screen. It keeps departed prophecies next to the next buy so you decide whether to sell or buy the next one. A chart alone is not enough.
+The prophet page is not a balance screen. It lists every prophecy under the name with its market progress so you can decide which one to buy. A chart alone is not enough.
 
 ## Demo
 
@@ -371,7 +364,7 @@ Two to four minutes, five scenes:
 1. Verification succeeds and a prophet name is minted. The name points to the wallet.
 2. A sentence is issued. The prophecy name points to the token.
 3. Another wallet buys by name; selling lowers the price.
-4. An already departed prophecy sits under the name, and the next issue screen shows departed 1.
+4. The prophet page lists every prophecy under the name, each one still pointing at its token.
 5. Switching wallets does not allow issuing. Editing the sentence reverts. Cancelling verification blocks issuing.
 
 ## Out of scope

@@ -3,9 +3,9 @@
  *
  * Live: viem `getEnsText` / `getEnsAddress` on Sepolia through
  * `VITE_UNIVERSAL_RESOLVER` (INTERFACE §4).
- * Mock: sample records in mock.ts, same keys (`prophecy`, `deadline`).
+ * Mock: sample records in mock.ts, same key (`prophecy`).
  *
- * Sentence and deadline live only on the prophecy resolver (DECISIONS #5).
+ * The sentence lives only on the prophecy resolver (DECISIONS #5).
  */
 import { createPublicClient, http, type Address, type PublicClient } from "viem";
 import { sepolia } from "viem/chains";
@@ -14,7 +14,6 @@ import { SEPOLIA_CHAIN_ID, webEnv } from "./env";
 import { MOCK_PARENT_NAME, MOCK_PROPHECIES, MOCK_PROPHETS } from "./mock";
 
 export const ENS_TEXT_PROPHECY = "prophecy";
-export const ENS_TEXT_DEADLINE = "deadline";
 
 export type EnsPublicClient = Pick<PublicClient, "getEnsText" | "getEnsAddress">;
 
@@ -40,7 +39,6 @@ export function mockEnsText(name: string, key: string): string | null {
   });
   if (!row) return null;
   if (key === ENS_TEXT_PROPHECY) return row.sentence;
-  if (key === ENS_TEXT_DEADLINE) return String(row.deadline);
   return null;
 }
 
@@ -51,15 +49,6 @@ export function mockEnsAddress(name: string): Address | null {
   if (prophecy) return prophecy.token;
   const prophet = MOCK_PROPHETS.find((item) => prophetMockName(item.label) === n || item.label === n);
   return prophet?.wallet ?? null;
-}
-
-/** `deadline` text is unix seconds as a decimal string (INTERFACE §1). */
-export function parseDeadlineText(value: string | null | undefined): number | null {
-  if (value == null || value === "") return null;
-  if (!/^[0-9]+$/.test(value)) return null;
-  const n = Number(value);
-  if (!Number.isSafeInteger(n) || n <= 0) return null;
-  return n;
 }
 
 export function createEnsClient(rpcUrl = webEnv.rpcUrl): PublicClient {
@@ -115,11 +104,4 @@ export async function getEnsAddress(
     coinType: 60n,
   });
   return address ?? null;
-}
-
-export async function getEnsDeadline(
-  name: string,
-  options: { client?: EnsPublicClient; universalResolver?: Address } = {},
-): Promise<number | null> {
-  return parseDeadlineText(await getEnsText(name, ENS_TEXT_DEADLINE, options));
 }

@@ -124,14 +124,14 @@ contract LaunchpadWorldTest is LaunchpadTestBase {
     function test_launchByNonProphetReverts() public {
         vm.prank(buyer);
         vm.expectRevert(Launchpad.NotProphet.selector);
-        launchpad.launch("lingo-2028", "a prophecy sentence", 1_800_000_000);
+        launchpad.launch("lingo-2028", "a prophecy sentence");
     }
 
     function test_reusedSlugReverts() public {
         _registerAndLaunch();
         vm.prank(prophet);
         vm.expectRevert(Launchpad.SlugTaken.selector);
-        launchpad.launch("lingo-2028", "another sentence here", 1_800_000_001);
+        launchpad.launch("lingo-2028", "another sentence here");
     }
 
     function test_sameSlugDifferentProphetsOk() public {
@@ -139,7 +139,7 @@ contract LaunchpadWorldTest is LaunchpadTestBase {
         _registerProphet(buyer, "mina");
         address a = _launch("lingo-2028");
         vm.prank(buyer);
-        address b = launchpad.launch("lingo-2028", "a prophecy sentence", 1_800_000_000);
+        address b = launchpad.launch("lingo-2028", "a prophecy sentence");
         assertTrue(a != b);
         assertEq(ProphecyToken(a).name(), "lingo-2028.ringo.prophecy.eth");
         assertEq(ProphecyToken(b).name(), "lingo-2028.mina.prophecy.eth");

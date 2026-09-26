@@ -10,8 +10,6 @@ import { MOCK_ISSUE_SESSION, MOCK_RETURNING_SESSION, MOCK_WORLD_HEALTH, MOCK_RP_
 import { WorldClientError, createWorldClient, type WorldClient } from "../lib/world";
 import { IssueScreen } from "./CreatePage";
 
-const NOW = Date.parse("2026-09-26T00:00:00Z");
-
 function renderIssue(
   session = MOCK_ISSUE_SESSION,
   extras: {
@@ -27,7 +25,6 @@ function renderIssue(
       <IssueScreen
         session={session}
         world={extras.world ?? createWorldClient({ mock: true })}
-        now={NOW}
         registerProphet={extras.registerProphet}
         launchProphecy={extras.launchProphecy}
         lookupProphet={extras.lookupProphet}
@@ -404,7 +401,7 @@ describe("Screen 2 button gating", () => {
     await waitFor(() => expect(issued).toEqual([token]));
     expect(seen?.slug).toBe("coffee-last");
     expect(seen?.prophecy).toBe("Coffee lasts until the last pitch");
-    expect(seen?.deadline).toBeGreaterThan(0n);
+    expect(seen).toEqual({ slug: "coffee-last", prophecy: "Coffee lasts until the last pitch" });
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByTestId("write-success")).toHaveTextContent(WRITE_COPY.launchSuccess);
   });

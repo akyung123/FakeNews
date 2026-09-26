@@ -8,7 +8,7 @@ Gates (KST): 22:00 INTERFACE + contract skeleton; 02:00 Sepolia-fork 4 steps; 03
 
 ## Project context
 
-Prophecy is a Sepolia launchpad that turns one sentence into a token. The address book is the core feature (`ringo.prophecy.eth` → wallet, `lingo-2028.ringo.prophecy.eth` → token). There is no oracle and no True / False; after the deadline the only on-screen status is Departed. We never describe the price as recording truth (DECISIONS #1).
+Prophecy is a Sepolia launchpad that turns one sentence into a token. The address book is the core feature (`ringo.prophecy.eth` → wallet, `lingo-2028.ringo.prophecy.eth` → token). There is no oracle and no True / False; the only on-screen stage is the market stage (auction, graduated or ended), read from the chain. We never describe the price as recording truth (DECISIONS #1).
 
 On `main`, people buy and sell on a bonding curve; when that supply sells out, liquidity moves into a Uniswap v4 pool and is locked. On the `cca` family we replace the curve with Uniswap CCA + official LBPStrategy v3.3.0, then `migrate` opens the v4 pool.
 

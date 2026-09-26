@@ -24,7 +24,7 @@ export type { ClassifiedWriteError, MappedRevertName } from "./writeErrors";
 export const SLIPPAGE_BPS = 100n;
 export const BPS_DENOM = 10_000n;
 
-/** Unix seconds added to now. buy/sell have no deadline arg; launch uses the form deadline. */
+/** Unix seconds added to now for trade transactions. */
 export const TX_DEADLINE_SECONDS = 10 * 60;
 
 export const WRITE_COPY = {
@@ -127,7 +127,6 @@ export type WriteOptions = {
 export type LaunchInput = {
   slug: string;
   prophecy: string;
-  deadline: bigint;
 };
 
 export type BuyInput = {
@@ -216,7 +215,7 @@ export function launchWrite(input: LaunchInput, address: Address) {
     address,
     abi: launchpadAbi,
     functionName: "launch" as const,
-    args: [input.slug, input.prophecy, input.deadline] as const,
+    args: [input.slug, input.prophecy] as const,
   };
 }
 

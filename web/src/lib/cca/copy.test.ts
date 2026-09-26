@@ -19,7 +19,6 @@ import {
   auctionStatusSubCopy,
   ccaErrorCopy,
   claimBlockedCopy,
-  departedReplacesAuctionStatus,
   exitCtaCopy,
   exitDoneCopy,
   exitHelpCopy,
@@ -62,7 +61,6 @@ describe("designer FINAL CCA copy", () => {
       "The goal wasn't reached, so no tokens were issued and the market won't open. Every bid is returned in full.",
     );
     expect(auctionStatusCopy("pool_open")).toBe("Market open on Uniswap v4");
-    expect(departedReplacesAuctionStatus()).toBe(false);
     expect(Object.values(CCA_COPY).join(" ")).not.toContain("Departed");
   });
 

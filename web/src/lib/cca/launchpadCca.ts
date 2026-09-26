@@ -95,20 +95,19 @@ export function auctionBlocksRead(launchpad: Address) {
 }
 
 /**
- * `launch(slug, prophecy, deadline)` — not payable, no first buy.
+ * `launch(slug, prophecy)` — not payable, no first buy.
  * Returns the token only — read auction from Launched or auctionOf.
  */
 export function launchCcaWrite(
   launchpad: Address,
   slug: string,
   prophecy: string,
-  deadline: bigint,
 ): CcaWriteRequest {
   return {
     address: launchpad,
     abi: launchpadCcaAbi,
     functionName: "launch",
-    args: [slug, prophecy, deadline],
+    args: [slug, prophecy],
   };
 }
 

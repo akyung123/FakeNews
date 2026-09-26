@@ -21,7 +21,6 @@ export const launchpadCcaAbi = [
     inputs: [
       { name: "slug", type: "string" },
       { name: "prophecy", type: "string" },
-      { name: "deadline", type: "uint64" },
     ],
     outputs: [{ name: "token", type: "address" }],
   },

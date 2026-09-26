@@ -37,7 +37,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - a separate fee ledger
   - rounding rules
 - [x] `Launchpad.registerProphet`: server signature and nullifier checks, then prophet name + prophet registry + prophet resolver @cursor
-- [x] `Launchpad.launch`: initialize the prophecy resolver (sentence, deadline, address), register the name, mint the token @cursor
+- [x] `Launchpad.launch`: initialize the prophecy resolver (sentence, address), register the name, mint the token @cursor
 - [x] Graduation: fill only the remaining supply and refund, `complete`, V4 pool, `LiquidityLocker` @cursor-agent
 - [x] `ProphecyHook`: `beforeInitialize` allows only the Launchpad. Mine the CREATE2 salt @cursor-agent
 - [x] `LiquidityLocker.collect`: 24 : 76 @cursor-agent
@@ -55,7 +55,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 - [x] Replace the prototype curve constants with SPEC values (`src/lib/curve.ts`) @cursor
 - [x] wagmi + viem, Sepolia only @cursor
-- [x] Screen 1: prophecy list (name, sentence, price, Departed count) @cursor
+- [x] Screen 1: prophecy list (name, sentence, price) @cursor
 - [x] Screen 2: issue @cursor
   - the issue button turns on only after World verification
   - cancelling or failing disables it
@@ -66,7 +66,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - optional one-line memo on buy and sell; recent trades listed with their memos
   - [x] replace the prototype's holder talk with trade memos @cursor
   - [x] hide Buy/Sell after graduation; Uniswap V4 panel @cursor-agent
-- [x] Screen 4: prophet page. Departed prophecies next to the next buy, claimable fees, sell button @cursor
+- [x] Screen 4: prophet page. Every prophecy under the name, claimable fees @cursor
 - [ ] Every sentence is read from ENS. Nothing hardcoded
 - [ ] Republish the demo page (skill `demo-publish`)
 
@@ -81,7 +81,6 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] Record scene 1 on Sepolia (register `ringo.prophecy.eth`).
   - If it fails: record it again with another person's World ID and a different name.
   - Redeploying the contracts is the last resort only.
-- [ ] Right after scene 1, off camera: issue a prophecy under `ringo` with a 2-minute deadline so it is already Departed for the later scenes.
 - [ ] Record the remaining scenes in SPEC "Demo" (total 2–4 minutes, success and failure paths).
 - [ ] If the ENS app cannot read Sepolia ENSv2 names: use the viem lookup script in `infra/` (`getEnsAddress` and text record) output as the external lookup evidence for scenes 1 and 2.
 - [ ] `FEEDBACK.md` (Uniswap): keep notes of blockers during development; it is the fallback deliverable if Uniswap graduation is cut.
@@ -97,6 +96,9 @@ Team decision B2: replace the bonding curve with official Uniswap LBPStrategy. T
 - [x] Follow-up Sepolia fork tests: no-checkpoint 0.021@2× floor, `CannotExitBid` at clearing, Launchpad+ProphecyHook+Locker migrate/register, leftover ETH `assertEq(171)` @cursor
 - [x] CCA `Deploy.s.sol`: hook `authorized` = LBPStrategy, `setUniswap` then `setCca`, sepolia.json schema @cursor
 - [x] Web bid / CCALens / claim / migrate / v4 swap + collect on existing screens @cursor
+- [x] Remove deadline and Departed (DECISIONS #18): `launch(slug, prophecy)`, no `deadline` text record, no deadline field on Issue, no Departed on the prophet page @akyung123
+- [ ] Redeploy Launchpad and the ENS adapter on Sepolia with the new `launch` (a person broadcasts; skill `deploy-sepolia`)
+- [ ] Market stage badge (Auction / Graduated / Ended) on the prophecy detail screen, then the list
 
 ## If there is time
 

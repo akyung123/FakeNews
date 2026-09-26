@@ -48,6 +48,15 @@ describe("Launchpad ABI from #26", () => {
     ]);
   });
 
+  it("launch is { slug, prophecy } with no deadline", () => {
+    const fn = entry("function", "launch");
+    if (!fn || fn.type !== "function") throw new Error("missing launch");
+    expect(fn.inputs.map((input) => [input.name, input.type])).toEqual([
+      ["slug", "string"],
+      ["prophecy", "string"],
+    ]);
+  });
+
   it("Launched carries prophetLabel and slug, not deadline", () => {
     const ev = entry("event", "Launched");
     if (!ev || ev.type !== "event") throw new Error("missing Launched");

@@ -374,11 +374,6 @@ export function graduationGoalWei(): bigint {
   return GRADUATION_ETH_WEI;
 }
 
-/** Departed is a separate badge. It never replaces an auction status string. */
-export function departedReplacesAuctionStatus(): false {
-  return false;
-}
-
 export function swapSectionCopy() {
   return SWAP_SECTION_COPY;
 }

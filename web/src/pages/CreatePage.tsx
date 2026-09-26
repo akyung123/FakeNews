@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { WorldGate } from "../components/WorldGate";
 import {
-  fromDatetimeLocalValue,
   isIssueFormValid,
   isIssueSubmitEnabled,
   isLaunchEnabled,
@@ -12,7 +11,6 @@ import {
   prophecyName,
   readStoredProphetLabel,
   storeProphetLabel,
-  toDatetimeLocalValue,
   worldUserMessage,
   type IssueSession,
   type RegisterStatus,
@@ -38,12 +36,9 @@ import {
   type WorldServerSignature,
 } from "../lib/world";
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-
 export type IssueScreenProps = {
   session: IssueSession;
   world?: WorldClient;
-  now?: number;
   parentName?: string;
   onIssued?: (id: string) => void;
   registerProphet?: (input: RegisterProphetInput) => Promise<void>;
@@ -67,7 +62,6 @@ export function CreatePage() {
 export function IssueScreen({
   session,
   world = createWorldClient(),
-  now = Date.now(),
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
   onIssued,
   registerProphet = createRegisterProphet(),
@@ -81,7 +75,6 @@ export function IssueScreen({
   const [prophetLabel, setProphetLabel] = useState(session.prophetLabel ?? "");
   const [prophecy, setProphecy] = useState("");
   const [slug, setSlug] = useState("");
-  const [deadlineLocal, setDeadlineLocal] = useState(toDatetimeLocalValue(now + WEEK_MS));
   const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
   const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
@@ -91,8 +84,6 @@ export function IssueScreen({
   const [writeError, setWriteError] = useState<string | null>(null);
   const [writeSuccess, setWriteSuccess] = useState<string | null>(null);
 
-  const deadlineUnix = fromDatetimeLocalValue(deadlineLocal);
-  const nowSeconds = Math.floor(now / 1000);
   useEffect(() => {
     let cancelled = false;
     void readProphet(session.wallet).then((label) => {
@@ -109,8 +100,6 @@ export function IssueScreen({
     prophetLabel,
     prophecy,
     slug,
-    deadlineUnix,
-    nowSeconds,
   });
   const gate = { returningProphet, worldStatus, formValid, registerStatus };
   const canLaunch = isLaunchEnabled(gate);
@@ -190,7 +179,6 @@ export function IssueScreen({
               const token = await runLaunch({
                 slug,
                 prophecy: prophecy.trim(),
-                deadline: BigInt(deadlineUnix),
               });
               if (token) {
                 actions.create({
@@ -269,18 +257,6 @@ export function IssueScreen({
               onChange={(e) => setSlug(e.target.value.toLowerCase())}
             />
             <span className="faint small">3–32 characters, a–z, 0–9 and hyphen</span>
-          </label>
-          <label className="field">
-            <span>Deadline</span>
-            <input
-              aria-label="Deadline"
-              type="datetime-local"
-              value={deadlineLocal}
-              onChange={(e) => setDeadlineLocal(e.target.value)}
-            />
-            <span className="faint small">
-              After this time the screen shows Departed. Unix {deadlineUnix || "—"}.
-            </span>
           </label>
         </div>
 

@@ -12,7 +12,6 @@ import {
   normalizeProphetLabel,
   prophetPageFromChain,
   prophecyDetailPath,
-  prophecyTradeLabel,
   type ProphetPageData,
   type ProphetProphecy,
 } from "../lib/prophetData";
@@ -106,8 +105,6 @@ function ProphetView({
   claimFee?: () => Promise<unknown>;
   readCreatorFee?: (wallet: string) => Promise<bigint>;
 }) {
-  const departed = data.prophecies.filter((p) => p.departed);
-  const nextBuy = data.prophecies.find((p) => !p.departed);
   const [claimed, setClaimed] = useState(false);
   const [pending, setPending] = useState(false);
   const [phase, setPhase] = useState<WritePhase | null>(null);
@@ -151,7 +148,6 @@ function ProphetView({
         </p>
         <p className="faint small">
           {data.prophecies.length} {data.prophecies.length === 1 ? "prophecy" : "prophecies"}
-          {data.departedCount > 0 ? ` · ${data.departedCount} Departed` : ""}
         </p>
       </section>
 
@@ -197,39 +193,6 @@ function ProphetView({
         ) : null}
       </section>
 
-      <div className="prophet-split">
-        <section className="block">
-          <div className="block-head">
-            <h2>Departed</h2>
-            <span className="faint">deadline passed · name still points at the token</span>
-          </div>
-          {departed.length === 0 ? (
-            <p className="empty">None yet. A prophecy stays here after its deadline.</p>
-          ) : (
-            <ul className="prophet-cards">
-              {departed.map((row) => (
-                <ProphecyCard key={row.ensName} row={row} />
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="block">
-          <div className="block-head">
-            <h2>Next buy</h2>
-            <span className="faint">an open prophecy beside the departed ones</span>
-          </div>
-          {nextBuy ? (
-            <ProphecyCard row={nextBuy} />
-          ) : (
-            <p className="empty">
-              No open prophecy under this name.{" "}
-              <Link to="/create">Write the next one</Link>
-            </p>
-          )}
-        </section>
-      </div>
-
       <section className="block">
         <div className="block-head">
           <h2>Prophecies</h2>
@@ -242,7 +205,6 @@ function ProphetView({
             <div className="tr th" role="row">
               <span>Name</span>
               <span>Sentence</span>
-              <span className="col-deadline">Deadline</span>
               <span className="col-token">Token</span>
               <span className="col-curve">Curve</span>
               <span className="num">Trade</span>
@@ -255,9 +217,6 @@ function ProphetView({
                   </span>
                 </span>
                 <span className="prophet-sentence">{row.sentence}</span>
-                <span className="col-deadline">
-                  <Status row={row} />
-                </span>
                 <span className="mono col-token" title={row.token}>
                   {shortAddress(row.token)}
                 </span>
@@ -265,9 +224,7 @@ function ProphetView({
                   <CurveMark row={row} />
                 </span>
                 <span className="num">
-                  <span className={row.departed ? "prophet-row-sell" : "strong"}>
-                    {prophecyTradeLabel(row)}
-                  </span>
+                  <span className="strong">Buy</span>
                 </span>
               </Link>
             ))}
@@ -278,61 +235,16 @@ function ProphetView({
   );
 }
 
-function ProphecyCard({ row }: { row: ProphetProphecy }) {
-  const href = prophecyDetailPath(row.ensName);
-  const label = prophecyTradeLabel(row);
-  return (
-    <article className="prophet-card">
-      <TokenName slug={row.slug} ensName={row.ensName} />
-      <p className="prophet-card-sentence">{row.sentence}</p>
-      <Status row={row} />
-      <p className="faint small mono" title={row.token}>
-        Token {shortAddress(row.token)}
-      </p>
-      <CurveMark row={row} labelled />
-      <div className="prophet-card-actions">
-        <Link to={href} className={`btn ${label === "Sell" ? "sell" : "primary"}`}>
-          {label}
-        </Link>
-      </div>
-    </article>
-  );
-}
-
-function Status({ row }: { row: ProphetProphecy }) {
-  return (
-    <span className="prophet-status">
-      {row.departed ? <span className="badge departed">Departed</span> : null}
-      {row.complete ? <span className="badge graduated">Graduated</span> : null}
-      <span className="faint small">{formatDeadline(row.deadline)}</span>
-    </span>
-  );
-}
-
-function CurveMark({ row, labelled }: { row: ProphetProphecy; labelled?: boolean }) {
+function CurveMark({ row }: { row: ProphetProphecy }) {
   if (row.complete) {
     return <span className="strong">Graduated</span>;
   }
   const pctText = `${(row.curveProgress * 100).toFixed(0)}%`;
   return (
     <>
-      <Bar value={row.curveProgress} labelled={labelled} />
-      {labelled ? null : <span className="faint">{pctText}</span>}
+      <Bar value={row.curveProgress} />
+      <span className="faint">{pctText}</span>
     </>
-  );
-}
-
-function formatDeadline(sec: number): string {
-  return (
-    new Date(sec * 1000).toLocaleString("en-GB", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "UTC",
-      hour12: false,
-    }) + " UTC"
   );
 }
 
