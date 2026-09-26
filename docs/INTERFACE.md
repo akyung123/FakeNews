@@ -1,61 +1,16 @@
 # Interface
 
-`cca` branch family. Bonding-curve trading on `main` is the fallback until the final gate. This file is the contract between `contracts/`, `web/`, `world/`, and `infra/` for the CCA path.
+CCA version on branch `cca`: see [`INTERFACE_CCA.md`](INTERFACE_CCA.md).
+
+What `contracts/`, `web/` and `world/` rely on from each other. Only the contract between folders, not how to implement it.
 
 - **Changing it:** edit this file first, in **the same PR** as the code change, and write "INTERFACE change" in the PR description.
-- **Sources:** [`SPEC.md`](SPEC.md), [`DECISIONS.md`](DECISIONS.md) #1 (unchanged), #18–#22. Official Uniswap sources are pinned in section 0. Research notes (not accepted as INTERFACE): [PR #38 `CCA_RESEARCH.md`](https://github.com/prism-toggle-ai/FakeNews/blob/a45aecb37f7e1fdc64bed17b1391bb2f603a8ea3/docs/CCA_RESEARCH.md).
+- **Sources:** [`SPEC.md`](SPEC.md), [`DECISIONS.md`](DECISIONS.md)
 - `(draft)` means the shape may still change during implementation. Remove the mark once it settles.
-- `(removed-on-cca)` is the bonding-curve surface. Do not call it from web on this branch.
-- `TBD(backend)` is a question the contracts lane must answer. Do not guess a function, field, event, or error to fill it.
-
-## 0. Pinned official sources
-
-Read on 2026-09-26. Every external signature below is copied from these pins. If a name is not in this file, it is not in the official source we read.
-
-| Piece | Pin | What we read |
-|---|---|---|
-| Continuous Clearing Auction factory **v2.1.0** | tag `v2.1.0`, commit `7d7602d257733315434570f2a0c2f94f1c7b207a` | [`ContinuousClearingAuctionFactory.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuctionFactory.sol), [`IContinuousClearingAuction.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuction.sol). Address from [Launchpad deployments](https://developers.uniswap.org/docs/liquidity/liquidity-launchpad/deployments) |
-| CCALens | tag `v2.1.0` (lens source) / deployed **v2.0.0** commit `aee9bca51c92c24eb24a00d75ad98e678bac61d3` | [`CCALens.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/v2.1.0/src/lens/CCALens.sol) = `AuctionStateLens` + `TickDataLens`. Address from the CCA README Deployments table |
-| LBPStrategy **v3.3.0** | commit `1c5904912aefceaceb89c24528cd5e25d0b61597` (no `v3.3.0` git tag exists) | [`IStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IStrategy.sol), [`ILBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/ILBPStrategy.sol), [`LBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol), [`MigratorParams.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/libraries/MigratorParams.sol) |
-| InitializerHook **v3.3.0** | source at `1c590491…`; Sepolia deploy commit `7ea523c9d75a51cb2f497be5e49bacdaeb80a342` | [`InitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/periphery/hooks/InitializerHook.sol), [`IInitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IInitializerHook.sol) |
-| Uniswap v4 Sepolia | [v4 deployments](https://docs.uniswap.org/contracts/v4/deployments) | PoolManager, PositionManager, Universal Router 2.1.2, StateView, Quoter, Permit2 |
-| Universal Router `execute` | [`IUniversalRouter.sol` on `main`](https://github.com/Uniswap/universal-router/blob/main/contracts/interfaces/IUniversalRouter.sol) | signature only; **V4_SWAP command bytes are `TBD(backend)`** — tag `v2.1.2` was not fetchable from this environment |
-| PositionManager collect actions | [`IPositionManager.sol` on `main`](https://github.com/Uniswap/v4-periphery/blob/main/src/interfaces/IPositionManager.sol) | `modifyLiquidities` only; **action-byte encoding is `TBD(backend)`** |
-
-The CCA README at tag `v2.1.0` still lists v2.0.0 as “latest” in its own table. The official deployments page lists factory **v2.1.0** at the address below. Use the deployments page for the factory address.
-
-## 0.1 Fixed Sepolia addresses and parameters
-
-| Item | Value | Who uses it |
-|---|---|---|
-| LBPStrategy v3.3.0 | `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000` | Launchpad `initializeDistribution`; web `migrate` |
-| CCA factory v2.1.0 | `0x000000001F26a0044BaA66024e7b6599c61963F8` | LBPStrategy `initializerFactory()` (already wired on chain). Launchpad does **not** call `create` |
-| InitializerHook reference | `0x1600059B95A80d500fC42400ea9a88A9C29D2000` | Reference only. `ProphecyHook` **inherits** `InitializerHook`; `authorized()` must be the LBPStrategy above |
-| CCALens v2.0.0 | `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53` | Web `state(auction)` via `eth_call` |
-| PoolManager | `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543` | Hook, locker, fork tests |
-| PositionManager | `0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4` | LBPStrategy mints the LP NFT here; locker holds it |
-| Universal Router 2.1.2 | `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3` | Web v4 swap after migrate |
-| StateView | `0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c` | Optional pool reads |
-| Quoter | `0x61b3f2011a92d183c7dbadbda940a7555ccf9227` | Optional quotes |
-| Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | Not used for ETH bids |
-| Currency | native ETH (`address(0)`) | `AuctionParameters.currency` and `MigratorParameters.currency` |
-| Auction length | **25 blocks** | `endBlock = startBlock + 25` |
-| Graduation threshold | **0.02 ETH** (`20000000000000000` wei) | `AuctionParameters.requiredCurrencyRaised` |
-| Pool fee | **1% = `10000` pips** | `PoolParameters.fee` |
-| Pool tickSpacing | **200** | `PoolParameters.tickSpacing` |
-| LP NFT holder | `LiquidityLocker` | `MigratorParameters.positionRecipient` |
-| Fee split after the pool | prophet **24** : protocol **76** | locker `collect` |
-| `recipient` | protocol fee recipient **or** Launchpad — **never the prophet** | unused currency / unused reserved tokens after migrate (and recover-on-fail) |
-| `tokensRecipient` | protocol fee recipient **or** Launchpad — **never the prophet**, and **never** LBPStrategy | unsold auction tokens via `sweepUnsoldTokens` |
-| `fundsRecipient` | **LBPStrategy** (`0x9543…2000`) | official `InvalidFundsRecipient` if anything else |
-| Deadline vs auction | **not linked** | ENS `deadline` / Departed stay as today. Auction blocks do not read the deadline |
-| World ID / ENS | **unchanged** | section 1 and section 3 |
-
-Do not describe the auction or the pool in terms of returns, profit, or prediction. Do not use “coin”. Do not show a percent price change.
 
 ## 1. Names (ENS)
 
-Unchanged from `main`. The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NAME` (see DECISIONS "Not decided yet").
+The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NAME` (see DECISIONS "Not decided yet").
 
 | Name | Address record (coinType 60) | Text records | Who can write |
 |---|---|---|---|
@@ -69,13 +24,13 @@ Unchanged from `main`. The parent is written as `prophecy.eth`. The real one com
   - Prophecy: 3–32 chars, `[a-z0-9-]`, no leading or trailing hyphen
 - **Expiry:** `type(uint64).max` for every name, so names never expire (DECISIONS #14).
 - **Transfer:** not allowed. The owner's role bitmap is 0.
-- **Departed:** `now >= deadline`. Computed by the UI; there is no on-chain status. Independent of auction blocks (DECISIONS #21).
+- **Departed:** `now >= deadline`. Computed by the UI; there is no on-chain status.
 
 ## 2. Contracts
 
 ### `Launchpad` `(draft)`
 
-Constructor stays `(protocolFeeRecipient, worldSigner, ens)`. No new constructor arguments.
+Final constructor. Graduation does not add constructor arguments.
 
 ```solidity
 constructor(address protocolFeeRecipient, address worldSigner, address ens);
@@ -83,24 +38,25 @@ constructor(address protocolFeeRecipient, address worldSigner, address ens);
 // Deployer-only, once. After Launchpad, Hook (CREATE2), and Locker exist.
 function setUniswap(address poolManager, address hook, address locker) external;
 
-// Deployer-only, once. Official Sepolia LBPStrategy + PositionManager.
-function setLbp(address lbpStrategy, address positionManager) external;
-
-// Unchanged. Create a prophet name. Needs a World ID server signature. Once per nullifier.
+// Create a prophet name. Needs a World ID server signature. Once per nullifier.
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
 
-// Issue a prophecy. Caller must own a prophet name.
-// Mints ProphecyToken (1_000_000_000e18) to the Launchpad, writes ENS (sentence + deadline
-// only on the prophecy resolver), approves LBPStrategy for `totalSupply`, then calls
-// LBPStrategy.initializeDistribution(token, totalSupply, configData, salt).
-// Not payable. There is no first buy.
-function launch(string slug, string prophecy, uint64 deadline)
-    external
-    returns (address token, address auction);
+// Issue a prophecy. Caller must own a prophet name. If msg.value > 0, also makes the first buy.
+function launch(string slug, string prophecy, uint64 deadline, uint256 minTokensOut)
+    external payable returns (address token);
+
+// memo: optional one-line note shown next to the trade. Empty string for none. At most 140 bytes.
+function buy(address token, uint256 minTokensOut, string memo) external payable;
+function sell(address token, uint256 tokensIn, uint256 minEthOut, string memo) external;
+function claimCreatorFee() external;
 
 // views
-function auctionOf(address token) external view returns (address auction, bool poolOpened);
+function curve(address token) external view returns (
+    uint256 vEth, uint256 vToken, uint256 realEth, uint256 sold, bool complete);
+function quoteBuy(address token, uint256 ethIn) external view returns (uint256 tokensOut, uint256 fee);
+function quoteSell(address token, uint256 tokensIn) external view returns (uint256 ethOut, uint256 fee);
 function prophetOf(address wallet) external view returns (string label);
+function creatorFeeOf(address wallet) external view returns (uint256);
 function protocolFeeRecipient() external view returns (address);
 function worldSigner() external view returns (address);
 function ens() external view returns (address);
@@ -108,202 +64,61 @@ function deployer() external view returns (address);
 function poolManager() external view returns (address);
 function hook() external view returns (address);
 function locker() external view returns (address);
-function lbpStrategy() external view returns (address);
-function positionManager() external view returns (address);
 ```
-
-`initializeDistribution` **returns nothing** ([`IStrategy.sol` L29–L33](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IStrategy.sol#L29-L33)). Launchpad obtains `auction` from the official factory predict or from the strategy event in the same transaction:
-
-```solidity
-// LBPStrategy.sol L91–L94
-bytes32 initializerSalt = keccak256(abi.encode(salt, migrationParams));
-initializerFactory.create(token, auctionSupply, initializerParams, initializerSalt);
-
-// factory
-function getAddress(address token, uint256 amount, bytes calldata configData, bytes32 salt, address sender)
-    external view returns (IDistributor distributor);
-// CREATE2 salt inside the factory is keccak256(abi.encode(sender, salt))
-// with sender = LBPStrategy
-```
-
-`TBD(backend):` exact `salt` derivation (must be unique per prophecy). `TBD(backend):` whether Launchpad also exposes a permissionless `openMarket(token)` wrapper around `LBPStrategy.migrate`, or web always calls `migrate` on the strategy. Either way web can detect the open pool from `Migrated` or `PoolManager.getSlot0`.
 
 ```solidity
 event ProphetRegistered(address indexed wallet, string label, uint256 nullifier);
-event Launched(
-    address indexed token,
-    address indexed prophet,
-    address indexed auction,
-    string prophetLabel,
-    string slug
-);
-event UniswapSet(address poolManager, address hook, address locker);
-event LbpSet(address lbpStrategy, address positionManager);
-```
-
-- `Launched` still does **not** contain the sentence or the deadline (DECISIONS #5).
-- `registerProphet` recovers EIP-191 `personal_sign` of `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` (section 3). `chainId` must be `block.chainid` and `launchpad` must be this contract; the signed wallet must be `msg.sender`. Label is chosen by the caller and is not in the signed payload.
-- Deploy order: Launchpad, Hook (CREATE2; `authorized` = LBPStrategy), Locker (ERC-721 receiver), `setUniswap(poolManager, hook, locker)`, `setLbp(lbpStrategy, positionManager)`. A second call or a non-deployer call reverts. `launch` reverts if Uniswap or LBP is not set.
-- `receive()` leftover ETH only from the locker, the PoolManager, and — `TBD(backend)` — LBPStrategy / PositionManager if migrate refunds native ETH to Launchpad as `recipient`.
-- Sentence length: 1–140 UTF-8 bytes (`BadProphecy`).
-
-#### `launch` encodes these official structs
-
-`configData` for `initializeDistribution` is `abi.encode(MigratorParameters, bytes initializerParams)` ([`LBPStrategy.sol` L74–L75](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol#L74-L75)). `initializerParams` is `abi.encode(AuctionParameters)` (factory `abi.decode(configData, (AuctionParameters))`).
-
-```solidity
-// IContinuousClearingAuction.sol — AuctionParameters
-struct AuctionParameters {
-    address currency;                 // address(0) = ETH
-    address tokensRecipient;          // protocol or Launchpad — NEVER prophet, NEVER LBPStrategy
-    address fundsRecipient;           // MUST be LBPStrategy
-    uint64 startBlock;
-    uint64 endBlock;                  // startBlock + 25
-    uint64 claimBlock;                // >= endBlock
-    uint256 tickSpacing;              // Q96 price granularity (NOT pool tickSpacing 200)
-    address validationHook;           // address(0) = none
-    uint256 floorPrice;               // Q96; official minimum is 2^32 + 1
-    uint128 requiredCurrencyRaised;   // 0.02 ether
-    bytes auctionStepsData;           // packed MPS + block deltas
-}
-
-// MigratorParams.sol — MigratorParameters
-struct MigratorParameters {
-    address token;
-    address currency;                 // address(0)
-    uint64 migrationBlock;            // MUST be > endBlock
-    uint128 reservedTokenAmountForLP; // pulled to the strategy; rest is auction supply
-    address recipient;                // protocol or Launchpad — NEVER prophet
-    address positionRecipient;        // LiquidityLocker
-    PoolParameters poolParameters;
-    bytes positionDefinitions;        // abi.encode(PositionDefinition[])
-    bytes lpAllocationSchedule;       // abi.encode(LiquidityAllocationBracket[])
-}
-
-struct PoolParameters {
-    uint24 fee;                       // 10000
-    int24 tickSpacing;                // 200
-    address hook;                     // ProphecyHook (inherits InitializerHook)
-}
-
-struct PositionDefinition {
-    int24 offsetLower;                // sentinel MIN_TICK + MAX_TICK = full range
-    int24 offsetUpper;
-    uint24 weight;                    // mps, 1e7 = 100%
-    address overridePositionRecipient; // address(0) → positionRecipient (locker)
-}
-
-struct LiquidityAllocationBracket {
-    uint128 lowerThreshold;           // first bracket MUST be 0
-    uint24 rate;                      // mps, 1e7 = 100%
-}
-```
-
-Strategy pull ([`LBPStrategy.sol` L67–L116](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol#L67-L116)): Launchpad must `approve` the strategy for `totalSupply` first. Strategy `safeTransferFrom`s `auctionSupply = totalSupply - reservedTokenAmountForLP` to the auction and `reservedTokenAmountForLP` to itself, then calls `onTokensReceived()`. Launchpad does **not** call `onTokensReceived` itself on this path.
-
-Official errors the prophet can see on `launch` (bubble from LBP / factory / CCA constructor):
-
-`ZeroAddressToken`, `InitializerAlreadyCreated`, `HookIsStrategy`, `InvalidReservedTokenAmountForLP`, `TokenMismatch`, `CurrencyMismatch`, `TokenAmountMismatch`, `PoolIdOccupied`, `InvalidFundsRecipient`, `InvalidTokensRecipient`, `InvalidEndBlock`, `InvalidRecipient`, `InvalidPositionRecipient`, `InvalidTickSpacing`, `InvalidFee`, `InvalidHook`, `InvalidTokenAmount`, `InvalidTokenAmountReceived` (CCA name) / `InvalidAmountReceived` (IDistributor name), plus CCA constructor names in section 8.
-
-#### What stays
-
-- `registerProphet`, World ID signature, one nullifier, prophet ENS name (section 3).
-- ENS adapter: prophecy sentence and deadline live only on the prophecy resolver (DECISIONS #5).
-- Constructor `(protocolFeeRecipient, worldSigner, ens)`.
-- `setUniswap` + CREATE2 hook address flags.
-- `LiquidityLocker.collect` / `withdrawAccrued` after the pool exists. Prophet 24 : protocol 76.
-- Label / slug / prophecy length rules. Names never expire.
-
-#### What is removed-on-cca
-
-Bonding-curve trading. Do not keep these on Launchpad:
-
-```solidity
-function launch(..., uint256 minTokensOut) external payable returns (address token); // old
-function buy(address token, uint256 minTokensOut, string memo) external payable;
-function sell(address token, uint256 tokensIn, uint256 minEthOut, string memo) external;
-function claimCreatorFee() external;
-function curve(address token) external view returns (
-    uint256 vEth, uint256 vToken, uint256 realEth, uint256 sold, bool complete);
-function quoteBuy(address token, uint256 ethIn) external view returns (uint256 tokensOut, uint256 fee);
-function quoteSell(address token, uint256 tokensIn) external view returns (uint256 ethOut, uint256 fee);
-function creatorFeeOf(address wallet) external view returns (uint256);
-function ccaFactory() external view returns (address); // Path A proposal only; B2 talks to LBPStrategy
-
+event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
 event Trade(address indexed token, address indexed trader, bool isBuy,
             uint256 ethAmount, uint256 tokenAmount, uint256 fee, uint256 vEthAfter, uint256 vTokenAfter, string memo);
+event Graduated(
+    address indexed token,
+    bytes32 indexed poolId,
+    uint256 ethToPool,
+    uint256 tokensToPool,
+    uint160 sqrtPriceX96,
+    uint24 fee,
+    int24 tickSpacing,
+    address hooks
+);
 event CreatorFeeClaimed(address indexed prophet, uint256 amount);
-event Graduated(address indexed token, bytes32 indexed poolId, uint256 ethToPool, uint256 tokensToPool,
-                uint160 sqrtPriceX96, uint24 fee, int24 tickSpacing, address hooks); // last-buy graduate
-event CcaFactorySet(address factory); // Path A proposal only
+event UniswapSet(address poolManager, address hook, address locker);
 ```
 
-`(removed-on-cca)` Launchpad revert names the UI must stop mapping: `CurveComplete`, `Slippage`, `MemoTooLong`, `ExceedsSold`, `ZeroAmount` (`claimCreatorFee`).
-
-Write-facing names that **still** apply: `NullifierUsed`, `LabelTaken`, `AlreadyProphet`, `SlugTaken`, `InvalidSignature`, `NotProphet`, `BadSlug`, `BadProphecy`, `BadLabel`, `ZeroAddress`, `NotDeployer`, `UniswapAlreadySet`, `UniswapNotSet`, `UnknownToken`.
-
-`registerProphet` check order stays: `NullifierUsed`, `AlreadyProphet`, `LabelTaken`, `InvalidSignature`.
-
-`TBD(backend):` names for “LBP not set”, “auction already exists”, “not the Launchpad’s token”. Do not invent them in web until the contracts PR writes them.
+- `Graduated` is emitted in the buy that sells the last curve tokens. `poolId` is the V4 `PoolId` (`keccak256` of the `PoolKey`). `currency0` is native ETH (`address(0)`); `currency1` is `token`. The frontend reconstructs the key from `token`, `fee`, `tickSpacing`, and `hooks`.
+- The sentence and deadline are not in `Launched`. Both are read from ENS (DECISIONS #5).
+- `registerProphet` recovers EIP-191 `personal_sign` of `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` (section 3). `chainId` must be `block.chainid` and `launchpad` must be this contract; the signed wallet must be `msg.sender`. Label is chosen by the caller and is not in the signed payload.
+- Constructor is `(protocolFeeRecipient, worldSigner, ens)`. This PR does not add constructor arguments.
+- Deploy order: Launchpad, then Hook (CREATE2 using the Launchpad address), then Locker, then a deployer-only one-time `setUniswap(poolManager, hook, locker)`. A second call or a non-deployer call reverts. Graduation reverts if Uniswap is not set.
+- `receive()` accepts leftover seed ETH only from the locker and the PoolManager.
+- Constants are exactly the "Constants" section of SPEC.md.
+- `memo` is only on `buy` / `sell` (INTERFACE / DECISIONS #15). `launch` has no memo argument; the first buy inside `launch` goes without a memo. `buy` / `sell` revert if the memo is longer than 140 UTF-8 bytes. Launchpad `MAX_MEMO` is internal (not a view) — the web hardcodes 140. The prophecy sentence is 1–140 UTF-8 bytes (`BadProphecy`).
+- Rounding:
+  - Buy: fee rounds up, tokens out round down.
+  - Sell: fee rounds up, ETH out rounds down.
+- Write-facing custom errors (names match `Launchpad.sol`). The web maps these six so a revert can show a human sentence instead of a raw name:
+  `NullifierUsed`, `LabelTaken`, `AlreadyProphet`, `SlugTaken`, `Slippage`, `CurveComplete`.
+  `registerProphet` checks in this order: `NullifierUsed`, `AlreadyProphet`, `LabelTaken`, `InvalidSignature`.
+  `CurveComplete` can come from `buy` or `sell`.
+  Other custom errors on the contract stay a generic write failure. `ZeroAmount` (`claimCreatorFee` when nothing is accrued) uses that generic banner — no extra designer sentence. Wallet rejection is not a revert.
+- The web prevents these before a send (no extra revert banners): `MemoTooLong` (buy/sell memo, 140 UTF-8 bytes), `BadProphecy` (sentence, 1–140 UTF-8 bytes), `NotProphet` (`launch` only after `registerProphet` succeeds or `prophetOf(wallet)` is a non-empty label), `ZeroAmount` (`claimCreatorFee` only when `creatorFeeOf(wallet)` is 0; the Claim fees button stays disabled).
 
 ### `ProphecyToken`
-
-Unchanged.
 
 - ERC-20, 18 decimals, 1,000,000,000 total. All minted to the Launchpad.
 - `name` is the full prophecy name (`lingo-2028.ringo.prophecy.eth`).
 - `symbol` is the slug in upper case, truncated to 11 chars `(draft)`.
-- Plain ERC-20 (no fee-on-transfer). Auction `amount` must be `<= type(uint128).max` (1e27 is inside).
-
-### `ProphecyHook`
-
-Must inherit official `InitializerHook` so LBPStrategy `validateHook` passes ([`MigratorParams.validateHook`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/libraries/MigratorParams.sol#L143-L158)).
-
-```solidity
-// InitializerHook.sol — public surface ProphecyHook keeps
-constructor(IPoolManager _poolManager, address _authorized) BaseHook(_poolManager);
-address public immutable authorized;
-function getHookPermissions() public pure virtual returns (Hooks.Permissions memory);
-function supportsInterface(bytes4 interfaceId) public pure virtual returns (bool);
-error InvalidInitializer(address caller, address expected);
-```
-
-- `_authorized` **must** be LBPStrategy `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000`. The official Sepolia InitializerHook’s `authorized()` is that strategy. Today’s “only Launchpad may initialize” does **not** work on B2: `migrate` initializes as the strategy.
-- ERC165 must report `IInitializerHook` (`authorized()`).
-- Permission bits must include `BEFORE_INITIALIZE`. Deploy with a mined CREATE2 salt.
-- Official `getHookPermissions` is `beforeInitialize` only. Extra flags (e.g. `afterSwap`) are out of the 02:00 fork gate.
-- Do not point `PoolParameters.hook` at the official reference hook `0x1600…2000` if we want `ProphecyHook` in the `PoolKey`. That reference address is the inherit-from sample, not our pool hook.
 
 ### `LiquidityLocker`
 
-LBPStrategy mints a PositionManager ERC-721 and transfers it to `positionRecipient` ([`LBPStrategy.sol` L346–L363](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol#L346-L363)). The locker **is** that recipient.
-
-```solidity
-// Incoming NFT (official ERC-721)
-function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data)
-    external returns (bytes4);
-
-function collect(address token) external;
-function withdrawAccrued() external;
-
-// views — names are (draft); tokenId mapping is required
-function tokenIdOf(address token) external view returns (uint256 tokenId);
-function prophetOf(address token) external view returns (address);
-function protocolFeeRecipient() external view returns (address);
-```
-
+- `lock(address token, address prophet, address protocolFeeRecipient, PoolKey key, uint256 tokenAmount)` is called only by the Launchpad at graduation. Recipients are fixed then.
 - `collect(address token)` can be called by anyone. Collected fees go **only** to prophet 24 : protocol 76.
-- No withdraw of principal. The locker must not `transferFrom` the NFT out, and must not decrease liquidity.
-- If sending ETH to the prophet fails, `collect` still pays the protocol and accrues the prophet share. The prophet later calls `withdrawAccrued()`.
+- No withdraw of principal. Liquidity cannot be decreased or burned.
+- If sending ETH to the prophet fails, `collect` still pays the protocol and accrues the prophet share. The prophet later calls `withdrawAccrued()`. Seed leftovers must not sweep `accruedEth`.
 - `withdrawAccrued()` sends only accrued ETH, never pool principal.
-- Collect path is PositionManager `modifyLiquidities(bytes unlockData, uint256 deadline)` ([`IPositionManager.sol`](https://github.com/Uniswap/v4-periphery/blob/main/src/interfaces/IPositionManager.sol)). **Action bytes for a fees-only collect are `TBD(backend)`.**
-- `(removed-on-cca)` Launchpad-only `lock(address token, address prophet, address protocolFeeRecipient, PoolKey key, uint256 tokenAmount)` that called `PoolManager.modifyLiquidity` directly. The NFT arrives from LBPStrategy, not from Launchpad.
-- `TBD(backend):` how the locker learns `prophet` / `token` for a newly received `tokenId` (same-tx callback data vs Launchpad registry vs `getPoolAndPositionInfo(tokenId)`).
-- `TBD(backend):` more than one NFT if `positionDefinitions` has several rows. Demo intent is one full-range position.
+- Leftover seed tokens after lock are sent to `0x…dEaD` (the token rejects `address(0)`).
 
 ## 3. World server → Launchpad `(draft)`
-
-Unchanged from `main`.
 
 - The server verifies an IDKit 4 Proof of Human with Portal v4.
 - On success it signs `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` with EIP-191.
@@ -353,195 +168,19 @@ Live IDKit uses `app_id`, `action`, and `environment` from this envelope so the 
 
 Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check can take a minute when the World server has been idle. The issue button stays off while the check is running. The retry sentence is shown only after a timeout or a dropped connection — not while the request is still open.
 
-## 4. What the web calls (exact ABI + address)
+## 4. How the web app reads
 
-Issue still goes to Launchpad (`registerProphet`, `launch`). After `launch`, trading talks to the **auction**, **LBPStrategy**, **CCALens**, and **Universal Router** — not Launchpad `buy` / `sell`.
+1. List: `Launched` logs.
+2. Names, resolved through the Universal Resolver (`VITE_UNIVERSAL_RESOLVER`):
+   - token: `getEnsAddress(name)`
+   - sentence: `getEnsText(name, "prophecy")`
+   - deadline: `getEnsText(name, "deadline")`
+3. Price and progress: `curve(token)`.
+4. Graduation: `curve(token).complete` on load. Watch `Graduated` so the trade panel flips during a live last buy. There is no `getState`. The Uniswap link uses `Graduated.poolId` (V4 `PoolId`). If the event is not in hand yet, reconstruct the key: native ETH (`address(0)`), `token`, fee `10000`, tickSpacing `200`, `hooks` from the event or `launchpad.hook()`.
+5. Chart and trade memos: `Trade` logs.
+6. Name next to a wallet: reverse lookup, falling back to `prophetOf(wallet)`.
 
-### 4.1 Home list
-
-Keep `Launched`. Path B2 extends it with `auction` as the third indexed topic. Home still queries `fromBlock = VITE_LAUNCHPAD_DEPLOY_BLOCK`.
-
-Sentence and deadline still come from ENS (`getEnsAddress`, `getEnsText(name, "prophecy")`, `getEnsText(name, "deadline")`).
-
-Name next to a wallet: reverse lookup, falling back to `prophetOf(wallet)`.
-
-### 4.2 Auction address from a token
-
-| Order | Call | Address |
-|---|---|---|
-| 1 | `launchpad.auctionOf(token)` → `(address auction, bool poolOpened)` | `VITE_LAUNCHPAD_ADDRESS` |
-| 2 | Decode `Launched` where `token` matches | Launchpad logs |
-| 3 | LBPStrategy `InitializerCreated` / `DistributionInitialized` | `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000` |
-
-Do not use factory `getAddress` unless the UI already has the exact `create` args.
-
-### 4.3 Auction state (CCALens + CCA views)
-
-CCA has no `getState()` enum. CCALens `state` is **not** `view`: it runs `checkpoint()` inside and returns via a revert payload ([`AuctionStateLens.sol` L26–L31](https://github.com/Uniswap/continuous-clearing-auction/blob/v2.1.0/src/lens/AuctionStateLens.sol#L26-L31)). Call it with `eth_call`.
-
-```solidity
-// CCALens at 0xc3C65F5453A3674aDb693cbdA3C842545cD30f53
-struct AuctionState {
-    Checkpoint checkpoint;
-    uint256 currencyRaised;
-    uint256 totalCleared;
-    bool isGraduated;
-}
-struct Checkpoint {
-    uint256 clearingPrice; // Q96
-    ValueX7 currencyRaisedAtClearingPriceQ96X7;
-    uint256 cumulativeMpsPerPrice;
-    uint24 cumulativeMps;
-    uint64 prev;
-    uint64 next;
-}
-function state(IContinuousClearingAuction auction) public returns (AuctionState memory);
-function getInitializedTickData(IContinuousClearingAuction auction)
-    public view returns (TickWithData[] memory ticks);
-```
-
-Direct CCA views (auction address from `auctionOf`):
-
-```solidity
-function startBlock() external view returns (uint64);
-function endBlock() external view returns (uint64);
-function claimBlock() external view returns (uint64);
-function currency() external view returns (address);
-function token() external view returns (address);
-function totalSupply() external view returns (uint128);
-function clearingPrice() external view returns (uint256); // Q96 ETH per token; stale until checkpoint
-function isGraduated() external view returns (bool);      // may be stale
-function lastCheckpointedBlock() external view returns (uint64); // ICheckpointStorage
-function floorPrice() external view returns (uint256);
-function tickSpacing() external view returns (uint256);
-function bids(uint256 bidId) external view returns (Bid memory);
-function nextBidId() external view returns (uint256);
-
-struct Bid {
-    uint64 startBlock;
-    uint24 startCumulativeMps;
-    uint64 exitedBlock;
-    uint256 maxPrice;
-    address owner;
-    uint256 amountQ96;
-    uint256 tokensFilled;
-}
-```
-
-Display the clearing price as `clearingPrice / 2^96` ETH per token. Do not call `curve()`. Do not show a percent change.
-
-`$_tokensReceived` is internal — there is no public `tokensReceived()` getter.
-
-### 4.4 Bid (budget + max price)
-
-Address: the CCA at `auctionOf(token).auction`. Currency is ETH (`address(0)`). Empty `hookData` when `validationHook == 0`.
-
-```solidity
-function submitBid(
-    uint256 maxPriceQ96,
-    uint128 amount,
-    address owner,
-    uint256 prevTickPriceQ96,
-    bytes calldata hookData
-) external payable returns (uint256 bidId);
-
-// 4-arg overload omits prevTickPriceQ96 and scans from the floor — do not use in the demo
-function submitBid(uint256 maxPriceQ96, uint128 amount, address owner, bytes calldata hookData)
-    external payable returns (uint256 bidId);
-```
-
-| Field | Meaning |
-|---|---|
-| `amount` | budget in wei; `msg.value` **must** equal `amount` |
-| `maxPriceQ96` | max price the bidder accepts (Q96 ETH per token), strictly above current clearing and `<= MAX_BID_PRICE` |
-| `owner` | bidder (receives tokens and leftover ETH) |
-| `prevTickPriceQ96` | hint; prefer `floorPrice` for the first bid on that tick |
-
-```solidity
-event BidSubmitted(uint256 indexed id, address indexed owner, uint256 priceQ96, uint128 amount);
-```
-
-Bid revert names (official CCA): `AuctionNotStarted`, `TokensNotReceived`, `AuctionIsOver`, `BidAmountTooSmall`, `BidOwnerCannotBeZeroAddress`, `InvalidAmount`, `CurrencyIsNotNative`, `InvalidBidPriceTooHigh`, `BidMustBeAboveClearingPrice`, `AuctionSoldOut`, `InvalidBidUnableToClear`, `TickPreviousPriceInvalid`, `TickPriceNotIncreasing`, `TickPriceNotAtBoundary`, `TickNotInitialized`, `InvalidTickPrice`, `TickHintMustBeGreaterThanNextActiveTickPrice`.
-
-There is **no sell** during the auction.
-
-### 4.5 Claim tokens and refund leftover
-
-Same CCA address.
-
-```solidity
-function checkpoint() external returns (Checkpoint memory);
-function exitBid(uint256 bidId) external;
-function exitPartiallyFilledBid(uint256 bidId, uint64 lastFullyFilledCheckpointBlock, uint64 outbidBlock) external;
-function claimTokens(uint256 bidId) external;
-function claimTokensBatch(address owner, uint256[] calldata bidIds) external;
-```
-
-| Action | When | ETH / tokens |
-|---|---|---|
-| `exitBid` | after `endBlock`; bid max price strictly **above** final clearing | leftover ETH paid in `BidExited` |
-| `exitPartiallyFilledBid` | partial fill; needs checkpoint hints. `outbidBlock = 0` means still at clearing at the end | leftover ETH in `BidExited` |
-| `claimTokens` | after `claimBlock`, auction graduated, bid already exited | tokens to `bid.owner`. Anyone may call |
-
-```solidity
-event BidExited(uint256 indexed bidId, address indexed owner, uint256 tokensFilled, uint256 currencyRefunded);
-event TokensClaimed(uint256 indexed bidId, address indexed owner, uint256 tokensFilled);
-event CheckpointUpdated(uint256 blockNumber, uint256 clearingPriceQ96, uint24 cumulativeMps);
-event ClearingPriceUpdated(uint256 blockNumber, uint256 clearingPriceQ96);
-event TokensReceived(uint128 totalSupply);
-```
-
-Exit / refund revert names: `AuctionIsNotOver`, `BidAlreadyExited`, `CannotExitBid`, `CannotPartiallyExitBidBeforeGraduation`, `CannotPartiallyExitBidBeforeEndBlock`, `InvalidLastFullyFilledCheckpointHint`, `InvalidOutbidBlockCheckpointHint`, `BidIdDoesNotExist`.
-
-Claim revert names: `NotClaimable`, `AuctionIsNotFinalized`, `NotGraduated`, `BidNotExited`, `BatchClaimDifferentOwner`, `BidIdDoesNotExist`.
-
-Demo: prefer a bid strictly above final clearing so the UI can `exitBid` without partial-exit hints.
-
-### 4.6 Open market (`migrate`)
-
-Address: LBPStrategy `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000`. Anyone may call after `migrationBlock`.
-
-```solidity
-function migrate(ILBPInitializer initializer) external;
-function initializers(ILBPInitializer initializer) external view returns (MigratorParameters memory);
-function registeredPoolIds(PoolId poolId) external view returns (address initializer);
-function positionManager() external view returns (IPositionManager);
-function initializerFactory() external view returns (IDistributorFactory);
-
-event InitializerCreated(ILBPInitializer indexed initializer, MigratorParameters migrationParams);
-event Migrated(ILBPInitializer indexed initializer, PoolKey indexed key, uint160 initialSqrtPriceX96, bytes plan);
-event MigrationFailed(ILBPInitializer indexed initializer, bytes reason);
-event FundsRecovered(ILBPInitializer indexed initializer, address indexed recipient, uint256 amount);
-event CurrencySwept(address indexed recipient, uint256 amount);
-event TokensSwept(address indexed recipient, uint256 amount);
-```
-
-`initializer` is the auction address from `auctionOf` / `Launched`.
-
-If `tryMigrate` reverts, official `migrate` recovers currency + reserved tokens to `recipient` and does **not** create a pool. That `recipient` is protocol / Launchpad, not the prophet.
-
-Migrate revert names (official): `MigrationNotYetAllowed`, `InitializerNotRegistered`, `PoolManagerAlreadyUnlocked`, plus the `tryMigrate` names (`CurrencyRaisedMismatch`, `NoPositionsCreated`, `OnlySelfCall`). A failed attempt emits `MigrationFailed` and `FundsRecovered` instead of reverting the outer `migrate`.
-
-Pool key after success: native ETH (`address(0)`), `token`, fee `10000`, tickSpacing `200`, hooks = `ProphecyHook`. `poolId = keccak256(abi.encode(key))`.
-
-### 4.7 v4 swap
-
-Address: Universal Router 2.1.2 `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`.
-
-```solidity
-function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable;
-error ExecutionFailed(uint256 commandIndex, bytes message);
-error TransactionDeadlinePassed();
-error LengthMismatch();
-```
-
-`TBD(backend):` the exact `commands` byte and `inputs` encoding for a native-ETH ↔ token v4 swap on this router version. Do not invent `V4_SWAP` command ids in web until the contracts / web PR copies them from the official Universal Router `Commands.sol` at the 2.1.2 pin. Fork tests may use the official Sepolia `PoolSwapTest` `0x9b6b46e2c869aa39918db7f52f5557fe577b6eee` as a harness-only caller; that is not the product ABI.
-
-Optional reads: StateView `0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c`, Quoter `0x61b3f2011a92d183c7dbadbda940a7555ccf9227`.
-
-UI v2 chrome (DECISIONS #17) still applies. The trade controls on this branch are bid / claim / open market / swap, not curve Buy / Sell.
-
-## 5. Environment variables and `deployments/sepolia.json`
+## 5. Environment variables
 
 | Name | Used by |
 |---|---|
@@ -549,11 +188,6 @@ UI v2 chrome (DECISIONS #17) still applies. The trade controls on this branch ar
 | `VITE_LAUNCHPAD_ADDRESS` | web |
 | `VITE_LAUNCHPAD_DEPLOY_BLOCK` | web (`fromBlock` for `Launched` logs) |
 | `VITE_HOOK_ADDRESS`, `VITE_LOCKER_ADDRESS` | web (optional) |
-| `VITE_LBP_STRATEGY` | web (optional; empty = `launchpad.lbpStrategy()` / official `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000`) |
-| `VITE_CCA_FACTORY` | web (optional; empty = official `0x000000001F26a0044BaA66024e7b6599c61963F8`) |
-| `VITE_CCA_LENS` | web (optional; empty = official `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53`) |
-| `VITE_POSITION_MANAGER` | web (optional; empty = official `0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4`) |
-| `VITE_UNIVERSAL_ROUTER` | web (optional; empty = official `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`) |
 | `VITE_PARENT_NAME` | web (e.g. `prophecy.eth`) |
 | `VITE_UNIVERSAL_RESOLVER` | web ([`ENSV2.md`](ENSV2.md) section 0) |
 | `VITE_WORLD_APP_ID`, `VITE_WORLD_ACTION` | web |
@@ -564,115 +198,29 @@ UI v2 chrome (DECISIONS #17) still applies. The trade controls on this branch ar
 | `TEAM_WALLET` | deploy scripts (optional; defaults to the deployer). If set, must equal the deployer — one wallet |
 | `PARENT_USER_REGISTRY` | deploy script (`deployUserRegistry` output; required when the script creates `ProphecyEns`) |
 | `ENS_ADAPTER_ADDRESS` | deploy script **output** (logged `ProphecyEns`). Optional override: if set, skip adapter CREATE |
-| `UNISWAP_V4_POOL_MANAGER` | deploy script (optional). Empty = official Uniswap v4 Sepolia PoolManager |
+| `UNISWAP_V4_POOL_MANAGER` | deploy script (optional). Empty = official Uniswap v4 Sepolia PoolManager (`SepoliaConfig.POOL_MANAGER`) |
 | `HOOK_SALT` | deploy script (optional). Empty = mine a CREATE2 salt whose address has `beforeInitialize` flags |
 | `PARENT_LABEL`, `ENS_REGISTRATION_SECRET`, `ENS_DURATION_SECONDS` | parent `.eth` register (`infra/scripts/deploy-sepolia.sh`) |
 | `MOCK_USDC_MINT_AMOUNT` | optional MockUSDC `mint` amount (6 decimals). Empty = script mints enough for the fee |
 | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |
 
-Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. When the address is set, the web app sends `registerProphet` / `launch` only for a live prophet, and sends bid / exit / claim / migrate / swap only for tokens that came from a `Launched` log or a live `launch` receipt. Prototype rows are never write targets. Empty address keeps the local mock store. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0. The web app does not read `ENS_ADAPTER_ADDRESS`; if it needs the adapter it calls `launchpad.ens()`.
+Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. When the address is set, the web app sends `launch`, `buy`, `sell` (and ERC-20 `approve` before `sell` when allowance is short) only for tokens that came from a `Launched` log or a live `launch` receipt. Mock seed coins and `prototypeCoinFromName` rows are never simulate or write targets and do not render the trade box. `claimCreatorFee` is sent from a live prophet's own page (`prophetOf(wallet)` matches the name) only when `creatorFeeOf(wallet)` is greater than 0; the Claim fees button stays disabled (existing style) when the view is 0 so the send does not revert `ZeroAmount`. Mock prophet rows do not send it. `minTokensOut` / `minEthOut` use a 1% band under the local curve quote. `buy` / `sell` have no deadline argument; `launch` uses the form deadline. Empty address keeps the local mock store. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0. The web app does not read `ENS_ADAPTER_ADDRESS`; if it needs the adapter it calls `launchpad.ens()`.
 
-After a successful send, infra writes a machine-readable record (no secrets) to `deployments/sepolia.json`, or `deployments/anvil.json` on a local / fork run (gitignored). Format: [`infra/README.md`](../infra/README.md) “Deployment record”. Web copies `launchpad` into `VITE_LAUNCHPAD_ADDRESS` and `launchpadBlock` into `VITE_LAUNCHPAD_DEPLOY_BLOCK`.
+After a successful send, infra writes a machine-readable record (no secrets) to `deployments/sepolia.json`, or `deployments/anvil.json` on a local / fork run (gitignored). Format: [`infra/README.md`](../infra/README.md) “Deployment record”. Web copies `launchpad` into `VITE_LAUNCHPAD_ADDRESS` and `launchpadBlock` into `VITE_LAUNCHPAD_DEPLOY_BLOCK` (optional; empty means the web uses a recent block range). `hook` / `locker` / `poolManager` are recorded after `setUniswap`; optional `VITE_HOOK_ADDRESS` / `VITE_LOCKER_ADDRESS` copy the first two. `VITE_CHAIN_ID` stays `11155111` on Sepolia.
 
-**Keys infra must add** to `deployments/sepolia.json` (later infra PR; this file does not edit the writer):
+`Deploy.s.sol` order matches section 2: Launchpad, CREATE2 Hook (Launchpad in the constructor; salt mined for permission flags), Locker, then deployer-only `setUniswap(poolManager, hook, locker)` once. The script requires `launchpad.hook()`, `launchpad.locker()`, and `launchpad.poolManager()` match.
 
-| JSON field | Value | Vite / web |
-|---|---|---|
-| `lbpStrategy` | `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000` | `VITE_LBP_STRATEGY` |
-| `ccaFactory` | `0x000000001F26a0044BaA66024e7b6599c61963F8` | `VITE_CCA_FACTORY` |
-| `ccaLens` | `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53` | `VITE_CCA_LENS` |
-| `positionManager` | `0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4` | `VITE_POSITION_MANAGER` |
-| `universalRouter` | `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3` | `VITE_UNIVERSAL_ROUTER` |
-| `initializerHookReference` | `0x1600059B95A80d500fC42400ea9a88A9C29D2000` | record only (not a Vite var) |
-| *(existing)* `launchpad` / `launchpadBlock` | our CREATE | `VITE_LAUNCHPAD_ADDRESS` / `VITE_LAUNCHPAD_DEPLOY_BLOCK` |
-| *(existing)* `hook` / `locker` / `poolManager` | our CREATE2 / CREATE / official v4 | optional `VITE_HOOK_ADDRESS` / `VITE_LOCKER_ADDRESS` |
-| *(do not add per auction)* | auction / pool / NFT ids | `Launched.auction` / `auctionOf` / `Migrated` |
+`ENS_ADAPTER_ADDRESS` is the `ProphecyEns` address. **Default: output.** `Deploy.s.sol` creates the adapter (predicted Launchpad CREATE address) and the Launchpad in one broadcast, then the CREATE2 Hook, Locker, and `setUniswap`, then logs `ENS_ADAPTER_ADDRESS`. **Optional input override:** if the env var is set, the script does not CREATE an adapter and passes that address as Launchpad `ens`. Off anvil, a set value cannot be `address(0)` or placeholder `0xe05` — the same `#24` guard as `PROTOCOL_FEE_RECIPIENT` / `0xfee` and `worldSigner` / `0x51e`. Anvil dry-run (`chainid == 31337`) fills `0xe05` when unset (Launchpad reverts on zero). The hook / locker / `setUniswap` steps still run.
 
-`VITE_CHAIN_ID` stays `11155111`.
+`TEAM_WALLET` defaults to the address of `DEPLOYER_PRIVATE_KEY`. A different `TEAM_WALLET` reverts: `setSubregistry` and `ROLE_REGISTRAR` grants need the same key that registered the parent name.
 
-`Deploy.s.sol` order on this branch (later contracts / infra PR; do not CREATE the official factory or strategy):
+Parent lock (revoke `SET_SUBREGISTRY` on `.eth` for `prophecy`) is not part of this deploy. A later PR adds that irreversible step after a person confirms.
 
-1. Predict Launchpad CREATE address.
-2. `new ProphecyEns(predictedPad, …)` then `new Launchpad(protocolFeeRecipient, worldSigner, ens)`.
-3. Mine CREATE2 salt; `new ProphecyHook{salt}(poolManager, lbpStrategy)` — `authorized` is LBPStrategy, not Launchpad.
-4. `new LiquidityLocker(…)` — must be an ERC-721 receiver. `TBD(backend):` exact constructor args.
-5. `launchpad.setUniswap(poolManager, hook, locker)` once.
-6. `launchpad.setLbp(0x95434E898Af471945Cab33D5064d2aC1A6Ba2000, 0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4)`. Require the views match.
+## 6. Curve quote vectors
 
-`ENS_ADAPTER_ADDRESS` / `TEAM_WALLET` / parent-lock rules stay as on `main`. Parent lock is not part of this deploy.
+Canonical rows live in backend M1 PR #8 as `contracts/test/Curve.vectors.json`. Web keeps a byte-matching copy at `web/src/lib/Curve.vectors.json`. Do not re-derive the numbers. Do not edit `contracts/` from this lane.
 
-## 6. Curve quote vectors `(removed-on-cca)`
+- Web: `web/src/lib/curve.vectors.test.ts` imports the web copy.
+- Contracts: forge tests read `contracts/test/Curve.vectors.json`.
 
-Bonding-curve quote vectors (`contracts/test/Curve.vectors.json`, `web/src/lib/Curve.vectors.json`) are unused on this branch. Do not re-derive them. A later contracts PR deletes the callers; this file does not edit those files.
-
-## 7. Auction UI states and revert names
-
-CCA has no `getState()` enum. The UI derives a label from blocks + views. Departed (`now >= deadline` from ENS) is independent of these labels.
-
-`block` is the chain’s block-numberish. Sepolia is 12s blocks. 25 blocks is five minutes at that pace.
-
-| UI state | Detect on-chain | User can |
-|---|---|---|
-| **Not funded** | No `TokensReceived`; `submitBid` would revert `TokensNotReceived`. After a successful `launch` this should not appear (strategy calls `onTokensReceived`) | Nothing |
-| **Not started** | Funded, `block < startBlock()` | Wait. Bid reverts `AuctionNotStarted` |
-| **Live** | Funded, `startBlock() <= block < endBlock()` | `submitBid`. Price from `clearingPrice()` or CCALens `state(auction)` |
-| **Sold out (still live)** | `block < endBlock()` but next `submitBid` reverts `AuctionSoldOut` | Wait for end, then exit / claim if graduated |
-| **Ended, not finalized** | `block >= endBlock()` and `lastCheckpointedBlock() != endBlock()` | Anyone `checkpoint()` |
-| **Ended, graduated** | `block >= endBlock()`, `isGraduated() == true` after a current checkpoint | `exitBid` / `exitPartiallyFilledBid` |
-| **Ended, failed** | `block >= endBlock()` and `isGraduated() == false` after a final checkpoint | Full leftover via `exitBid`. `claimTokens` reverts `NotGraduated`. `migrate` will not open a pool |
-| **Claimable** | Graduated and `block >= claimBlock()` and `bid.exitedBlock != 0` | `claimTokens` / `claimTokensBatch` |
-| **Claim blocked** | Graduated but `block < claimBlock()` | Exit after end; claim reverts `NotClaimable` |
-| **Migratable** | Graduated and `block >= migrationBlock` and no `Migrated` yet | `LBPStrategy.migrate(auction)` |
-| **Pool open** | `Migrated` for that initializer, or `auctionOf.poolOpened`, or `slot0 != 0` | v4 swap (section 4.7) |
-
-Create-time revert names (factory / constructor, prophet sees these on `launch`): `InvalidTokenAmount`, `InvalidEndBlock`, `ClaimBlockIsBeforeEndBlock`, `InvalidAuctionDataLength`, `StepBlockDeltaCannotBeZero`, `InvalidStepDataMps`, `InvalidEndBlockGivenStepData`, `FloorPriceIsZero`, `FloorPriceTooLow`, `TickSpacingTooSmall`, `FloorPriceAndTickSpacingGreaterThanMaxBidPrice`, `FloorPriceAndTickSpacingTooLarge`, `TotalSupplyIsZero`, `TotalSupplyIsTooLarge`, `TokenIsAddressZero`, `TokenAndCurrencyCannotBeTheSame`, `FundsRecipientIsZero`, `TokensRecipientIsZero`.
-
-## 8. Four fork-test steps (02:00 KST gate)
-
-Sepolia fork. Same harness idea as `ForkE2EHelpers` (`SEPOLIA_RPC_URL` + `vm.createSelectFork` + `vm.skip` when unset). Fork PRs do not get the Actions secret. Official factory / LBPStrategy / PoolManager / PositionManager already have bytecode.
-
-| # | Step | Calls (official) | Pass when |
-|---|---|---|---|
-| 1 | Launch + create auction | Local Launchpad `launch` → LBPStrategy `initializeDistribution` → factory `create` + `onTokensReceived` | `Launched` + `InitializerCreated` + `TokensReceived`. `auctionOf(token).auction != 0`. `fundsRecipient == LBPStrategy`, `tokensRecipient` and `recipient` are not the prophet |
-| 2 | Bid | `vm.roll` to `startBlock`. CCA `submitBid{value: amount}(maxPriceQ96, amount, bidder, prevTick, "")` | `BidSubmitted`. CCALens `state(auction)` shows raised demand |
-| 3 | Migrate opens v4 pool | `vm.roll` to `endBlock`, `checkpoint()`, `isGraduated() == true`. `vm.roll` to `migrationBlock`. `LBPStrategy.migrate(auction)` | `Migrated`. `PoolManager.getSlot0(poolId)` is non-zero. Hook in the key is `ProphecyHook`. Locker `balanceOf` (ERC-721) is 1 (or `tokenIdOf` set). Fee 10000, tickSpacing 200 |
-| 4 | Swap | After (3), a v4 swap on the new pool (Universal Router `execute` **or** harness `PoolSwapTest` if command bytes are still TBD) | Pool price / balances move. Locker still holds the NFT |
-
-`TBD(backend):` gas for each step. Record in `FEEDBACK.md` after the run (`TODO(team)` until then).
-
-## 9. Gates and fallback
-
-All CCA work lives on the `cca` branch family. It reaches `main` only after the final gate. Hours are KST.
-
-| Gate | When | Must be true | If missed |
-|---|---|---|---|
-| INTERFACE + contract skeleton | 22:00 | this file + a compiling Launchpad / hook / locker skeleton on a `cca/*` branch | submit the curve version on `main` |
-| Sepolia-fork 4 steps green | 02:00 | section 8 | submit the curve version on `main` |
-| Web + deploy script wired | 03:30 | web bid / lens / claim / migrate / swap; `Deploy.s.sol` writes the new JSON keys | submit the curve version on `main` |
-
-Do not merge CCA contracts into `main` before the final gate.
-
-## 10. `TBD(backend)` list
-
-Copy these into the contracts PR. Do not invent answers here.
-
-1. `salt` derivation for `initializeDistribution` (unique per prophecy; included in `initializerSalt = keccak256(abi.encode(salt, migrationParams))`).
-2. `AuctionParameters.floorPrice` Q96 (must be `>= 2^32 + 1`) and auction `tickSpacing` Q96 (must be `>= 2`).
-3. `auctionStepsData` bytes for a 25-block schedule (official pack: 24-bit MPS + 40-bit block delta; 1e7 MPS = 100%). Steps must land on `endBlock` or the constructor reverts `InvalidEndBlockGivenStepData`.
-4. `startBlock` at `launch`: `block.number` vs `block.number + 1`.
-5. `claimBlock` offset (`>= endBlock`) and `migrationBlock` offset (`> endBlock`). Demo intent: `claimBlock = endBlock`, `migrationBlock = endBlock + 1`.
-6. `reservedTokenAmountForLP` and therefore auction supply (`totalSupply - reserved`). Former SPEC split 206.9M / 793.1M is **not** decided for CCA (#7 is superseded).
-7. Exact `positionDefinitions` / `lpAllocationSchedule` encodings (demo intent: one full-range `PositionDefinition` at weight `1e7`, one bracket `{0, 1e7}`).
-8. Whether `tokensRecipient` and `recipient` are `protocolFeeRecipient` or Launchpad (neither may be the prophet; `tokensRecipient` may not be LBPStrategy).
-9. Whether Launchpad wraps `migrate` (`openMarket`) or web always calls the strategy.
-10. How `auctionOf(token).poolOpened` is set if web calls `migrate` directly.
-11. New Launchpad custom-error names (`LbpNotSet` and the like).
-12. `LiquidityLocker` constructor and how it binds `tokenId` → token / prophet.
-13. PositionManager action bytes for fees-only `collect` (no liquidity decrease).
-14. Universal Router 2.1.2 `V4_SWAP` command + inputs encoding.
-15. Whether `receive()` must accept ETH from LBPStrategy / PositionManager when Launchpad is `recipient`.
-16. Hook CREATE2 flags if any permission besides `BEFORE_INITIALIZE` is added.
-
-## 11. Copy (user-facing)
-
-English only. No wording about returns, profit, or prediction. No “coin”. No percent price change. The price says people are here, not that the sentence is true (DECISIONS #1).
+In the fixture, sell `ethOut` is the seller payout. SPEC's pre-fee `ethOut` is the fixture's `rawOut`. Rounding matches section 2.

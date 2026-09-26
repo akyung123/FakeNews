@@ -2,7 +2,7 @@
 
 Prize-submission notes for Uniswap. Facts only, from this repo and official Uniswap source / docs. Do not invent findings. `TODO(team)` means the result is not in yet.
 
-Sources: [`docs/INTERFACE.md`](docs/INTERFACE.md) (cca), [`docs/DECISIONS.md`](docs/DECISIONS.md) #1, #18–#22, [PR #38 `CCA_RESEARCH.md`](https://github.com/prism-toggle-ai/FakeNews/blob/a45aecb37f7e1fdc64bed17b1391bb2f603a8ea3/docs/CCA_RESEARCH.md) (`a45aecb`), official pins in INTERFACE section 0.
+Sources: [`docs/INTERFACE_CCA.md`](docs/INTERFACE_CCA.md) (CCA path), [`docs/INTERFACE.md`](docs/INTERFACE.md) (curve fallback on `main`), [`docs/DECISIONS.md`](docs/DECISIONS.md) #1, #18–#22, [PR #38 `CCA_RESEARCH.md`](https://github.com/prism-toggle-ai/FakeNews/blob/a45aecb37f7e1fdc64bed17b1391bb2f603a8ea3/docs/CCA_RESEARCH.md) (`a45aecb`), official pins in INTERFACE_CCA section 0.
 
 Gates (KST): 22:00 INTERFACE + contract skeleton; 02:00 Sepolia-fork 4 steps; 03:30 web + deploy script. Miss any gate → submit the bonding-curve Launchpad already on `main`.
 
@@ -106,4 +106,4 @@ CCA fork result: `TODO(team)`.
 
 ## 09-26 note — switching from curve graduation to official migrate
 
-The hard part of the curve-era hook was the address and the caller, not the hook body. Official LBP makes that stricter: the caller **must** be the strategy, the hook **must** speak ERC165, and the lock **must** be an NFT. That is a product fit (we still want a locked pool and a 24 : 76 fee split) but it is not a drop-in. INTERFACE records the rewrite so frontend, backend and infra can move in parallel. Implementation results belong in the rows marked `TODO(team)`.
+The hard part of the curve-era hook was the address and the caller, not the hook body. Official LBP makes that stricter: the caller **must** be the strategy, the hook **must** speak ERC165, and the lock **must** be an NFT. That is a product fit (we still want a locked pool and a 24 : 76 fee split) but it is not a drop-in. [`INTERFACE_CCA.md`](docs/INTERFACE_CCA.md) records the rewrite so frontend, backend and infra can move in parallel. `INTERFACE.md` on `main` stays the curve contract. Implementation results belong in the rows marked `TODO(team)`.
