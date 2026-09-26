@@ -61,6 +61,7 @@ describe("registerProphet write shape", () => {
     }, MOCK_WORLD_LAUNCHPAD);
     expect(got).toBe(adapter);
     expect(seen).toEqual([ensAdapterRead(MOCK_WORLD_LAUNCHPAD)]);
-    expect(JSON.stringify({ request, env: import.meta.env })).not.toMatch(/ENS_ADAPTER_ADDRESS/);
+    expect(webEnv).not.toHaveProperty("ensAdapterAddress");
+    expect(Object.keys(webEnv).join(",")).not.toMatch(/ENS_ADAPTER/);
   });
 });
