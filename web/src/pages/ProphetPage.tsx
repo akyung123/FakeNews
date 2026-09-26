@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatEther, type Address } from "viem";
-import { getAccount, readContract } from "wagmi/actions";
+import { getAccount } from "wagmi/actions";
 import { Bar } from "../components/CoinCard";
 import { contracts, hasLaunchpad } from "../lib/contracts";
-import { createReadProphetOf } from "../lib/launchpad";
-import { launchpadAbi } from "../lib/launchpadAbi";
+import { createReadCreatorFee, createReadProphetOf } from "../lib/launchpad";
 import {
   canClaimCreatorFee,
   getProphetPage,
@@ -22,6 +21,7 @@ import { createClaim, writeErrorMessage, writePhaseCopy, WRITE_COPY, type WriteP
 export type ProphetPageProps = {
   claimFee?: () => Promise<unknown>;
   loadProphet?: (name: string) => Promise<ProphetPageData | null>;
+  readCreatorFee?: (wallet: string) => Promise<bigint>;
 };
 
 async function loadOwnChainProphet(name: string): Promise<ProphetPageData | null> {
@@ -38,25 +38,14 @@ async function loadOwnChainProphet(name: string): Promise<ProphetPageData | null
   try {
     const onChain = await createReadProphetOf()(wallet);
     if (!onChain || onChain.toLowerCase() !== label) return null;
-    let claimableFeeWei = 0n;
-    try {
-      const fee = await readContract(wagmiConfig, {
-        address: contracts.launchpad,
-        abi: launchpadAbi,
-        functionName: "creatorFeeOf",
-        args: [wallet],
-      });
-      if (typeof fee === "bigint") claimableFeeWei = fee;
-    } catch {
-      claimableFeeWei = 0n;
-    }
+    const claimableFeeWei = await createReadCreatorFee()(wallet);
     return prophetPageFromChain({ label, wallet, claimableFeeWei });
   } catch {
     return null;
   }
 }
 
-export function ProphetPage({ claimFee, loadProphet }: ProphetPageProps = {}) {
+export function ProphetPage({ claimFee, loadProphet, readCreatorFee }: ProphetPageProps = {}) {
   const { name = "" } = useParams();
   const chain = hasLaunchpad() || Boolean(loadProphet);
   const mock = getProphetPage(name);
@@ -100,17 +89,21 @@ export function ProphetPage({ claimFee, loadProphet }: ProphetPageProps = {}) {
       </main>
     );
   }
-  return <ProphetView data={data} chain={chain} claimFee={claimFee} />;
+  return (
+    <ProphetView data={data} chain={chain} claimFee={claimFee} readCreatorFee={readCreatorFee} />
+  );
 }
 
 function ProphetView({
   data,
   chain,
   claimFee,
+  readCreatorFee,
 }: {
   data: ProphetPageData;
   chain: boolean;
   claimFee?: () => Promise<unknown>;
+  readCreatorFee?: (wallet: string) => Promise<bigint>;
 }) {
   const departed = data.prophecies.filter((p) => p.departed);
   const nextBuy = data.prophecies.find((p) => !p.departed);
@@ -118,8 +111,34 @@ function ProphetView({
   const [pending, setPending] = useState(false);
   const [phase, setPhase] = useState<WritePhase | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const feeWei = claimed ? 0n : data.claimableFeeWei;
+  const [onChainFee, setOnChainFee] = useState<bigint | null>(null);
+
+  useEffect(() => {
+    if (!chain || !data.fromChain) {
+      setOnChainFee(null);
+      return;
+    }
+    const read = readCreatorFee ?? (hasLaunchpad() ? createReadCreatorFee() : undefined);
+    if (!read) {
+      setOnChainFee(null);
+      return;
+    }
+    let cancelled = false;
+    void read(data.prophet.wallet)
+      .then((fee) => {
+        if (!cancelled) setOnChainFee(fee);
+      })
+      .catch(() => {
+        if (!cancelled) setOnChainFee(0n);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chain, data.fromChain, data.prophet.wallet, readCreatorFee]);
+
+  const feeWei = claimed ? 0n : (onChainFee ?? data.claimableFeeWei);
   const showClaim = canClaimCreatorFee(data, { chain, claimFee });
+  const claimDisabled = claimed || feeWei === 0n || pending;
 
   return (
     <main className="prophet-page stack">
@@ -145,8 +164,9 @@ function ProphetView({
           <button
             type="button"
             className="btn primary"
-            disabled={claimed || feeWei === 0n || pending}
+            disabled={claimDisabled}
             onClick={() => {
+              if (claimDisabled) return;
               void (async () => {
                 setPending(true);
                 setPhase("wallet");

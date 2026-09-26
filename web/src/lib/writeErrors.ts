@@ -16,6 +16,13 @@ export const WRITE_REVERT_COPY = {
 
 export type MappedRevertName = keyof typeof WRITE_REVERT_COPY;
 
+/** Launchpad errors that keep the generic write banner. No extra designer sentence. */
+export const GENERIC_REVERT_NAMES = ["ZeroAmount"] as const;
+
+export function isGenericRevertName(name: string): boolean {
+  return (GENERIC_REVERT_NAMES as readonly string[]).includes(name);
+}
+
 export type ClassifiedWriteError =
   | { kind: "rejected" }
   | { kind: "revert"; name: MappedRevertName; message: string }
@@ -63,6 +70,7 @@ export function classifyWriteError(error: unknown): ClassifiedWriteError {
       const mapped = name as MappedRevertName;
       return { kind: "revert", name: mapped, message: WRITE_REVERT_COPY[mapped] };
     }
+    if (isGenericRevertName(name)) return { kind: "unknown" };
     return { kind: "unknown" };
   }
   return { kind: "unknown" };

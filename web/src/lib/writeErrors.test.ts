@@ -2,7 +2,7 @@ import { ContractFunctionRevertedError, encodeErrorResult, UserRejectedRequestEr
 import { describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "./issue";
 import { launchpadAbi } from "./launchpadAbi";
-import { WRITE_REVERT_COPY, classifyWriteError } from "./writeErrors";
+import { GENERIC_REVERT_NAMES, WRITE_REVERT_COPY, classifyWriteError } from "./writeErrors";
 import { LaunchedParseError, WRITE_COPY, writeErrorMessage } from "./writes";
 
 function revertNamed(errorName: string, functionName = "buy") {
@@ -66,8 +66,14 @@ describe("classifyWriteError", () => {
     }
   });
 
-  it("treats an unmapped contract error name as unknown", () => {
+  it("maps ZeroAmount to the generic write failure, not a designer sentence", () => {
+    expect(GENERIC_REVERT_NAMES).toEqual(["ZeroAmount"]);
     expect(classifyWriteError(wrappedRevert("ZeroAmount"))).toEqual({ kind: "unknown" });
+    expect(classifyWriteError({ data: { errorName: "ZeroAmount" } })).toEqual({ kind: "unknown" });
+    expect(writeErrorMessage(wrappedRevert("ZeroAmount"))).toBe(WRITE_COPY.failed);
+  });
+
+  it("treats an unmapped contract error name as unknown", () => {
     expect(classifyWriteError({ data: { errorName: "BadLabel" } })).toEqual({ kind: "unknown" });
     expect(classifyWriteError({ data: { errorName: "NotARealError" } })).toEqual({ kind: "unknown" });
   });

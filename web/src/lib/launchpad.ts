@@ -51,6 +51,14 @@ export type ProphetOfOptions = {
   ) => Promise<unknown>;
 };
 
+export type CreatorFeeOfOptions = {
+  address?: Address | undefined;
+  readContract?: (
+    config: typeof wagmiConfig,
+    request: ReturnType<typeof creatorFeeOfRead>,
+  ) => Promise<unknown>;
+};
+
 export function prophetOfRead(wallet: Address, address = contracts.launchpad) {
   if (!address) {
     throw new Error("Launchpad address is not set");
@@ -60,6 +68,32 @@ export function prophetOfRead(wallet: Address, address = contracts.launchpad) {
     abi: launchpadAbi,
     functionName: "prophetOf" as const,
     args: [wallet] as const,
+  };
+}
+
+export function creatorFeeOfRead(wallet: Address, address = contracts.launchpad) {
+  if (!address) {
+    throw new Error("Launchpad address is not set");
+  }
+  return {
+    address,
+    abi: launchpadAbi,
+    functionName: "creatorFeeOf" as const,
+    args: [wallet] as const,
+  };
+}
+
+/** INTERFACE `creatorFeeOf(address wallet) returns (uint256)`. 0 when unset or unread. */
+export function createReadCreatorFee(
+  options: CreatorFeeOfOptions = {},
+): (wallet: string) => Promise<bigint> {
+  const address = "address" in options ? options.address : contracts.launchpad;
+  return async (wallet) => {
+    if (!address || !isAddress(wallet)) return 0n;
+    const read = options.readContract ?? (readContract as CreatorFeeOfOptions["readContract"]);
+    if (!read) return 0n;
+    const fee = await read(wagmiConfig, creatorFeeOfRead(wallet, address));
+    return typeof fee === "bigint" ? fee : 0n;
   };
 }
 

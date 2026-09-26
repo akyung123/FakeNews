@@ -17,6 +17,14 @@ describe("Launchpad ABI from #25", () => {
     ]);
   });
 
+  it("exposes creatorFeeOf(wallet) → uint256", () => {
+    const fn = entry("function", "creatorFeeOf");
+    if (!fn || fn.type !== "function") throw new Error("missing creatorFeeOf");
+    expect(fn.stateMutability).toBe("view");
+    expect(fn.inputs.map((input) => [input.name, input.type])).toEqual([["wallet", "address"]]);
+    expect(fn.outputs.map((output) => output.type)).toEqual(["uint256"]);
+  });
+
   it("exposes ens() and prophetOf(wallet) → label", () => {
     const ens = entry("function", "ens");
     expect(ens).toBeDefined();

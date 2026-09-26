@@ -11,22 +11,47 @@ const WALLET = "0x3333333333333333333333333333333333333333" as const;
 const ownPage = prophetPageFromChain({
   label: "alice",
   wallet: WALLET,
-  claimableFeeWei: 1_200_000_000_000_000n,
+  claimableFeeWei: 0n,
 });
 
+function renderOwn(props: {
+  readCreatorFee?: (wallet: string) => Promise<bigint>;
+} = {}) {
+  return render(
+    <MemoryRouter initialEntries={["/p/alice"]}>
+      <Routes>
+        <Route
+          path="/p/:name"
+          element={<ProphetPage loadProphet={async () => ownPage} readCreatorFee={props.readCreatorFee} />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe("chain-mode prophet page", () => {
-  it("shows Claim fees on a live own page and sends claimCreatorFee", async () => {
+  it("disables Claim fees when creatorFeeOf is 0 and does not simulate", async () => {
     const run = vi.fn(async () => true);
     const createClaim = vi.spyOn(writes, "createClaim").mockReturnValue(run);
-    render(
-      <MemoryRouter initialEntries={["/p/alice"]}>
-        <Routes>
-          <Route path="/p/:name" element={<ProphetPage loadProphet={async () => ownPage} />} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    const readCreatorFee = vi.fn(async () => 0n);
+    renderOwn({ readCreatorFee });
     const button = await screen.findByRole("button", { name: /Claim fees/i });
-    expect(button).toBeEnabled();
+    await waitFor(() => expect(readCreatorFee).toHaveBeenCalledWith(WALLET));
+    expect(button).toBeDisabled();
+    await userEvent.click(button);
+    expect(createClaim).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+    createClaim.mockRestore();
+  });
+
+  it("enables Claim fees when creatorFeeOf is greater than 0 and sends claimCreatorFee", async () => {
+    const run = vi.fn(async () => true);
+    const createClaim = vi.spyOn(writes, "createClaim").mockReturnValue(run);
+    const readCreatorFee = vi.fn(async () => 1_200_000_000_000_000n);
+    renderOwn({ readCreatorFee });
+    const button = await screen.findByRole("button", { name: /Claim fees/i });
+    await waitFor(() => expect(button).toBeEnabled());
+    expect(readCreatorFee).toHaveBeenCalledWith(WALLET);
     await userEvent.click(button);
     expect(createClaim).toHaveBeenCalled();
     expect(run).toHaveBeenCalled();
