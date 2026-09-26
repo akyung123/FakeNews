@@ -20,7 +20,7 @@ forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545
 
 Required off-anvil: `DEPLOYER_PRIVATE_KEY`, `PROTOCOL_FEE_RECIPIENT` (not `0xfee`), `WORLD_SIGNER_KEY` or `WORLD_SIGNER_ADDRESS` (not `0x51e`).
 
-ENS: set `PARENT_USER_REGISTRY` to create the adapter, or set `ENS_ADAPTER_ADDRESS` to skip CREATE (not `0` / `0xe05` off anvil). A fork dry-run can use a no-code `ENS_ADAPTER_ADDRESS` override.
+ENS: set `PARENT_USER_REGISTRY` to create the adapter, or set `ENS_ADAPTER_ADDRESS` to skip CREATE (not `0` / `0xe05` off anvil). A fork dry-run can use a no-code `ENS_ADAPTER_ADDRESS` override. Do not use a well-known Anvil EOA (`0xf39F…`, `0x7099…`, …) as that override on Sepolia: those accounts carry a 23-byte EIP-7702 designation, so `ens.code.length > 0` and the `adapter.launchpad()` check reverts. Use a no-code address such as `0x1234567890123456789012345678901234567890`.
 
 Official addresses live in `SepoliaConfig.sol`. Optional env overrides: `UNISWAP_V4_POOL_MANAGER`, `LBP_STRATEGY`, `POSITION_MANAGER`, `CCA_FACTORY`, `INITIALIZER_HOOK`, `HOOK_SALT`.
 
