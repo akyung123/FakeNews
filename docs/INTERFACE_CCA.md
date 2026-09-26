@@ -4,10 +4,10 @@ Companion to [`INTERFACE.md`](INTERFACE.md). **`INTERFACE.md` stays the bonding-
 
 - **Changing it:** edit this file first, in **the same PR** as the CCA code change, and write "INTERFACE_CCA change" in the PR description.
 - **Sources:** [`SPEC.md`](SPEC.md), [`DECISIONS.md`](DECISIONS.md) #1 (unchanged), #18–#22. Official Uniswap sources are pinned in section 0. Research notes (not accepted as INTERFACE): [PR #38 `CCA_RESEARCH.md`](https://github.com/prism-toggle-ai/FakeNews/blob/a45aecb37f7e1fdc64bed17b1391bb2f603a8ea3/docs/CCA_RESEARCH.md).
-- **TBD answers (this revision):** [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) head `b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9` — issue comments **INTERFACE_CCA TBD answers** and **Designer Q1-Q4 answers** — plus official pins in section 0. Designer-approved copy v2 is in section 7 (character-for-character).
+- **#42 final head (this revision):** [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163da093ea67d1788b43897bb3572e3fbc6d` (review passed). Locker, 50:50 supply, floor / tick, and demo bid are copied from that commit. Designer-approved copy v2 is in section 7 (character-for-character), with the §7.1 ended header and §7.13 `collect(token, tokenId)` wording from the attached v2 file.
 - `(draft)` means the shape may still change during implementation. Remove the mark once it settles.
 - `(removed-on-cca)` is the bonding-curve surface. Do not call it from web on the `cca` branch.
-- `TBD(backend)` / `TBD (#42)` is still open on the contracts PR. Do not guess a function, field, event, or error to fill it. Do not invent floor / tick numbers.
+- Remaining `TBD(backend)` rows are listed in section 10. Floor, tick, locker API, and auction/pool split are settled at `9c6b163`.
 
 ## 0. Pinned official sources
 
@@ -22,7 +22,7 @@ Read on 2026-09-26. Every external signature below is copied from these pins. If
 | Uniswap v4 Sepolia | [v4 deployments](https://docs.uniswap.org/contracts/v4/deployments) | PoolManager, PositionManager, Universal Router **2.1.2** `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`, StateView, Quoter, Permit2 |
 | Universal Router `execute` | tag `2.1.2` [`IUniversalRouter.sol`](https://github.com/Uniswap/universal-router/blob/2.1.2/contracts/interfaces/IUniversalRouter.sol) L21–L40 + [`Commands.sol`](https://github.com/Uniswap/universal-router/blob/2.1.2/contracts/libraries/Commands.sol) L35 | `execute(commands, inputs, deadline)`; `V4_SWAP = 0x10`. Not Universal Router 2.0 |
 | v4-periphery actions / swap params | pin `545a5d2a87228167edde48f3b9eda122d1e3c4d6` | [`Actions.sol`](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/libraries/Actions.sol) L28 / L40 / L44 (`SWAP_EXACT_IN_SINGLE = 0x06`, `SETTLE_ALL = 0x0c`, `TAKE_ALL = 0x0f`); collect `DECREASE_LIQUIDITY = 0x01` L11, `TAKE_PAIR = 0x11` L46; [`IV4Router.sol`](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/interfaces/IV4Router.sol) L31–L38 six-field `ExactInputSingleParams` |
-| PositionManager collect actions | same `545a5d2` `Actions.sol` + [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`LiquidityLocker.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol) L24–L25, L163–L169 | fees-only: `0x01` then `0x11`, liquidity delta `0` |
+| PositionManager collect actions | same `545a5d2` `Actions.sol` + [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`LiquidityLocker.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol) L25–L26, L175–L176 | fees-only: `0x01` then `0x11`, liquidity delta `0`; one `tokenId` per `collect` |
 
 The CCA README at tag `v2.1.0` still lists v2.0.0 as “latest” in its own table. The official deployments page lists factory **v2.1.0** at `0x000000001F26a0044BaA66024e7b6599c61963F8` / `7d7602d`. Use that address. The git tag SHA (`a56d422`) and the deployments SHA (`7d7602d`) are two commits of the same bump; `IContinuousClearingAuction` ABI is identical.
 
@@ -55,11 +55,15 @@ Verified on a Sepolia fork at block **11_784_960** in [PR #41](https://github.co
 | Quoter | `0x61b3f2011a92d183c7dbadbda940a7555ccf9227` | Optional quotes | official |
 | Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` | Unused for ETH bids. **Required** before a token→ETH swap (section 4.7) | official + [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) TBD answers / Designer Q3 |
 | Currency | native ETH (`address(0)`) | `AuctionParameters.currency` and `MigratorParameters.currency` | **#41** |
-| `N` (auction blocks) | **25** default (also green at **10**) | `endBlock = startBlock + N` | **#41** |
+| `N` (auction blocks) | **25** default (`setAuctionBlocks(uint64)` is deployer-only). Recording uses **10**. Both divide 1e7 | `endBlock = startBlock + N` | **#42** `9c6b163` [`Launchpad.sol` L123–L129](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L123-L129), [`CcaLib.sol` L24](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/cca/CcaLib.sol#L24) |
 | Auction windows | `startBlock = block.number`; `endBlock = start + N`; `claimBlock = end`; `migrationBlock = end + 1` | Launchpad `configData` | **#41** `CCAForkHelpers._auctionWindows` |
 | `auctionStepsData` | `abi.encodePacked(uint24(1e7 / N), uint40(N))` so `mps * N == 1e7`. N=25 → `(400_000, 25)`; N=10 → `(1_000_000, 10)` | `AuctionParameters.auctionStepsData` | **#41** `packUniformSteps` |
-| Floor price (auction Q96) | `1000 << 96` — **pending #42 recalculation** for the 1B product mint (~0.02 ETH at full sale). Do not invent a replacement | `AuctionParameters.floorPrice` | **#41** (`CCA_FLOOR_PRICE`); still `CcaLib.FLOOR_PRICE_Q96` at [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`CcaLib.sol` L27](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/cca/CcaLib.sol#L27) |
-| Auction price tick | `100 << 96` — **pending #42 recalculation** (paired with floor). Do not invent a replacement | `AuctionParameters.tickSpacing` — **not** the v4 pool tick | **#41** (`CCA_TICK_SPACING`); still `CcaLib.AUCTION_TICK_SPACING_Q96` at [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`CcaLib.sol` L28](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/cca/CcaLib.sol#L28) |
+| Auction / LP supply | **50:50** — 500,000,000e18 auction / 500,000,000e18 LP | `CcaLib.AUCTION_SUPPLY` / `LP_SUPPLY` / `reservedTokenAmountForLP` | **#42** `9c6b163` [`CcaLib.sol` L19–L20](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/cca/CcaLib.sol#L19-L20) |
+| Floor price (auction Q96) | `3169126500570573600` | `AuctionParameters.floorPrice` | **#42** `9c6b163` [`CcaLib.sol` L46](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/cca/CcaLib.sol#L46) `FLOOR_PRICE_Q96` |
+| Auction price tick | `31691265005705736` (1% of floor; `floor % tick == 0`) | `AuctionParameters.tickSpacing` — **not** the v4 pool tick | **#42** `9c6b163` [`CcaLib.sol` L45](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/cca/CcaLib.sol#L45) `AUCTION_TICK_SPACING_Q96` |
+| Full sell-out at floor | raises **exactly 0.02 ETH**; LBP full-range mint leftover is **171 wei ETH** to the protocol | graduation line / `mp.recipient` | **#42** `9c6b163` [`CcaLib.t.sol` L74–L76](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/test/CcaLib.t.sol#L74-L76) (`raisedAtFloor == 0.02 ether`), [L115](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/test/CcaLib.t.sol#L115) (171 wei comment) |
+| Initial v4 tick | **239433** (full-range position, so no tickSpacing-200 alignment is needed) | LBP `TokenPricing` √price at floor | **#42** `9c6b163` [`CcaLib.t.sol` L91–L107](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/test/CcaLib.t.sol#L91-L107) |
+| Demo bid | budget **0.021 ETH**; max price **2× floor** = `6338253001141147200` | `submitBid` 5-arg | **#42** `9c6b163` [`CcaSepoliaFork.t.sol` L96, L104](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/test/fork/CcaSepoliaFork.t.sol#L96) |
 | Graduation threshold | **0.02 ETH** (`20000000000000000` wei) | `AuctionParameters.requiredCurrencyRaised` | **#41** |
 | Pool fee | **1% = `10000` pips** | `PoolParameters.fee` | **#41** |
 | Pool tickSpacing | **200** | `PoolParameters.tickSpacing` | **#41** |
@@ -97,9 +101,7 @@ Unchanged from `main`. The parent is written as `prophecy.eth`. The real one com
 
 ### `Launchpad` `(draft)`
 
-Constructor stays `(protocolFeeRecipient, worldSigner, ens)`. No new constructor arguments.
-
-Surface from [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) head `b71c64e` [`Launchpad.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol). Constructor stays `(protocolFeeRecipient, worldSigner, ens)`. No new constructor arguments.
+Surface from [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) head `9c6b163` [`Launchpad.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol). Constructor stays `(protocolFeeRecipient, worldSigner, ens)`. No new constructor arguments.
 
 ```solidity
 constructor(address protocolFeeRecipient, address worldSigner, address ens);
@@ -111,7 +113,7 @@ function setUniswap(address poolManager, address hook, address locker) external;
 // Name is setCca (not setLbp). Reverts InvalidHook unless hook.authorized() == lbpStrategy.
 function setCca(address lbpStrategy, address positionManager) external; // L111–L121
 
-// Deployer-only. Default 25. N must divide 1e7.
+// Deployer-only. Default 25. Recording uses 10. N must divide 1e7.
 function setAuctionBlocks(uint64 auctionBlocks) external; // L123–L129
 
 // Unchanged. Create a prophet name. Needs a World ID server signature. Once per nullifier.
@@ -142,7 +144,7 @@ function positionManager() external view returns (address);
 function auctionBlocks() external view returns (uint64);
 ```
 
-`initializeDistribution` **returns nothing** ([`IStrategy.sol` L29–L33](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IStrategy.sol#L29-L33)). Launchpad obtains `auction` from the official factory predict in the same transaction ([`Launchpad.sol` L195–L199](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L195-L199)):
+`initializeDistribution` **returns nothing** ([`IStrategy.sol` L29–L33](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IStrategy.sol#L29-L33)). Launchpad obtains `auction` from the official factory predict in the same transaction ([`Launchpad.sol` L195–L199](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L195-L199)):
 
 ```solidity
 // Launchpad.sol L191 — frontend does NOT pass a salt
@@ -159,11 +161,11 @@ function getAddress(address token, uint256 amount, bytes calldata configData, by
 // with sender = LBPStrategy
 ```
 
-**Salt rule** ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) TBD answers + [`Launchpad.sol` L191](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L191)): the frontend **must not** pass a salt on `launch`, bid, claim, migrate, or swap.
+**Salt rule** ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) TBD answers + [`Launchpad.sol` L191](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L191)): the frontend **must not** pass a salt on `launch`, bid, claim, migrate, or swap.
 
 | Artifact | How | Formula | Frontend |
 |---|---|---|---|
-| ProphecyToken | `CREATE` (not CREATE2) | `new ProphecyToken(...)` from Launchpad ([`Launchpad.sol` L176](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L176)) | no salt |
+| ProphecyToken | `CREATE` (not CREATE2) | `new ProphecyToken(...)` from Launchpad ([`Launchpad.sol` L176](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L176)) | no salt |
 | LBP `initializeDistribution` salt | Launchpad | `salt = keccak256(abi.encode(token, msg.sender, slug))` | no salt |
 | Factory `create` / `getAddress` salt | official LBP | `initializerSalt = keccak256(abi.encode(salt, migrationParams))`; factory sender = LBPStrategy | no salt |
 | ProphecyHook | CREATE2, mined | `HookMiner`: `salt = bytes32(i)` until the address has `BEFORE_INITIALIZE`. Ctor `(poolManager, authorized=LBPStrategy)` | no salt (deploy only) |
@@ -185,9 +187,9 @@ event AuctionBlocksSet(uint64 auctionBlocks);               // L55
 ```
 
 - `Launched` still does **not** contain the sentence or the deadline (DECISIONS #5).
-- `registerProphet` recovers EIP-191 `personal_sign` of `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` (section 3). `chainId` must be `block.chainid` and `launchpad` must be this contract; the signed wallet must be `msg.sender`. Label is chosen by the caller and is not in the signed payload. Check order ([`Launchpad.sol` L142–L145](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L142-L145)): `NullifierUsed`, `AlreadyProphet`, `LabelTaken`, `InvalidSignature`.
-- Deploy order: Launchpad, Hook (CREATE2; `authorized` = LBPStrategy), Locker (`constructor(poolManager, launchpad, hook)`), `setUniswap(poolManager, hook, locker)`, `setCca(lbpStrategy, positionManager)`. A second call or a non-deployer call reverts. `launch` reverts `CcaNotSet` if Uniswap or CCA is not set ([`Launchpad.sol` L162–L164](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L162-L164)).
-- `receive()` leftover ETH only from the locker and the PoolManager ([`Launchpad.sol` L131–L133](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L131-L133)). It does **not** accept ETH from LBPStrategy (official LBP does not pay Launchpad; `recipient` is protocol).
+- `registerProphet` recovers EIP-191 `personal_sign` of `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` (section 3). `chainId` must be `block.chainid` and `launchpad` must be this contract; the signed wallet must be `msg.sender`. Label is chosen by the caller and is not in the signed payload. Check order ([`Launchpad.sol` L142–L145](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L142-L145)): `NullifierUsed`, `AlreadyProphet`, `LabelTaken`, `InvalidSignature`.
+- Deploy order: Launchpad, Hook (CREATE2; `authorized` = LBPStrategy), Locker (`constructor(poolManager, launchpad, hook)`), `setUniswap(poolManager, hook, locker)`, `setCca(lbpStrategy, positionManager)`. A second call or a non-deployer call reverts. `launch` reverts `CcaNotSet` if Uniswap or CCA is not set ([`Launchpad.sol` L162–L164](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L162-L164)).
+- `receive()` leftover ETH only from the locker and the PoolManager ([`Launchpad.sol` L131–L133](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L131-L133)). It does **not** accept ETH from LBPStrategy (official LBP does not pay Launchpad; `recipient` is protocol).
 - Sentence length: 1–140 UTF-8 bytes (`BadProphecy`).
 
 #### `launch` encodes these official structs
@@ -203,9 +205,9 @@ struct AuctionParameters {
     uint64 startBlock;                // block.number (#41)
     uint64 endBlock;                  // startBlock + N (#41)
     uint64 claimBlock;                // = endBlock (#41)
-    uint256 tickSpacing;              // 100 << 96 — NOT pool tickSpacing 200 (#41). pending #42 recalculation
+    uint256 tickSpacing;              // 31691265005705736 — 1% of floor; NOT pool tickSpacing 200
     address validationHook;           // address(0) = none
-    uint256 floorPrice;               // 1000 << 96 (#41). pending #42 recalculation for 1B supply (~0.02 ETH at full sale)
+    uint256 floorPrice;               // 3169126500570573600 — full auction sell at floor = 0.02 ETH
     uint128 requiredCurrencyRaised;   // 0.02 ether
     bytes auctionStepsData;           // abi.encodePacked(uint24(1e7/N), uint40(N)) (#41)
 }
@@ -215,7 +217,7 @@ struct MigratorParameters {
     address token;
     address currency;                 // address(0)
     uint64 migrationBlock;            // endBlock + 1 (#41)
-    uint128 reservedTokenAmountForLP; // pulled to the strategy; rest is auction supply
+    uint128 reservedTokenAmountForLP; // 500_000_000e18; rest is auction supply (50:50)
     address recipient;                // protocol — NEVER prophet (#41)
     address positionRecipient;        // LiquidityLocker
     PoolParameters poolParameters;
@@ -254,7 +256,7 @@ Official errors the prophet can see on `launch` (bubble from LBP / factory / CCA
 - ENS adapter: prophecy sentence and deadline live only on the prophecy resolver (DECISIONS #5).
 - Constructor `(protocolFeeRecipient, worldSigner, ens)`.
 - `setUniswap` + CREATE2 hook address flags.
-- `LiquidityLocker.collect` / `withdrawAccrued` after the pool exists. Prophet 24 : protocol 76.
+- `LiquidityLocker.collect(token, tokenId)` / `withdrawAccrued` after the pool exists. Prophet 24 : protocol 76.
 - Label / slug / prophecy length rules. Names never expire.
 
 #### What is removed-on-cca
@@ -283,7 +285,7 @@ event CcaFactorySet(address factory); // Path A proposal only
 
 `(removed-on-cca)` Launchpad revert names the UI must stop mapping: `CurveComplete`, `Slippage`, `MemoTooLong`, `ExceedsSold`, `ZeroAmount` (`claimCreatorFee`).
 
-Write-facing names that **still** apply, from [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`Launchpad.sol` L57–L80](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L57-L80): `NullifierUsed`, `LabelTaken`, `AlreadyProphet`, `SlugTaken`, `InvalidSignature`, `NotProphet`, `BadSlug`, `BadProphecy`, `BadLabel`, `ZeroAddress`, `NotDeployer`, `UniswapAlreadySet`, `UniswapNotSet`, `CcaNotSet`, `CcaAlreadySet`, `BadAuctionBlocks`, `AuctionExists`, `ProphetRecipient`, `AuctionNotCreated`, `InvalidHook`, `TokenTransferFailed`, `UnexpectedEth`, `EthTransferFailed`, `Reentrant`. There is no `UnknownToken`.
+Write-facing names that **still** apply, from [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`Launchpad.sol` L57–L80](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L57-L80): `NullifierUsed`, `LabelTaken`, `AlreadyProphet`, `SlugTaken`, `InvalidSignature`, `NotProphet`, `BadSlug`, `BadProphecy`, `BadLabel`, `ZeroAddress`, `NotDeployer`, `UniswapAlreadySet`, `UniswapNotSet`, `CcaNotSet`, `CcaAlreadySet`, `BadAuctionBlocks`, `AuctionExists`, `ProphetRecipient`, `AuctionNotCreated`, `InvalidHook`, `TokenTransferFailed`, `UnexpectedEth`, `EthTransferFailed`, `Reentrant`. There is no `UnknownToken`.
 
 `registerProphet` check order stays: `NullifierUsed`, `AlreadyProphet`, `LabelTaken`, `InvalidSignature`.
 
@@ -314,37 +316,43 @@ error InvalidInitializer(address caller, address expected);
 - `_authorized` **must** be LBPStrategy `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000`. The official Sepolia InitializerHook’s `authorized()` is that strategy. Today’s “only Launchpad may initialize” does **not** work on B2: `migrate` initializes as the strategy.
 - ERC165 must report `IInitializerHook` (`authorized()`).
 - Permission bits must include `BEFORE_INITIALIZE`. Deploy with a mined CREATE2 salt.
-- Official `getHookPermissions` is `beforeInitialize` only. [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`ProphecyHook.sol` L31–L47](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/ProphecyHook.sol#L31-L47) matches: `beforeSwap` / `afterSwap` are false. Extra flags are out of the 02:00 fork gate.
+- Official `getHookPermissions` is `beforeInitialize` only. [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`ProphecyHook.sol` L31–L47](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/ProphecyHook.sol#L31-L47) matches: `beforeSwap` / `afterSwap` are false. Extra flags are out of the 02:00 fork gate.
 - Do not point `PoolParameters.hook` at the official reference hook `0x1600…2000` if we want `ProphecyHook` in the `PoolKey`. That reference address is the inherit-from sample, not our pool hook.
 
 ### `LiquidityLocker`
 
-Locker API and auction/pool supply split are subject to #42's final head (multi-tokenId `tokenIdsOf`/`collect(token, tokenId)` and a 50:50 split are in progress). The 24/76 fee split doesn't change.
+LBPStrategy mints a PositionManager ERC-721 and transfers it to `positionRecipient` ([`LBPStrategy.sol` L346–L363](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol#L346-L363)). The locker **is** that recipient. The 24/76 fee split does not change.
 
-LBPStrategy mints a PositionManager ERC-721 and transfers it to `positionRecipient` ([`LBPStrategy.sol` L346–L363](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol#L346-L363)). The locker **is** that recipient.
-
-Surface from [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) head `b71c64e` [`LiquidityLocker.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol). Official PositionManager `_mint` is callback-less, so `onERC721Received` does not run on Sepolia. Anyone may bind the NFT after `prepare` via `register`.
+Surface from [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) final head `9c6b163` [`LiquidityLocker.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol). Official PositionManager `_mint` is callback-less, so `onERC721Received` does not run on Sepolia. Anyone may bind an NFT the locker already owns after `prepare` via `register`. There is **no** `tokenIdOf`.
 
 ```solidity
-constructor(IPoolManager poolManager, address launchpad, IHooks hook); // L85–L92
+constructor(IPoolManager poolManager, address launchpad, IHooks hook); // L91–L98
 
-function prepare(address token, address prophet, address protocolFeeRecipient) external; // Launchpad-only; L107–L116
-function register(address token, uint256 tokenId) external; // permissionless; L120–L123
-function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data)
-    external returns (bytes4); // L125–L130; still kept if a callback mint happens
+function prepare(address token, address prophet, address protocolFeeRecipient) external; // Launchpad-only; L113–L122
+function register(address token, uint256 tokenId) external; // permissionless; L127–L130
+function onERC721Received(address, address, uint256 tokenId, bytes calldata)
+    external returns (bytes4); // L132–L137; still kept if a callback mint happens
 
-function collect(address token) external;          // L155–L182
-function withdrawAccrued() external;               // L184–L192
+function collect(address token, uint256 tokenId) external; // one position per call; L164–L193
+function withdrawAccrued() external;                       // L195–L203
 
-function tokenIdOf(address token) external view returns (uint256); // L194–L197; reverts UnknownLock if NFT not registered
-function prophetOf(address token) external view returns (address); // L200–L203; reverts UnknownLock if not prepared
+function tokenIdsOf(address token) external view returns (uint256[] memory); // L205–L207; can grow with spam registrations — do not use to pick the LP id
+function isRegistered(address token, uint256 tokenId) external view returns (bool); // L209–L211
+function prophetOf(address token) external view returns (address); // L214–L217; reverts UnknownLock if not prepared
 function positions(address token) external view returns (Position);
 function accruedEth(address prophet) external view returns (uint256);
 
 event Prepared(address indexed token, address indexed prophet, address indexed protocolFeeRecipient);
-event Registered(address indexed token, uint256 indexed tokenId); // L49, L150
+event Registered(address indexed token, uint256 indexed tokenId); // L54, L158
 event PositionReceived(address indexed token, uint256 indexed tokenId); // also emitted from _register
-event Collected(address indexed token, uint256 prophetAmount0, uint256 protocolAmount0, uint256 prophetAmount1, uint256 protocolAmount1);
+event Collected(
+    address indexed token,
+    uint256 indexed tokenId,
+    uint256 prophetAmount0,
+    uint256 protocolAmount0,
+    uint256 prophetAmount1,
+    uint256 protocolAmount1
+); // L56–L63, L192
 event ProphetAccrued(address indexed prophet, uint256 amount);
 event ProphetWithdrawn(address indexed prophet, uint256 amount);
 event PositionManagerSet(address positionManager);
@@ -353,8 +361,8 @@ error NotLaunchpad();
 error NotPositionManager();
 error ZeroAddress();
 error AlreadyPrepared();
-error AlreadyReceived();
-error UnknownLock();
+error AlreadyReceived(); // per tokenId — L72, L153
+error UnknownLock();     // unprepared token, or collect on an unregistered id — L73, L166, L168
 error PositionManagerAlreadySet();
 error PositionManagerNotSet();
 error BadPoolKey();
@@ -363,28 +371,28 @@ error TokenTransferFailed();
 error Reentrant();
 error NothingAccrued();
 error UnexpectedEth();
-error NotNftOwner(); // L76, L134
+error NotNftOwner(); // L82, L141
 ```
 
-There is **no** `prophetOf(uint256 tokenId)` and **no** standalone `protocolFeeRecipient()` view. Key is the ERC-20. Recipients live on `positions[token]`.
+There is **no** `tokenIdOf(address)`, **no** `prophetOf(uint256 tokenId)`, and **no** standalone `protocolFeeRecipient()` view. Key is the ERC-20. Recipients live on `positions[token]`.
 
-**How the locker learns the mapping** ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) TBD answers + [`LiquidityLocker.sol` L106–L151](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L106-L151)):
+**How the locker learns the mapping** ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`LiquidityLocker.sol` L113–L160](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol#L113-L160)):
 
 1. `Launchpad.launch` → `locker.prepare(token, prophet, protocolFeeRecipient)` (Launchpad-only). Recipients are fixed here.
 2. After a successful `LBPStrategy.migrate`, PositionManager mints the LP NFT to the locker **without** `onERC721Received`.
-3. Anyone calls `register(token, tokenId)`. Shared `_register` also serves `onERC721Received` if a callback mint happens.
-4. Checks: `ownerOf(tokenId) == locker`; poolKey `currency0 == ETH`, `currency1 == token`, `hooks == ProphecyHook`, `fee == 10000`, `tickSpacing == 200`; token prepared; not yet received. Else `NotNftOwner` / `BadPoolKey` / `UnknownLock` / `AlreadyReceived`.
+3. Anyone calls `register(token, tokenId)`. Shared `_register` (L139) also serves `onERC721Received` if a callback mint happens.
+4. Checks: `ownerOf(tokenId) == locker`; poolKey `currency0 == ETH`, `currency1 == token`, `hooks == ProphecyHook`, `fee == 10000`, `tickSpacing == 200`; token prepared; that tokenId not yet registered. Else `NotNftOwner` / `BadPoolKey` / `UnknownLock` / `AlreadyReceived`. Multiple tokenIds per token are allowed so dust spam cannot freeze the real position.
 
 Event and error names for `register` **are** in #42 (`Registered`, `NotNftOwner`). Do not mark them TBD.
 
-- `collect(address token)` can be called by anyone. Collected fees go **only** to prophet 24 : protocol 76 ([`Graduation.sol` L17–L18, L62–L64](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/Graduation.sol#L62-L64): `prophetShare = amount * 24 / 100`, remainder including dust to protocol).
+- `collect(address token, uint256 tokenId)` can be called by anyone, one NFT per call. Collected fees go **only** to prophet 24 : protocol 76 ([`Graduation.sol` L17–L18, L62–L64](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/Graduation.sol#L62-L64): `prophetShare = amount * 24 / 100`, remainder including dust to protocol). An unregistered id reverts `UnknownLock`.
 - No withdraw of principal. The locker must not `transferFrom` the NFT out, and must not decrease liquidity.
 - If sending ETH to the prophet fails, `collect` still pays the protocol and accrues the prophet share. The prophet later calls `withdrawAccrued()`.
 - `withdrawAccrued()` sends only accrued ETH, never pool principal.
-- Collect path is PositionManager `modifyLiquidities(bytes unlockData, uint256 deadline)`. Fees-only action bytes ([`LiquidityLocker.sol` L24–L25, L163–L169](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L163-L169)): `DECREASE_LIQUIDITY = 0x01` (liquidity delta `0`) then `TAKE_PAIR = 0x11`.
+- Collect path is PositionManager `modifyLiquidities(bytes unlockData, uint256 deadline)`. Fees-only action bytes ([`LiquidityLocker.sol` L25–L26, L175–L176](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol#L175-L176)): `DECREASE_LIQUIDITY = 0x01` (liquidity delta `0`) then `TAKE_PAIR = 0x11`.
 - `(removed-on-cca)` Launchpad-only `lock(address token, address prophet, address protocolFeeRecipient, PoolKey key, uint256 tokenAmount)` that called `PoolManager.modifyLiquidity` directly. The NFT arrives from LBPStrategy, not from Launchpad.
-- Demo intent is still one full-range position (`CcaLib.emptyPositionDefinitions` at `b71c64e`). More than one NFT if `positionDefinitions` has several rows is still not a product path.
-- After `migrate`, if `tokenIdOf(token)` reverts `UnknownLock` ([`LiquidityLocker.sol` L194–L195](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L194-L195)), web calls `register(address token, uint256 tokenId)` ([L120–L123](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L120-L123)). That emits `Registered(address indexed token, uint256 indexed tokenId)` ([L49](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L49), [L150](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L150)). If the locker does not own the NFT, `_register` reverts `NotNftOwner()` ([L76](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L76), [L134](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L134)). The frontend reads `tokenId` from the migrate tx receipt: PositionManager ERC-721 `Transfer(from=0x0, to=locker, tokenId)`. Official `_mint` emits that log without a callback: v4-periphery `545a5d2` [`PositionManager.sol` L369](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/PositionManager.sol#L369) `_mint(owner, tokenId)`; solmate `4b47a19` [`ERC721.sol` L157–L169](https://github.com/transmissions11/solmate/blob/4b47a19038b798b4a33d9749d25e570443520647/src/tokens/ERC721.sol#L157-L169) `emit Transfer(address(0), to, id)` — the receiver callback is only in `_safeMint` (L193).
+- Demo intent is still one full-range position (`CcaLib.emptyPositionDefinitions` at `9c6b163` L75–L76). More than one NFT if `positionDefinitions` has several rows is still not a product path.
+- Web finds the **real LP** `tokenId` from the migrate receipt: PositionManager ERC-721 `Transfer(from=0x0, to=locker, tokenId)`, or the `Registered` log — **not** `tokenIdsOf` (that array can grow with spam registrations). Use `isRegistered(token, tokenId)` to choose `Set up fee collection` vs `Collect fees`. Official `_mint` emits that Transfer without a callback: v4-periphery `545a5d2` [`PositionManager.sol` L369](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/PositionManager.sol#L369) `_mint(owner, tokenId)`; solmate `4b47a19` [`ERC721.sol` L157–L169](https://github.com/transmissions11/solmate/blob/4b47a19038b798b4a33d9749d25e570443520647/src/tokens/ERC721.sol#L157-L169) `emit Transfer(address(0), to, id)` — the receiver callback is only in `_safeMint` (L193). If the locker does not own the NFT, `_register` reverts `NotNftOwner()` (L82, L141).
 
 ## 3. World server → Launchpad `(draft)`
 
@@ -454,7 +462,7 @@ Name next to a wallet: reverse lookup, falling back to `prophetOf(wallet)`.
 
 | Order | Call | Address |
 |---|---|---|
-| 1 | `launchpad.auctionOf(token)` → `address` ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`Launchpad.sol` L205–L207](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L205-L207)). There is no `poolOpened` flag | `VITE_LAUNCHPAD_ADDRESS` |
+| 1 | `launchpad.auctionOf(token)` → `address` ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`Launchpad.sol` L205–L207](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L205-L207)). There is no `poolOpened` flag | `VITE_LAUNCHPAD_ADDRESS` |
 | 2 | Decode `Launched` where `token` matches | Launchpad logs |
 | 3 | LBPStrategy `InitializerCreated` / `DistributionInitialized` | `0x95434E898Af471945Cab33D5064d2aC1A6Ba2000` |
 
@@ -540,7 +548,9 @@ function submitBid(uint256 maxPriceQ96, uint128 amount, address owner, bytes cal
 | `amount` | budget in wei; `msg.value` **must** equal `amount` |
 | `maxPriceQ96` | max price the bidder accepts (Q96 ETH per token), strictly above current clearing and `<= MAX_BID_PRICE` |
 | `owner` | bidder (receives tokens and leftover ETH) |
-| `prevTickPriceQ96` | hint; #41 uses `floor + (n-1) * tick` with `maxPrice = floor + n * tick` |
+| `prevTickPriceQ96` | hint; demo uses `floor` as the tick below `maxPrice = 2 × floor` |
+
+Demo bid ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`CcaSepoliaFork.t.sol` L96](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/test/fork/CcaSepoliaFork.t.sol#L96)): budget **0.021 ETH**, max price **2× floor** = `6338253001141147200`. That stays strictly above a floor clearing so `exitBid` does not revert `CannotExitBid`.
 
 First `submitBid` return / `BidSubmitted.id` is **0**. Official CCA [`BidStorage.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/BidStorage.sol) L10 and L47–L49 (`$_nextBidId` starts at 0; `_createBid` assigns then increments). **Not** fork-asserted in #41.
 
@@ -580,9 +590,11 @@ event TokensReceived(uint128 totalSupply);
 
 Exit / refund revert names: `AuctionIsNotOver()`, `BidAlreadyExited()`, `CannotExitBid()`, `CannotPartiallyExitBidBeforeGraduation()`, `CannotPartiallyExitBidBeforeEndBlock()`, `InvalidLastFullyFilledCheckpointHint()`, `InvalidOutbidBlockCheckpointHint()`, `BidIdDoesNotExist(uint256 bidId)`.
 
+`exitBid` finalizes the price itself: official CCA `a56d422` [`ContinuousClearingAuction.sol` L498](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/ContinuousClearingAuction.sol#L498) calls `_getFinalCheckpoint()` → `_checkpointAtBlock(END_BLOCK)`. Public `checkpoint()` is `onlyActiveAuction` (L420) and is not a post-end CTA. There is **no** separate `Set final price` button. If `maxPrice <=` final clearing, `exitBid` reverts `CannotExitBid` (L504).
+
 Claim revert names: `NotClaimable()`, `AuctionIsNotFinalized()`, `NotGraduated()`, `BidNotExited()`, `BatchClaimDifferentOwner(address expectedOwner, address receivedOwner)`, `BidIdDoesNotExist(uint256 bidId)`.
 
-Demo: prefer a bid strictly above final clearing so the UI can `exitBid` without partial-exit hints.
+Demo: prefer a bid strictly above final clearing so the UI can `exitBid` without partial-exit hints (0.021 ETH at 2× floor).
 
 #### If the auction ends below 0.02 ETH (`requiredCurrencyRaised`)
 
@@ -628,7 +640,7 @@ Official `ILBPStrategy` (`1c590491`) revert names — **selectors differ from th
 
 There is no Launchpad wrapper. Web calls the strategy.
 
-Pool key after success: native ETH (`address(0)`), `token`, fee `10000`, tickSpacing `200`, hooks = `ProphecyHook`. `poolId = keccak256(abi.encode(key))`. After a successful migrate, if `tokenIdOf(token)` reverts `UnknownLock`, call `locker.register(token, tokenId)` with `tokenId` from the migrate receipt’s PositionManager ERC-721 `Transfer(from=0x0, to=locker, tokenId)` (see 7.12).
+Pool key after success: native ETH (`address(0)`), `token`, fee `10000`, tickSpacing `200`, hooks = `ProphecyHook`. `poolId = keccak256(abi.encode(key))`. Initial tick at floor is **239433** (full-range, no tickSpacing-200 alignment). After a successful migrate, if `isRegistered(token, tokenId)` is false, call `locker.register(token, tokenId)` with the real LP `tokenId` from the migrate receipt’s PositionManager ERC-721 `Transfer(from=0x0, to=locker, tokenId)` or the `Registered` log — not `tokenIdsOf` (see 7.12).
 
 ### 4.7 v4 swap
 
@@ -679,7 +691,7 @@ struct ExactInputSingleParams {
 - Exact-in ETH → token: `zeroForOne = true`, `msg.value = amountIn`. SETTLE_ALL currency0, TAKE_ALL currency1.
 - Exact-in token → ETH: `zeroForOne = false`, `msg.value = 0`. **Permit2 first** (`0x000000000022D473030F116dDEE9F6B43aC78BA3`): (1) token `approve` to Permit2, one time per token; (2) `permit2.approve(token, router, amount, expiration)` ([`IAllowanceTransfer.sol` L123](https://github.com/Uniswap/permit2/blob/cc56ad0/src/interfaces/IAllowanceTransfer.sol#L123)).
 
-`ProphecyHook` has no swap hooks (`beforeSwap` / `afterSwap` false, [`ProphecyHook.sol` `b71c64e` L39–L40](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/ProphecyHook.sol#L39-L40)). No hook error can come from a swap.
+`ProphecyHook` has no swap hooks (`beforeSwap` / `afterSwap` false, [`ProphecyHook.sol` `9c6b163` L39–L40](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/ProphecyHook.sol#L39-L40)). No hook error can come from a swap.
 
 Swap revert names the UI will hit (Designer Q2): `V4TooLittleReceived(uint256,uint256)` ([`IV4Router.sol` L13](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/interfaces/IV4Router.sol#L13)), `TransactionDeadlinePassed()`, `ExecutionFailed(uint256,bytes)`, `LengthMismatch()`, Permit2 `InsufficientAllowance(uint256)` / `AllowanceExpired(uint256)`.
 
@@ -743,7 +755,7 @@ After a successful send, infra writes a machine-readable record (no secrets) to 
 1. Predict Launchpad CREATE address.
 2. `new ProphecyEns(predictedPad, …)` then `new Launchpad(protocolFeeRecipient, worldSigner, ens)`.
 3. Mine CREATE2 salt; `new ProphecyHook{salt}(poolManager, lbpStrategy)` — `authorized` is LBPStrategy, not Launchpad.
-4. `new LiquidityLocker(poolManager, launchpad, hook)` — [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`LiquidityLocker.sol` L85](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L85). ERC-721 receiver plus permissionless `register`.
+4. `new LiquidityLocker(poolManager, launchpad, hook)` — [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`LiquidityLocker.sol` L91](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol#L91). ERC-721 receiver plus permissionless `register`; collect is per `tokenId`.
 5. `launchpad.setUniswap(poolManager, hook, locker)` once.
 6. `launchpad.setCca(0x95434E898Af471945Cab33D5064d2aC1A6Ba2000, 0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4)`. Require the views match. Reverts `InvalidHook` unless `hook.authorized() == lbpStrategy`.
 
@@ -767,13 +779,13 @@ Departed (`now >= deadline` from ENS) is its own badge next to any state below (
 | **Not started** | Funded, `block < startBlock()` | `Auction starts in {startBlock - block} blocks` |
 | **Live** | Funded, `startBlock() <= block < endBlock()` | `Auction live · ends in {blocks} blocks` (`{blocks}` = `endBlock - block`) |
 | **Sold out** (still live) | `block < endBlock()` but next `submitBid` reverts `AuctionSoldOut` | `Auction live · all tokens are bid for` · helper: `New bids are closed. Come back when the auction ends.` |
-| **Ended, not finalized** | `block >= endBlock()` and `lastCheckpointedBlock() != endBlock()` | `Auction ended · final price not set yet`. CTA (`checkpoint`): `Set final price` / pending: `Setting final price…` |
+| **Ended, not finalized** | `block >= endBlock()` and `lastCheckpointedBlock() != endBlock()` | `Auction ended`. No separate final-price button; `exitBid` sets the final price |
 | **Ended, graduated** | `block >= endBlock()`, `isGraduated() == true` after a current checkpoint | `Auction ended · ready to open the market` |
 | **Ended, failed** | `block >= endBlock()` and `isGraduated() == false` after a final checkpoint | `Auction ended · goal not reached` |
 | **Claim blocked** | Graduated and `block < claimBlock()` | `Tokens can be claimed from block {claimBlock}.` |
 | **Claimable** | Graduated, `block >= claimBlock()`, bid already exited | keep **Ended, graduated** header; CTAs in 7.4 |
 | **Migratable** | Graduated, `block >= migrationBlock`, no `Migrated` yet | keep **Ended, graduated** header; CTAs in 7.6 |
-| **Pool open** | `Migrated` or `slot0 != 0` (`auctionOf` has no `poolOpened` flag — [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`Launchpad.sol` L205–L207](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L205-L207)) | `Market open on Uniswap v4` |
+| **Pool open** | `Migrated` or `slot0 != 0` (`auctionOf` has no `poolOpened` flag — [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`Launchpad.sol` L205–L207](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L205-L207)) | `Market open on Uniswap v4` |
 
 ### 7.2 Clearing price and progress
 
@@ -957,9 +969,7 @@ v2: the new Launchpad error names are now known. Copy is in 7.14.
 
 ### 7.12 `register` (after Pool open, before `Collect fees`)
 
-Locker API and auction/pool supply split are subject to #42's final head (multi-tokenId `tokenIdsOf`/`collect(token, tokenId)` and a 50:50 split are in progress). The 24/76 fee split doesn't change.
-
-After `Migrated`, if locker `tokenIdOf(token)` reverts `UnknownLock` ([`LiquidityLocker.sol` `b71c64e` L194–L195](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L194-L195)), show this instead of `Collect fees`. Call `register(address token, uint256 tokenId)` ([L120–L123](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L120-L123)). `tokenId` is the PositionManager ERC-721 `Transfer(from=0x0, to=locker, tokenId)` log on the migrate receipt (official `_mint` emits it without a callback: v4-periphery `545a5d2` [`PositionManager.sol` L369](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/PositionManager.sol#L369); solmate `4b47a19` [`ERC721.sol` L157–L169](https://github.com/transmissions11/solmate/blob/4b47a19038b798b4a33d9749d25e570443520647/src/tokens/ERC721.sol#L157-L169), callback only in `_safeMint` L193).
+After `Migrated`, if `isRegistered(token, tokenId)` is false ([`LiquidityLocker.sol` `9c6b163` L209–L211](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol#L209-L211)), show this instead of `Collect fees`. Call `register(address token, uint256 tokenId)` ([L127–L130](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol#L127-L130)). Find the real LP `tokenId` from the migrate receipt’s PositionManager ERC-721 `Transfer(from=0x0, to=locker, tokenId)` or the `Registered` log — **not** `tokenIdsOf` (that array can grow with spam registrations). Official `_mint` emits the Transfer without a callback: v4-periphery `545a5d2` [`PositionManager.sol` L369](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/PositionManager.sol#L369); solmate `4b47a19` [`ERC721.sol` L157–L169](https://github.com/transmissions11/solmate/blob/4b47a19038b798b4a33d9749d25e570443520647/src/tokens/ERC721.sol#L157-L169), callback only in `_safeMint` L193.
 
 | Surface | Copy |
 |---|---|
@@ -968,11 +978,9 @@ After `Migrated`, if locker `tokenIdOf(token)` reverts `UnknownLock` ([`Liquidit
 
 `NotNftOwner()` has no UI copy (internal error). Before pool open, `UnknownLock` keeps showing `Fees start once the market opens.`
 
-### 7.13 Trading fees (`LiquidityLocker.collect(token)`)
+### 7.13 Trading fees (`LiquidityLocker.collect(token, tokenId)`)
 
-Locker API and auction/pool supply split are subject to #42's final head (multi-tokenId `tokenIdsOf`/`collect(token, tokenId)` and a 50:50 split are in progress). The 24/76 fee split doesn't change.
-
-Source: [`LiquidityLocker.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol) @ `b71c64e`. Anyone can call `collect(token)`. Fees always go to the two recipients set at launch (prophet 24, protocol 76, dust to the protocol). The caller gets nothing. It takes ETH and {SYMBOL} fees and never touches the locked liquidity. Show it only after Pool open and after `register` (7.12). Before the pool is open, `tokenIdOf(token)` reverts `UnknownLock` — treat that as "not open", not as an error (`Fees start once the market opens.`). After `Migrated`, the same revert is the 7.12 `register` step, not this section.
+Source: [`LiquidityLocker.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol) @ `9c6b163`. Anyone can call `collect(token, tokenId)`. Fees always go to the two recipients set at launch (prophet 24, protocol 76, dust to the protocol). The caller gets nothing. It takes ETH and {SYMBOL} fees and never touches the locked liquidity. Show it only after Pool open and after `register` (7.12). The UI shows **one** `Collect fees` button for the real LP id only. Before the pool is open, `collect` reverts `UnknownLock` — treat that as "not open", not as an error (`Fees start once the market opens.`). After `Migrated`, use `isRegistered(token, tokenId)` to choose 7.12 vs this section. Do not walk `tokenIdsOf`.
 
 | Surface | Copy |
 |---|---|
@@ -1050,8 +1058,8 @@ Removed on `cca` (do not map): `CurveComplete`, `Slippage`, `MemoTooLong`, `Exce
 | # | Step | Calls (as in #41) | Pass when |
 |---|---|---|---|
 | 1 | Create auction | `initializeDistribution` → factory `create` + `onTokensReceived` | Auction code at the predicted address. `fundsRecipient == LBPStrategy`, `tokensRecipient` and `recipient` are protocol, not the prophet |
-| 2 | Bid | 5-arg `submitBid{value: amount}(maxPrice, amount, owner, prevTick, "")`. First `bidId` is **0** (official `BidStorage`, not asserted in #41). Hint: `maxPrice = floor + n * tick`, `prevTick = floor + (n-1) * tick` | `BidSubmitted`. Raised demand ≥ 0.02 ETH for the happy path |
-| 3 | Settle + open market | `vm.roll` to `endBlock`, `checkpoint()`, `exitBid` (unused ETH), `claimTokens`. Then `vm.roll` to `endBlock + 1`, `LBPStrategy.migrate(auction)` | `isGraduated() == true`. `PoolManager.getSlot0(poolId)` non-zero. Fee 10000, tickSpacing 200 |
+| 2 | Bid | 5-arg `submitBid{value: amount}(maxPrice, amount, owner, prevTick, "")`. First `bidId` is **0**. Demo: budget **0.021 ETH**, `maxPrice = 2 × floor` (`6338253001141147200`), `prevTick = floor` | `BidSubmitted`. Raised demand ≥ 0.02 ETH for the happy path |
+| 3 | Settle + open market | `vm.roll` to `endBlock`, `exitBid` (writes the final checkpoint — no UI `Set final price`), `claimTokens`. Then `vm.roll` to `endBlock + 1`, `LBPStrategy.migrate(auction)` | `isGraduated() == true`. `PoolManager.getSlot0(poolId)` non-zero. Fee 10000, tickSpacing 200, initial tick 239433 |
 | 4 | Swap | After (3), one ETH→token swap. Product: Universal Router 2.1.2 `execute` with `V4_SWAP = 0x10` and actions `0x06, 0x0c, 0x0f` (section 4.7). #41 harness used `PoolSwapTest` | Token balance of the trader moves |
 
 Goal not reached is the same file, not a fifth happy-path step: `exitBid` full ETH / 0 tokens; `claimTokens` reverts `NotGraduated` (L93–L94); no pool (`sqrtPriceX96 == 0`, L121–L122). See section 4.5.
@@ -1074,22 +1082,22 @@ Do not merge CCA contracts into `main` before the final gate.
 
 Answered items stay struck through so later PRs can see the trail. Remaining rows are still open. Do not invent numbers.
 
-1. ~~`salt` derivation~~ → [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`Launchpad.sol` L191](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L191): `salt = keccak256(abi.encode(token, msg.sender, slug))`. Frontend does not pass a salt.
-2. `floorPrice` / auction `tickSpacing` — **pending #42 recalculation** for the 1B product mint (~0.02 ETH at full sale). Current values stay `1000 << 96` / `100 << 96` from #41 / `CcaLib` L27–L28. Do not invent replacements.
+1. ~~`salt` derivation~~ → [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`Launchpad.sol` L191](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L191): `salt = keccak256(abi.encode(token, msg.sender, slug))`. Frontend does not pass a salt.
+2. ~~`floorPrice` / auction `tickSpacing`~~ → [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`CcaLib.sol` L45–L46](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/cca/CcaLib.sol#L45-L46): `FLOOR_PRICE_Q96 = 3169126500570573600`, `AUCTION_TICK_SPACING_Q96 = 31691265005705736` (1% of floor). Full sell-out at floor raises exactly 0.02 ETH.
 3. ~~`auctionStepsData`~~ → section 0.1 (`abi.encodePacked(uint24(1e7/N), uint40(N))`) from #41.
 4. ~~`startBlock`~~ → `block.number` from #41.
 5. ~~`claimBlock` / `migrationBlock`~~ → `end` / `end + 1` from #41.
-6. `reservedTokenAmountForLP` / auction supply — [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`CcaLib.sol` L15–L17](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/cca/CcaLib.sol#L15-L17) currently uses 793.1M auction / 206.9M LP. Still paired with the pending floor recalculation. #41’s spike used `800e18` / `200e18` on a `1000e18` test token.
-7. Exact `positionDefinitions` / `lpAllocationSchedule` encodings. #41 and #42 `CcaLib` use empty `PositionDefinition[]` (implicit full-range) and one bracket `{0, 1e7}`. Still confirm against the pending floor recalculation.
+6. ~~`reservedTokenAmountForLP` / auction supply~~ → 50:50, 500M auction / 500M LP ([`CcaLib.sol` L19–L20](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/cca/CcaLib.sol#L19-L20)). LBP leftover at floor is 171 wei ETH to protocol ([`CcaLib.t.sol` L115](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/test/CcaLib.t.sol#L115)).
+7. ~~Exact `positionDefinitions` / `lpAllocationSchedule`~~ → empty `PositionDefinition[]` (implicit full-range, initial tick 239433) and one bracket `{0, 1e7}` ([`CcaLib.sol` L69–L76](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/cca/CcaLib.sol#L69-L76)).
 8. ~~`tokensRecipient` / `recipient`~~ → **protocol** (never the prophet) from #41.
 9. ~~Whether Launchpad wraps `migrate`~~ → web always calls `LBPStrategy.migrate(auction)`. No Launchpad wrapper ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) TBD answers).
-10. ~~How `auctionOf(token).poolOpened` is set~~ → `auctionOf` returns `address` only ([`Launchpad.sol` L205–L207](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L205-L207)). Detect pool open from `Migrated` or `slot0 != 0`.
-11. ~~New Launchpad custom-error names~~ → full list in section 7.14 / [`Launchpad.sol` L57–L80](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L57-L80). “LBP not set” is `CcaNotSet`.
-12. ~~`LiquidityLocker` constructor and tokenId bind~~ → `constructor(poolManager, launchpad, hook)`; `prepare` then permissionless `register(token, tokenId)` ([`LiquidityLocker.sol` L85, L120–L123](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L120-L123)). Event `Registered`; error `NotNftOwner`.
-13. ~~PositionManager action bytes for fees-only `collect`~~ → `0x01` + `0x11`, liquidity delta `0` ([`LiquidityLocker.sol` L24–L25, L163–L169](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol#L163-L169)).
+10. ~~How `auctionOf(token).poolOpened` is set~~ → `auctionOf` returns `address` only ([`Launchpad.sol` L205–L207](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L205-L207)). Detect pool open from `Migrated` or `slot0 != 0`.
+11. ~~New Launchpad custom-error names~~ → full list in section 7.14 / [`Launchpad.sol` L57–L80](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L57-L80). “LBP not set” is `CcaNotSet`.
+12. ~~`LiquidityLocker` constructor and tokenId bind~~ → `constructor(poolManager, launchpad, hook)` L91–L98; `prepare` then permissionless `register(token, tokenId)` ([`LiquidityLocker.sol` L127–L130](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol#L127-L130)); views `tokenIdsOf` / `isRegistered` (L205–L211). Event `Registered`; error `NotNftOwner`. `AlreadyReceived` is per tokenId.
+13. ~~PositionManager action bytes for fees-only `collect`~~ → `collect(token, tokenId)` with `0x01` + `0x11`, liquidity delta `0` ([`LiquidityLocker.sol` L25–L26, L164–L176](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol#L164-L176)). Unregistered id reverts `UnknownLock`.
 14. ~~Universal Router 2.1.2 `V4_SWAP` command + inputs~~ → section 4.7. **TBD:** not executed against live Sepolia 2.1.2 in this repo (PR #41 used `PoolSwapTest`).
-15. ~~Whether `receive()` must accept ETH from LBPStrategy~~ → no. [`Launchpad.sol` L131–L133](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/Launchpad.sol#L131-L133) accepts only locker and PoolManager. `recipient` is protocol, not Launchpad.
-16. Hook CREATE2 flags if any permission besides `BEFORE_INITIALIZE` is added. [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`ProphecyHook.sol` L31–L47](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/ProphecyHook.sol#L31-L47) is `beforeInitialize` only.
+15. ~~Whether `receive()` must accept ETH from LBPStrategy~~ → no. [`Launchpad.sol` L131–L133](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L131-L133) accepts only locker and PoolManager. `recipient` is protocol, not Launchpad.
+16. Hook CREATE2 flags if any permission besides `BEFORE_INITIALIZE` is added. [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`ProphecyHook.sol` L31–L47](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/ProphecyHook.sol#L31-L47) is `beforeInitialize` only.
 17. **TBD:** 1-wei leftover solvency after graduated + caught `migrate` (Designer Q1).
 18. **TBD:** Sepolia StateView `0xe1dd9c3…` bytecode vs pin `545a5d2` for a pending-fees view (Designer Q4). No locker `pendingFees` yet.
 
