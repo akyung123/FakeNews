@@ -33,6 +33,9 @@ interface ILbpStrategyFork {
 
 interface ICcaFork {
     error NotGraduated();
+    /// Official CCA v2.1.0: `exitBid` when `maxPrice == clearing`.
+    /// https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuction.sol
+    error CannotExitBid();
 
     function submitBid(
         uint256 maxPriceQ96,
