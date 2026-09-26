@@ -102,7 +102,7 @@ describe("DECISIONS #1 copy — new strings", () => {
     assertRemoved(empty);
 
     const graduated = renderApp("/n/two-min.ringo.prophecy.eth");
-    expect(graduated).toContain("Graduated to Uniswap V4");
+    expect(graduated.split("Graduated to Uniswap V4").length - 1).toBe(1);
     expect(graduated).toContain("The curve is closed. Trading continues on Uniswap.");
     expect(graduated).toContain("View pool on Uniswap");
     expect(graduated).toContain("Trade memos");

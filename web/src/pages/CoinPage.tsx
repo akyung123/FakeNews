@@ -66,11 +66,7 @@ export function CoinPage() {
           </div>
           <h1 className="prophecy-title">{coin.prophecy}</h1>
           <p className="big-num">{curveProgressHeader(coin)}</p>
-          {graduation.graduated ? (
-            <p className="up">{GRADUATED_TITLE}</p>
-          ) : (
-            <p className="faint">Curve progress</p>
-          )}
+          {graduation.graduated ? null : <p className="faint">Curve progress</p>}
           <Sparkline coin={coin} />
           <Bar value={progress(coin)} labelled />
         </section>

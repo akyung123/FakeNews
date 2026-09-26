@@ -69,10 +69,11 @@ describe("graduated trade panel", () => {
       const row = getProphecyByName(ens, NOW)!;
       const poolId = v4PoolId({ token: row.token, hooks: MOCK_HOOK });
       expect(html).toContain(row.sentence);
-      expect(html).toContain(GRADUATED_TITLE);
+      expect(html.split(GRADUATED_TITLE).length - 1).toBe(1);
       expect(html).toContain(GRADUATED_BODY);
       expect(html).toContain(GRADUATED_LINK);
       expect(html).toContain(uniswapGraduationHref({ graduated: true, poolId, token: row.token }));
+      expect(html).not.toContain("Curve progress");
       expect(html).not.toContain(">Buy<");
       expect(html).not.toContain(">Sell<");
       expect(html).not.toContain("Amount (ETH)");

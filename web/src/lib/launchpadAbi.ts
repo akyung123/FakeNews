@@ -1,5 +1,5 @@
 /**
- * Launchpad ABI from contracts/src/Launchpad.sol at 9366319 (PR #26).
+ * Launchpad ABI from contracts/src/Launchpad.sol at 0ee30ce (current main).
  *
  * Constructor ends at ens: (protocolFeeRecipient, worldSigner, ens).
  * Uniswap addresses are not constructor args; deployer-only one-time
