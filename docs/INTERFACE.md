@@ -83,6 +83,32 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 - On success it signs `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` with EIP-191.
 - The Launchpad checks that the signer is `WORLD_SIGNER` and that the nullifier is unused.
 
+### Web → World server `(draft)`
+
+The web app never holds the RP signing key. It asks `world/` for an IDKit 4 `rp_context`, then posts the IDKit result back.
+
+`POST {VITE_WORLD_SERVER_URL}/rp-context`
+
+```json
+{ "action": "<VITE_WORLD_ACTION>", "wallet": "0x..." }
+```
+
+Response is the IDKit `RpContext`: `{ "rp_id", "nonce", "created_at", "expires_at", "signature" }`.
+
+`POST {VITE_WORLD_SERVER_URL}/verify`
+
+```json
+{ "wallet": "0x...", "rp_id": "rp_...", "idkitResponse": { } }
+```
+
+`idkitResponse` is the IDKit 4 result, forwarded as-is. On success:
+
+```json
+{ "nullifier": "0x<uint256>", "serverSig": "0x<eip191>" }
+```
+
+`serverSig` is the EIP-191 signature described above. While `VITE_WORLD_MOCK` is not `0`/`false`, the web app uses the mock client in `web/src/lib/world.ts` instead of these URLs.
+
 ## 4. How the web app reads
 
 1. List: `Launched` logs.
@@ -103,5 +129,7 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 | `VITE_PARENT_NAME` | web (e.g. `prophecy.eth`) |
 | `VITE_UNIVERSAL_RESOLVER` | web ([`ENSV2.md`](ENSV2.md) section 0) |
 | `VITE_WORLD_APP_ID`, `VITE_WORLD_ACTION` | web |
+| `VITE_WORLD_MOCK` | web (default on; set `0` to call the world server) |
+| `VITE_WORLD_SERVER_URL` | web (world/ base URL; unused while mock) |
 | `RPC_URL`, `PRIVATE_KEY` | contract deployment (people only) |
 | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |
