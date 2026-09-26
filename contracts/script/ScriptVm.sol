@@ -31,7 +31,7 @@ abstract contract ScriptVm {
     }
 
     /// Foundry console, no forge-std import (that lane owns lib/).
-    function _pasteLine(string memory line) internal pure {
+    function _pasteLine(string memory line) internal view {
         bytes memory payload = abi.encodeWithSignature("log(string)", line);
         address console_ = address(0x000000000000000000636F6e736F6c652e6c6f67);
         uint256 len = payload.length;
