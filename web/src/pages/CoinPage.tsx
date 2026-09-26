@@ -1,0 +1,193 @@
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { CommentItem } from "../components/CommentItem";
+import { Bar } from "../components/CoinCard";
+import { graduated, progress, quoteBuy, quoteSell } from "../lib/curve";
+import { ago, eth, mcap, pct, tokens, trend } from "../lib/format";
+import {
+  actions,
+  changeSinceLaunch,
+  entryMcap,
+  holderCount,
+  marketCap,
+  myPosition,
+  useStore,
+  type Coin,
+} from "../lib/store";
+
+export function CoinPage() {
+  const { id = "" } = useParams();
+  const s = useStore();
+  const coin = s.coins.find((c) => c.id === id);
+  if (!coin) {
+    return (
+      <main className="narrow">
+        <section className="block">
+          <h1>Prophecy not found</h1>
+          <Link to="/">Back to all prophecies</Link>
+        </section>
+      </main>
+    );
+  }
+
+  const pos = myPosition(s, coin.id);
+  const talk = s.comments.filter((c) => c.coinId === coin.id).sort((a, b) => b.at - a.at);
+  const change = changeSinceLaunch(coin);
+
+  return (
+    <main className="coin-page">
+      <div className="stack">
+        <section className="block">
+          <div className="coin-id">
+            <div>
+              <p className="coin-name">
+                {coin.name} <span className="faint">${coin.ticker}</span>
+              </p>
+              <p className="faint small">
+                by {coin.creator} · {ago(coin.createdAt)} · {holderCount(s, coin.id)} holders
+              </p>
+            </div>
+          </div>
+          <h1 className="prophecy-title">{coin.prophecy}</h1>
+          <p className="big-num">{mcap(marketCap(coin))}</p>
+          <p className={trend(change)}>
+            {pct(change)} <span className="faint">market cap since launch</span>
+          </p>
+          <Sparkline coin={coin} />
+          <Bar value={progress(coin)} labelled />
+          {graduated(coin) ? <p className="up">Graduated. The curve sold out.</p> : null}
+        </section>
+
+        <section className="block">
+          <div className="block-head">
+            <h2>Holder talk</h2>
+            <span className="faint">{talk.length} posts</span>
+          </div>
+          <PostBox coinId={coin.id} holds={Boolean(pos)} />
+          <ul className="posts">
+            {talk.length === 0 ? <li className="empty">No talk yet. Buy in and say something.</li> : null}
+            {talk.map((c) => (
+              <CommentItem key={c.id} comment={c} coin={coin} />
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      <aside className="stack side">
+        <TradeBox coin={coin} balance={s.balance} held={pos?.tokens ?? 0} />
+        {pos ? (
+          <section className="block you-hold">
+            <p className="faint small">You hold</p>
+            <p className="you-amount">
+              {tokens(pos.tokens)} <span className="faint">${coin.ticker}</span>
+            </p>
+            <p className="small">
+              <span className={trend(marketCap(coin) / entryMcap(pos) - 1)}>
+                {pct(marketCap(coin) / entryMcap(pos) - 1)}
+              </span>{" "}
+              <span className="faint">from {mcap(entryMcap(pos))} MC</span>
+            </p>
+          </section>
+        ) : null}
+      </aside>
+    </main>
+  );
+}
+
+function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: number }) {
+  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [amount, setAmount] = useState("0.05");
+  const value = Number(amount) || 0;
+  const closed = graduated(coin);
+
+  const buyQuote = quoteBuy(coin, Math.min(value, balance));
+  const sellTokens = Math.min(held, (held * Math.min(value, 100)) / 100);
+  const sellQuote = quoteSell(coin, sellTokens);
+
+  function submit() {
+    if (side === "buy") actions.buy(coin.id, value);
+    else actions.sell(coin.id, sellTokens);
+  }
+
+  return (
+    <section className="block trade">
+      <div className="tabs">
+        <button type="button" className={side === "buy" ? "on buy" : ""} onClick={() => { setSide("buy"); setAmount("0.05"); }}>
+          Buy
+        </button>
+        <button type="button" className={side === "sell" ? "on sell" : ""} onClick={() => { setSide("sell"); setAmount("100"); }}>
+          Sell
+        </button>
+      </div>
+      <label className="field">
+        <span>{side === "buy" ? "Amount (ETH)" : "Amount (% of your bag)"}</span>
+        <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      </label>
+      <div className="quick">
+        {(side === "buy" ? ["0.01", "0.05", "0.1", "0.5"] : ["25", "50", "100"]).map((q) => (
+          <button type="button" key={q} onClick={() => setAmount(q)}>
+            {side === "buy" ? `${q} ETH` : `${q}%`}
+          </button>
+        ))}
+      </div>
+      <p className="faint">
+        {side === "buy"
+          ? `You get ≈ ${tokens(buyQuote.tokens)} $${coin.ticker}`
+          : `You get ≈ ${eth(sellQuote, 4)}`}
+      </p>
+      <button
+        type="button"
+        className={`btn ${side === "buy" ? "primary" : "sell"} full`}
+        disabled={closed || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
+        onClick={submit}
+      >
+        {closed ? "Curve sold out" : side === "buy" ? `Buy $${coin.ticker}` : `Sell $${coin.ticker}`}
+      </button>
+      <p className="faint small">Cash {eth(balance)}</p>
+    </section>
+  );
+}
+
+function PostBox({ coinId, holds }: { coinId: string; holds: boolean }) {
+  const [text, setText] = useState("");
+  if (!holds) return <p className="locked">Only holders can talk here. Buy any amount to join.</p>;
+  return (
+    <form
+      className="composer"
+      onSubmit={(e) => {
+        e.preventDefault();
+        actions.comment(coinId, text);
+        setText("");
+      }}
+    >
+      <input
+        value={text}
+        maxLength={140}
+        placeholder="How's your bag feeling?"
+        onChange={(e) => setText(e.target.value)}
+      />
+      <button type="submit" className="btn primary" disabled={!text.trim()}>
+        Post
+      </button>
+    </form>
+  );
+}
+
+function Sparkline({ coin }: { coin: Coin }) {
+  const points = coin.history.map((h) => h.mcap);
+  if (points.length < 2) return null;
+  const w = 600;
+  const h = 120;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const span = max - min || 1;
+  const d = points
+    .map((v, i) => `${i === 0 ? "M" : "L"}${((i / (points.length - 1)) * w).toFixed(1)},${(h - ((v - min) / span) * (h - 8) - 4).toFixed(1)}`)
+    .join(" ");
+  const up = points[points.length - 1] >= points[0];
+  return (
+    <svg className={`spark ${up ? "up" : "down"}`} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-label="Market cap over time">
+      <path d={d} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
