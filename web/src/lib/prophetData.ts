@@ -114,6 +114,7 @@ export function prototypeCoinFromName(
     ethRaised: p.complete ? GRADUATION_ETH : sold > 0 ? 0.001 : 0,
     history: [],
     token: p.token,
+    complete: p.complete,
   };
   coin.history = [
     { at: createdAt - 60_000, mcap: marketCap({ sold: 0, ethRaised: 0 }) },

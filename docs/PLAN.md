@@ -96,6 +96,7 @@ Team decision B2: replace the bonding curve with official Uniswap LBPStrategy. T
 - [x] Unit tests with mocks; `forge build && forge test` green @cursor
 - [x] Follow-up Sepolia fork tests: no-checkpoint 0.021@2× floor, `CannotExitBid` at clearing, Launchpad+ProphecyHook+Locker migrate/register, leftover ETH `assertEq(171)` @cursor
 - [x] CCA `Deploy.s.sol`: hook `authorized` = LBPStrategy, `setUniswap` then `setCca`, sepolia.json schema @cursor
+- [x] Web bid / CCALens / claim / migrate / v4 swap + collect on existing screens @cursor
 
 ## If there is time
 

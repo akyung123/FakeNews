@@ -5,6 +5,7 @@ import {
   createWorldClient,
   WorldClientError,
   idKitConfigFromRpContext,
+  worldClientWithServerFallback,
   worldErrorKindFromIdKit,
   worldStatusFromKind,
   type IdKitResultV4,
@@ -35,6 +36,23 @@ export function WorldGate({
   onErrorKind,
   onVerified,
 }: Props) {
+  const [resolved, setResolved] = useState<WorldClient | null>(world.isMock ? world : null);
+
+  useEffect(() => {
+    if (world.isMock) {
+      setResolved(world);
+      return;
+    }
+    let cancelled = false;
+    setResolved(null);
+    void worldClientWithServerFallback(world).then((next) => {
+      if (!cancelled) setResolved(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [world]);
+
   if (returningProphet) {
     return (
       <section className="world-gate" data-testid="world-gate">
@@ -45,11 +63,21 @@ export function WorldGate({
     );
   }
 
-  if (world.isMock) {
+  if (!resolved) {
+    return (
+      <section className="world-gate" data-testid="world-gate">
+        <p className="strong">Proof of Human</p>
+        <p className="faint">{ISSUE_COPY.worldHelp}</p>
+        <p className="faint">{ISSUE_COPY.pending}</p>
+      </section>
+    );
+  }
+
+  if (resolved.isMock) {
     return (
       <MockWorldGate
         wallet={wallet}
-        world={world}
+        world={resolved}
         status={status}
         onStatus={onStatus}
         onErrorKind={onErrorKind}
@@ -61,7 +89,7 @@ export function WorldGate({
   return (
     <LiveWorldGate
       wallet={wallet}
-      world={world}
+      world={resolved}
       status={status}
       onStatus={onStatus}
       onErrorKind={onErrorKind}
