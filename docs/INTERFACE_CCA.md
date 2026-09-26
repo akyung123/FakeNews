@@ -20,7 +20,7 @@ Read on 2026-09-26. Every external signature below is copied from these pins. If
 | LBPStrategy **v3.3.0** | commit `1c5904912aefceaceb89c24528cd5e25d0b61597` (no `v3.3.0` git tag exists) | [`IStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IStrategy.sol), [`ILBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/ILBPStrategy.sol), [`LBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol), [`MigratorParams.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/libraries/MigratorParams.sol) |
 | InitializerHook **v3.3.0** | source at `1c590491…`; Sepolia deploy commit `7ea523c9d75a51cb2f497be5e49bacdaeb80a342` | [`InitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/periphery/hooks/InitializerHook.sol), [`IInitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IInitializerHook.sol) |
 | Uniswap v4 Sepolia | [v4 deployments](https://docs.uniswap.org/contracts/v4/deployments) | PoolManager, PositionManager, Universal Router **2.1.2** `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`, StateView, Quoter, Permit2 |
-| Universal Router `execute` | tag `2.1.2` [`IUniversalRouter.sol`](https://github.com/Uniswap/universal-router/blob/2.1.2/contracts/interfaces/IUniversalRouter.sol) L21–L40 + [`Commands.sol`](https://github.com/Uniswap/universal-router/blob/2.1.2/contracts/libraries/Commands.sol) L36 | `execute(commands, inputs, deadline)`; `V4_SWAP = 0x10`. Not Universal Router 2.0 |
+| Universal Router `execute` | tag `2.1.2` [`IUniversalRouter.sol`](https://github.com/Uniswap/universal-router/blob/2.1.2/contracts/interfaces/IUniversalRouter.sol) L21–L40 + [`Commands.sol`](https://github.com/Uniswap/universal-router/blob/2.1.2/contracts/libraries/Commands.sol) L35 | `execute(commands, inputs, deadline)`; `V4_SWAP = 0x10`. Not Universal Router 2.0 |
 | v4-periphery actions / swap params | pin `545a5d2a87228167edde48f3b9eda122d1e3c4d6` | [`Actions.sol`](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/libraries/Actions.sol) L28 / L40 / L44 (`SWAP_EXACT_IN_SINGLE = 0x06`, `SETTLE_ALL = 0x0c`, `TAKE_ALL = 0x0f`); collect `DECREASE_LIQUIDITY = 0x01` L11, `TAKE_PAIR = 0x11` L46; [`IV4Router.sol`](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/interfaces/IV4Router.sol) L31–L38 six-field `ExactInputSingleParams` |
 | PositionManager collect actions | same `545a5d2` `Actions.sol` + [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `b71c64e` [`LiquidityLocker.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/LiquidityLocker.sol) L24–L25, L163–L169 | fees-only: `0x01` then `0x11`, liquidity delta `0` |
 
@@ -32,11 +32,11 @@ The CCA README at tag `v2.1.0` still lists v2.0.0 as “latest” in its own tab
 |---|---|---|
 | CCA version / factory | v2.1.0 · `0x000000001F26…63F8` · tag `a56d422` / deploy `7d7602d` | same address and v2.1.0; events cited at `a56d422`, factory commit comment `7d7602d` |
 | `BidSubmitted` / `BidExited` / `TokensClaimed` | `owner` indexed | `owner` indexed — same |
-| Bid function | official **`submitBid` 5-arg** (`maxPriceQ96, amount, owner, prevTickPriceQ96, hookData`) at `a56d422` [`IContinuousClearingAuction.sol` L137–L144](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/interfaces/IContinuousClearingAuction.sol#L137-L144). A 4-arg overload exists (L154–L157) — do **not** use it | `cca.ts` lists both; `placeBid` is **not** an official name and must not be the demo call |
+| Bid function | official **`submitBid` 5-arg** (`maxPriceQ96, amount, owner, prevTickPriceQ96, hookData`) at `a56d422` [`IContinuousClearingAuction.sol` L136–L142](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/interfaces/IContinuousClearingAuction.sol#L136-L142). A 4-arg overload exists (L152–L155) — do **not** use it | `cca.ts` lists both; `placeBid` is **not** an official name and must not be the demo call |
 | `submitBid` demo call | 5-arg `submitBid` only | `placeBid` sends the **4-arg** overload — do not copy that call |
 | CCALens `state` | not `view`; `eth_call` | same |
 | LBPStrategy `migrate` | `1c590491` · `0x9543…2000` | same |
-| Universal Router | **2.1.2** `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`; `V4_SWAP = 0x10` ([`Commands.sol` tag `2.1.2` L36](https://github.com/Uniswap/universal-router/blob/2.1.2/contracts/libraries/Commands.sol#L36)); actions `0x06, 0x0c, 0x0f` | **2.0** `0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b` is on the official table but is **not** this product’s router. Do not use 2.0 |
+| Universal Router | **2.1.2** `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`; `V4_SWAP = 0x10` ([`Commands.sol` tag `2.1.2` L35](https://github.com/Uniswap/universal-router/blob/2.1.2/contracts/libraries/Commands.sol#L35)); actions `0x06, 0x0c, 0x0f` | `0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b` appears in the official table without a version label. It is **not** this product’s router |
 
 ## 0.1 Fixed Sepolia addresses and parameters
 
@@ -619,8 +619,8 @@ If `tryMigrate` reverts, official `migrate` recovers currency + reserved tokens 
 Official `ILBPStrategy` (`1c590491`) revert names — **selectors differ from the zero-arg names previously listed** ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) TBD answers + [`ILBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/ILBPStrategy.sol)):
 
 - `MigrationNotYetAllowed(uint256 migrationBlock, uint256 currentBlock)` — L64; selector `0x2aa91e59` (not `MigrationNotYetAllowed()` `0x259e0809`)
-- `InitializerNotRegistered(ILBPInitializer initializer)` — L129; ABI type `address`; selector `0x8581b481` (not `InitializerNotRegistered()` `0xee7e9915`)
-- `PoolManagerAlreadyUnlocked()` — L137; no args, `0x84308fec`. Thrown on the **outer** `migrate` ([`LBPStrategy.sol` L221](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol#L221)) **before** the one-shot clear, so it can be retried.
+- `InitializerNotRegistered(ILBPInitializer initializer)` — L128; ABI type `address`; selector `0x8581b481` (not `InitializerNotRegistered()` `0xee7e9915`)
+- `PoolManagerAlreadyUnlocked()` — L137; no args, `0x84308fec`. Thrown on the **outer** `migrate` ([`LBPStrategy.sol` L220](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol#L220)) **before** the one-shot clear, so it can be retried.
 
 `tryMigrate` inner names (`CurrencyRaisedMismatch`, `NoPositionsCreated`) are caught and become `MigrationFailed` + `FundsRecovered`. After a caught failure, `registeredPoolIds` is already cleared ([`LBPStrategy.sol` L247–L248](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol#L247-L248)) so migrate cannot be retried (`InitializerNotRegistered`). `OnlySelfCall` is not a `migrate()` catch path — `migrate` always self-calls `this.tryMigrate`.
 
@@ -630,20 +630,20 @@ Pool key after success: native ETH (`address(0)`), `token`, fee `10000`, tickSpa
 
 ### 4.7 v4 swap
 
-Address: Universal Router **2.1.2** `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3` (official v4 Sepolia table). **Not** Universal Router 2.0 `0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b`. Launchpad does **not** wrap swaps. After `migrate`, the web calls the router directly ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) TBD answers).
+Address: Universal Router **2.1.2** `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3` (official v4 Sepolia table). `0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b` appears in the official table without a version label; do not use it. Launchpad does **not** wrap swaps. After `migrate`, the web calls the router directly ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) TBD answers).
 
 ```solidity
 // IUniversalRouter.sol tag 2.1.2 L40
 function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable;
-error ExecutionFailed(uint256 commandIndex, bytes message); // L21
-error TransactionDeadlinePassed();                         // L29
+error ExecutionFailed(uint256 commandIndex, bytes message); // L22
+error TransactionDeadlinePassed();                         // L28
 error LengthMismatch();                                    // L31
 ```
 
 **Command / actions** (official; do not invent):
 
 ```
-commands = abi.encodePacked(uint8(0x10))   // V4_SWAP — Commands.sol tag 2.1.2 L36
+commands = abi.encodePacked(uint8(0x10))   // V4_SWAP — Commands.sol tag 2.1.2 L35
 actions  = abi.encodePacked(uint8(0x06), uint8(0x0c), uint8(0x0f))
            // SWAP_EXACT_IN_SINGLE, SETTLE_ALL, TAKE_ALL
            // Actions.sol 545a5d2 L28 / L40 / L44
@@ -675,11 +675,11 @@ struct ExactInputSingleParams {
 ```
 
 - Exact-in ETH → token: `zeroForOne = true`, `msg.value = amountIn`. SETTLE_ALL currency0, TAKE_ALL currency1.
-- Exact-in token → ETH: `zeroForOne = false`, `msg.value = 0`. **Permit2 first** (`0x000000000022D473030F116dDEE9F6B43aC78BA3`): (1) token `approve` to Permit2, one time per token; (2) `permit2.approve(token, router, amount, expiration)` ([`IAllowanceTransfer.sol` L124](https://github.com/Uniswap/permit2/blob/main/src/interfaces/IAllowanceTransfer.sol#L124)).
+- Exact-in token → ETH: `zeroForOne = false`, `msg.value = 0`. **Permit2 first** (`0x000000000022D473030F116dDEE9F6B43aC78BA3`): (1) token `approve` to Permit2, one time per token; (2) `permit2.approve(token, router, amount, expiration)` ([`IAllowanceTransfer.sol` L123](https://github.com/Uniswap/permit2/blob/cc56ad0/src/interfaces/IAllowanceTransfer.sol#L123)).
 
 `ProphecyHook` has no swap hooks (`beforeSwap` / `afterSwap` false, [`ProphecyHook.sol` `b71c64e` L39–L40](https://github.com/prism-toggle-ai/FakeNews/blob/b71c64ed93cd2ca5e87c1b2a5df27f9997bb70b9/contracts/src/uniswap/ProphecyHook.sol#L39-L40)). No hook error can come from a swap.
 
-Swap revert names the UI will hit (Designer Q2): `V4TooLittleReceived(uint256,uint256)` ([`IV4Router.sol` L14](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/interfaces/IV4Router.sol#L14)), `TransactionDeadlinePassed()`, `ExecutionFailed(uint256,bytes)`, `LengthMismatch()`, Permit2 `InsufficientAllowance(uint256)` / `AllowanceExpired(uint256)`.
+Swap revert names the UI will hit (Designer Q2): `V4TooLittleReceived(uint256,uint256)` ([`IV4Router.sol` L13](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/interfaces/IV4Router.sol#L13)), `TransactionDeadlinePassed()`, `ExecutionFailed(uint256,bytes)`, `LengthMismatch()`, Permit2 `InsufficientAllowance(uint256)` / `AllowanceExpired(uint256)`.
 
 **TBD:** this calldata has not been executed against the live Sepolia 2.1.2 router in this repo (PR #41 used `PoolSwapTest` `0x9b6b46e2c869aa39918db7f52f5557fe577b6eee` as a harness-only caller; that is not the product ABI).
 
@@ -876,7 +876,7 @@ Web calls `LBPStrategy.migrate(auction)` directly; there is no Launchpad wrapper
 | `PoolManagerAlreadyUnlocked()` | `The market couldn't open. Try again.` |
 | `CurrencyRaisedMismatch`, `NoPositionsCreated`, `OnlySelfCall` | no revert copy: caught inside `migrate`, show 7.9 state |
 
-Rule: **`The market couldn't open. Try again.`** is only for `PoolManagerAlreadyUnlocked`. Other migrate failures show the 7.9 state. Designer (copy v2): only `PoolManagerAlreadyUnlocked` reverts and can be retried.
+Rule: **`The market couldn't open. Try again.`** is only for `PoolManagerAlreadyUnlocked`. Other caught migrate failures show the 7.9 state. `PoolManagerAlreadyUnlocked` and `MigrationNotYetAllowed` both revert on the outer `migrate` before the one-shot clear, so they can be called again (`MigrationNotYetAllowed` later, once `block >= migrationBlock`).
 
 Dev note (copy v2): `migrate` is one-shot. It clears the pool registration before trying, so a second call reverts `InitializerNotRegistered`. Check `Migrated` / `MigrationFailed` for the auction before you show `Open market`.
 
