@@ -15,6 +15,7 @@ export default defineConfig({
       "**/node_modules/**",
       "**/dist/**",
       "src/lib/curve.vectors.test.ts",
+      "src/lib/ensName.test.ts",
       "src/lib/prophetData.test.ts",
       "src/pages/CoinPage.test.tsx",
       "src/pages/ProphetPage.test.tsx",

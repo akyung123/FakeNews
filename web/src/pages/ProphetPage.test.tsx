@@ -42,6 +42,7 @@ describe("ProphetPage", () => {
       for (const row of data.prophecies) {
         expect(html).toContain(row.sentence);
         expect(html).toContain(row.ensName);
+        expect(html).toContain(row.slug);
         expect(html).toContain(prophecyDetailPath(row.ensName));
         expect(html).toContain(row.token.slice(0, 6));
         expect(prophecyTradeLabel(row)).toBe(row.departed ? "Sell" : "Buy");
@@ -51,6 +52,7 @@ describe("ProphetPage", () => {
       expect(html).toContain(">Buy</span>");
       expect(html).toContain(">Sell</span>");
 
+      expect(html).not.toContain(">Copy<");
       expect(html).not.toContain("True");
       expect(html).not.toContain("False");
       expect(html).not.toContain("yield");

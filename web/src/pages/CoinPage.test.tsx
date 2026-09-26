@@ -27,6 +27,8 @@ describe("Screen 3 name route", () => {
       const row = getProphecyByName(ens, NOW)!;
       expect(html).toContain(row.sentence);
       expect(html).toContain(row.ensName);
+      expect(html).toContain(row.slug);
+      expect(html).toContain(">Copy<");
       expect(html).toContain("Buy");
       expect(html).toContain("Trade memos");
       expect(html).toContain("Curve progress");
