@@ -12,7 +12,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 - [ ] Parent name: check that `prophecy.eth` is free on Sepolia
 - [x] DECISIONS #14: prophecy names never expire
-- [ ] DECISIONS #13: holder talk and trade memos, yes or no
+- [x] DECISIONS #15: trade memos yes, holder talk not now
 - [ ] Protocol fee recipient
 - [ ] Who owns which lane (write names here)
 
@@ -41,6 +41,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] Graduation: fill only the remaining supply and refund, `complete`, V4 pool, `LiquidityLocker`
 - [ ] `ProphecyHook`: `beforeInitialize` allows only the Launchpad. Mine the CREATE2 salt
 - [ ] `LiquidityLocker.collect`: 24 : 76
+- [ ] `memo` on `buy` / `sell`, emitted in `Trade`, reverts above 140 bytes
 - [ ] Tests
   - [ ] Lock tests: editing the sentence reverts, transfer reverts, swapping the resolver reverts, `hasAssignees(ROOT, UNREGISTER) == false`
   - [ ] Three fuzz tests: solvency, a round trip never gains, graduation vs pool start price gap < 0.0068%
@@ -59,6 +60,8 @@ Lanes follow folders. One lane = one person (or one agent session).
   - find the token by name
   - buy and sell
   - no True / False
+  - optional one-line memo on buy and sell; recent trades listed with their memos
+  - replace the prototype's holder talk with trade memos
 - [ ] Screen 4: prophet page. Departed prophecies next to the next buy, claimable fees, sell button
 - [ ] Every sentence is read from ENS. Nothing hardcoded
 - [ ] Republish the demo page (skill `demo-publish`)
@@ -75,6 +78,6 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 ## If there is time
 
-- [ ] Holder talk / trade memos (if DECISIONS #13 is yes)
+- [ ] Holder talk: a holder-only board (DECISIONS #15 leaves it for later)
 - [ ] Agent draft: an agent drafts, a person verifies again before the mint
 - [ ] Fee distribution in `afterSwap`

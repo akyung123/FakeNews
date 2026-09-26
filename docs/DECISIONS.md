@@ -23,15 +23,15 @@ One row per decision, with the reason.
 | 10 | 09-26 | **World ID (Proof of Human) only when creating a prophet name.** Store the nullifier: one prophet name per person. Buying and browsing are not verified | Issuing creates a lasting public record; the same person must not be able to reset it |
 | 11 | 09-26 | On graduation, open a Uniswap V4 pool (ETH/token, 1%, tickSpacing 200, `ProphecyHook`) and lock the position in `LiquidityLocker`. `collect` only pays prophet 24 : protocol 76 | Principal can never be withdrawn; fees keep flowing |
 | 12 | 09-26 | ~~(Proposed) Prophecy names never expire in ENS either~~ → #14 | |
-| 13 | 09-26 | **(Needs team confirmation) Holder talk and trade memos** (short notes attached to buys/sells) | Not in SPEC's four screens. If added, they go on the prophecy detail screen |
+| 13 | 09-26 | ~~(Needs team confirmation) Holder talk and trade memos~~ → #15 | |
 | 14 | 09-26 | **Prophecy names never expire in ENS** (`type(uint64).max`), like prophet names. The deadline lives only in the `deadline` text record, and Departed is computed from it | Review A: an expired name stops pointing at the token and its label could be registered again. A departed prophecy must keep its name and token |
+| 15 | 09-26 | **Trade memos: yes.** `buy` and `sell` take an optional one-line `memo` (at most 140 bytes) that is emitted in the `Trade` event and shown on the prophecy detail screen next to the trade. **Holder talk (a separate board for holders): not now**, possibly later | A memo rides on a transaction the trader sends anyway: no extra wallet prompt, no server, and every note is backed by a real trade. A holder board would need its own server |
 
 ## Not decided yet
 
 - Parent name (`prophecy.eth`?)
 - Protocol fee recipient address
 - Whether to run the final lock (emancipation) before or during the demo
-- #13
 
 ## Spec review (checked against code, 09-26)
 

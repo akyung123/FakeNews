@@ -36,8 +36,9 @@ function registerProphet(string label, uint256 nullifier, bytes serverSig) exter
 function launch(string slug, string prophecy, uint64 deadline, uint256 minTokensOut)
     external payable returns (address token);
 
-function buy(address token, uint256 minTokensOut) external payable;
-function sell(address token, uint256 tokensIn, uint256 minEthOut) external;
+// memo: optional one-line note shown next to the trade. Empty string for none. At most 140 bytes.
+function buy(address token, uint256 minTokensOut, string memo) external payable;
+function sell(address token, uint256 tokensIn, uint256 minEthOut, string memo) external;
 function claimCreatorFee() external;
 
 // views
@@ -53,13 +54,14 @@ function creatorFeeOf(address wallet) external view returns (uint256);
 event ProphetRegistered(address indexed wallet, string label, uint256 nullifier);
 event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug, uint64 deadline);
 event Trade(address indexed token, address indexed trader, bool isBuy,
-            uint256 ethAmount, uint256 tokenAmount, uint256 fee, uint256 vEthAfter, uint256 vTokenAfter);
+            uint256 ethAmount, uint256 tokenAmount, uint256 fee, uint256 vEthAfter, uint256 vTokenAfter, string memo);
 event Graduated(address indexed token, uint256 ethToPool, uint256 tokensToPool);
 event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 ```
 
 - The sentence is not in `Launched`. It is read from ENS (DECISIONS #5).
 - Constants are exactly the "Constants" section of SPEC.md.
+- `memo` is only emitted, never stored. `buy`/`sell` revert if it is longer than 140 bytes (DECISIONS #15).
 - Rounding:
   - Buy: fee rounds up, tokens out round down.
   - Sell: fee rounds up, ETH out rounds down.
@@ -89,7 +91,7 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
    - sentence: `getEnsText(name, "prophecy")`
    - deadline: `getEnsText(name, "deadline")`
 3. Price and progress: `curve(token)`.
-4. Chart: `Trade` logs.
+4. Chart and trade memos: `Trade` logs.
 5. Name next to a wallet: reverse lookup, falling back to `prophetOf(wallet)`.
 
 ## 5. Environment variables
