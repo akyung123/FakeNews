@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { MOCK_IDKIT_RESULT, MOCK_RP_CONTEXT, MOCK_WORLD_VERIFY } from "./mock";
+import {
+  MOCK_IDKIT_RESULT,
+  MOCK_RP_CONTEXT_RESPONSE,
+  MOCK_WORLD_CHAIN_ID,
+  MOCK_WORLD_LAUNCHPAD,
+  MOCK_WORLD_VERIFY,
+} from "./mock";
 import { createWorldClient, isWorldMockEnabled, worldStatusFromIdKitError } from "./world";
 
 describe("world client", () => {
@@ -18,49 +24,62 @@ describe("world client", () => {
     expect(worldStatusFromIdKitError("generic_error")).toBe("failed");
   });
 
-  it("returns INTERFACE-shaped mock rp-context and server signature", async () => {
+  it("returns the world/ GET /rp-context envelope and fixture server signature", async () => {
     const client = createWorldClient({ mock: true });
     expect(client.isMock).toBe(true);
-    await expect(client.fetchRpContext({ wallet: "0x1" })).resolves.toEqual(MOCK_RP_CONTEXT);
+    await expect(client.fetchRpContext()).resolves.toEqual(MOCK_RP_CONTEXT_RESPONSE);
     await expect(
       client.verifyProof({
-        wallet: "0x1",
-        rpContext: MOCK_RP_CONTEXT,
+        wallet: "0x2222222222222222222222222222222222222222",
         idkitResponse: MOCK_IDKIT_RESULT,
       }),
     ).resolves.toEqual(MOCK_WORLD_VERIFY);
   });
 
-  it("posts rp-context and verify to the world server when mock is off", async () => {
-    const seen: { url: string; body: unknown }[] = [];
+  it("calls GET /rp-context and POST /verify in the world/ shape when mock is off", async () => {
+    const seen: { url: string; method: string; body: unknown }[] = [];
     const client = createWorldClient({
       mock: false,
       serverUrl: "http://world.test",
       action: "register-prophet",
+      chainId: MOCK_WORLD_CHAIN_ID,
+      launchpad: MOCK_WORLD_LAUNCHPAD,
       fetch: async (input, init) => {
-        seen.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+        const method = init?.method ?? "GET";
+        seen.push({
+          url: String(input),
+          method,
+          body: init?.body ? JSON.parse(String(init.body)) : null,
+        });
         const url = String(input);
         if (url.endsWith("/rp-context")) {
-          return new Response(JSON.stringify(MOCK_RP_CONTEXT), { status: 200 });
+          return new Response(JSON.stringify(MOCK_RP_CONTEXT_RESPONSE), { status: 200 });
         }
         return new Response(JSON.stringify(MOCK_WORLD_VERIFY), { status: 200 });
       },
     });
 
-    const rp = await client.fetchRpContext({ wallet: "0xabc" });
+    const envelope = await client.fetchRpContext();
     const verified = await client.verifyProof({
-      wallet: "0xabc",
-      rpContext: rp,
+      wallet: "0x2222222222222222222222222222222222222222",
       idkitResponse: MOCK_IDKIT_RESULT,
     });
 
+    expect(envelope).toEqual(MOCK_RP_CONTEXT_RESPONSE);
     expect(seen[0]).toEqual({
       url: "http://world.test/rp-context",
-      body: { action: "register-prophet", wallet: "0xabc" },
+      method: "GET",
+      body: null,
     });
     expect(seen[1]).toEqual({
       url: "http://world.test/verify",
-      body: { wallet: "0xabc", rp_id: MOCK_RP_CONTEXT.rp_id, idkitResponse: MOCK_IDKIT_RESULT },
+      method: "POST",
+      body: {
+        wallet: "0x2222222222222222222222222222222222222222",
+        chainId: MOCK_WORLD_CHAIN_ID,
+        launchpad: MOCK_WORLD_LAUNCHPAD,
+        idkitResponse: MOCK_IDKIT_RESULT,
+      },
     });
     expect(verified).toEqual(MOCK_WORLD_VERIFY);
   });

@@ -81,10 +81,9 @@ function MockWorldGate({
     setBusy(true);
     onStatus("pending");
     try {
-      const rpContext = await world.fetchRpContext({ wallet });
+      await world.fetchRpContext();
       const result = await world.verifyProof({
         wallet,
-        rpContext,
         idkitResponse: MOCK_IDKIT_RESULT,
       });
       onVerified(result);
@@ -206,14 +205,11 @@ function IdKitHost({
     let cancelled = false;
     (async () => {
       try {
-        const [idkit, ctx] = await Promise.all([
-          import("@worldcoin/idkit"),
-          world.fetchRpContext({ wallet }),
-        ]);
+        const [idkit, envelope] = await Promise.all([import("@worldcoin/idkit"), world.fetchRpContext()]);
         if (cancelled) return;
         setWidget(() => idkit.IDKitRequestWidget as unknown as IdKitWidget);
         setPreset(idkit.proofOfHuman({ signal: wallet }));
-        setRpContext(ctx);
+        setRpContext(envelope.rp_context);
       } catch {
         if (!cancelled) {
           setLoadError("Could not start World ID. Check VITE_WORLD_APP_ID and the world server.");
@@ -241,7 +237,6 @@ function IdKitHost({
       handleVerify={async (result) => {
         const verified = await world.verifyProof({
           wallet,
-          rpContext,
           idkitResponse: result,
         });
         onVerified(verified);

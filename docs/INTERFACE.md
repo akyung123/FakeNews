@@ -85,29 +85,43 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 
 ### Web → World server `(draft)`
 
-The web app never holds the RP signing key. It asks `world/` for an IDKit 4 `rp_context`, then posts the IDKit result back.
+The web app never holds the RP signing key. HTTP matches `world/` (PR #10, PR #15): `GET /rp-context`, then `POST /verify`.
 
-`POST {VITE_WORLD_SERVER_URL}/rp-context`
+`GET {VITE_WORLD_SERVER_URL}/rp-context`
 
 ```json
-{ "action": "<VITE_WORLD_ACTION>", "wallet": "0x..." }
+{
+  "app_id": "app_...",
+  "action": "register-prophet",
+  "environment": "production",
+  "rp_context": {
+    "rp_id": "rp_...",
+    "nonce": "0x...",
+    "created_at": 1700000000,
+    "expires_at": 1700000300,
+    "signature": "0x..."
+  }
+}
 ```
-
-Response is the IDKit `RpContext`: `{ "rp_id", "nonce", "created_at", "expires_at", "signature" }`.
 
 `POST {VITE_WORLD_SERVER_URL}/verify`
 
 ```json
-{ "wallet": "0x...", "rp_id": "rp_...", "idkitResponse": { } }
+{
+  "wallet": "0x...",
+  "chainId": 11155111,
+  "launchpad": "0x...",
+  "idkitResponse": { }
+}
 ```
 
-`idkitResponse` is the IDKit 4 result, forwarded as-is. On success:
+`idkitResponse` is the IDKit 4 result, forwarded as-is (`proof` is an accepted alias on the server). On success:
 
 ```json
 { "nullifier": "0x<uint256>", "serverSig": "0x<eip191>" }
 ```
 
-`serverSig` is the EIP-191 signature described above. While `VITE_WORLD_MOCK` is not `0`/`false`, the web app uses the mock client in `web/src/lib/world.ts` instead of these URLs.
+`serverSig` is EIP-191 personal_sign of `keccak256(abi.encode(uint256 chainId, address launchpad, address wallet, uint256 nullifier))`. Fixture: `world/fixture/register-prophet-signature.json`. While `VITE_WORLD_MOCK` is not `0`/`false`, the web app uses the mock client in `web/src/lib/world.ts` instead of these URLs.
 
 ## 4. How the web app reads
 
