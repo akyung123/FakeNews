@@ -13,7 +13,7 @@ contract LaunchpadFuzzTest is Test {
     address[] internal traders;
 
     function setUp() public {
-        launchpad = new Launchpad();
+        launchpad = new Launchpad(address(0xFEE));
         vm.deal(prophet, 100 ether);
         traders.push(address(0x101));
         traders.push(address(0x102));

@@ -12,9 +12,10 @@ contract LaunchpadTest is Test {
     Launchpad internal launchpad;
     address internal prophet = address(0xA11CE);
     address internal buyer = address(0xB0B);
+    address internal protocol = address(0xFEE);
 
     function setUp() public {
-        launchpad = new Launchpad();
+        launchpad = new Launchpad(protocol);
         vm.deal(prophet, 100 ether);
         vm.deal(buyer, 100 ether);
     }
@@ -162,6 +163,35 @@ contract LaunchpadTest is Test {
         _assertSolvent(token);
     }
 
+    function test_constructorRejectsZeroRecipient() public {
+        vm.expectRevert(Launchpad.ZeroAddress.selector);
+        new Launchpad(address(0));
+    }
+
+    function test_constructorStoresProtocolRecipient() public view {
+        assertEq(launchpad.protocolFeeRecipient(), protocol);
+    }
+
+    function test_claimProtocolFeePaysOnlyTheRecipient() public {
+        address token = _launch();
+        vm.prank(buyer);
+        launchpad.buy{value: 0.001 ether}(token, 0, "");
+        uint256 owed = launchpad.protocolFees();
+        assertGt(owed, 0);
+
+        uint256 protocolBefore = protocol.balance;
+        uint256 callerBefore = buyer.balance;
+        vm.prank(buyer);
+        launchpad.claimProtocolFee();
+        assertEq(protocol.balance, protocolBefore + owed);
+        assertEq(buyer.balance, callerBefore);
+        assertEq(launchpad.protocolFees(), 0);
+
+        vm.prank(buyer);
+        vm.expectRevert(Launchpad.ZeroAmount.selector);
+        launchpad.claimProtocolFee();
+    }
+
     function test_claimCreatorFeePaysOnlyTheProphet() public {
         address token = _launch();
         vm.prank(buyer);
@@ -185,7 +215,7 @@ contract LaunchpadTest is Test {
         vm.deal(address(launchpad), 5 ether);
         (uint256 tokensA, uint256 feeA) = launchpad.quoteBuy(token, 0.001 ether);
 
-        address clean = address(new Launchpad());
+        address clean = address(new Launchpad(protocol));
         vm.prank(prophet);
         address tokenB = Launchpad(clean).launch("eth-10k", "", 0, 0);
         (uint256 tokensB, uint256 feeB) = Launchpad(clean).quoteBuy(tokenB, 0.001 ether);
