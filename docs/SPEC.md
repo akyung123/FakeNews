@@ -13,7 +13,7 @@ The address book is the core feature. Type a name and you get an address.
 | Name | Points to |
 |---|---|
 | `ringo.prophecy.eth` | the prophet's wallet |
-| `lingo-2028.ringo.prophecy.eth` | that prophecy's token |
+| `badges-2028.ringo.prophecy.eth` | that prophecy's token |
 
 Locking is a rule layered on top of the address book so it cannot be abandoned. It does not replace the address book.
 
@@ -239,14 +239,16 @@ eth
     │     expiry: none
     │     transfer: not allowed
     │     │
-    │     ├── lingo-2028                 prophecy. A coin in the address book
+    │     ├── badges-2028                prophecy. A coin in the address book
     │     │     points to: token
     │     │     text: sentence, deadline
+    │     │     sentence: Every hackathon badge is an ENS name by 2028
     │     │     expiry: none (deadline is a text record)
     │     │     transfer: not allowed
     │     │     edit sentence: not allowed
     │     │
-    │     └── eth-10k
+    │     └── two-min                    Departed
+    │           sentence: A two-minute demo has already left the stage
     │
     └── mina                             someone else. Requires a different World ID
 ```
@@ -256,7 +258,7 @@ Names are looked up in three places:
 | Lookup | Result | Used for |
 |---|---|---|
 | `ringo.prophecy.eth` | prophet wallet | who issued it, where fees go |
-| `lingo-2028.ringo.prophecy.eth` | token address | buying without pasting a contract address |
+| `badges-2028.ringo.prophecy.eth` | token address | buying without pasting a contract address |
 | reverse lookup of a wallet | `ringo.prophecy.eth` | a name next to each wallet |
 
 Curve balances, price and graduation live in the contracts. ENS only points at them.
