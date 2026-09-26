@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { encodePacked, parseEther, zeroAddress } from "viem";
+import { encodeAbiParameters, encodeEventTopics, encodePacked, parseEther, zeroAddress } from "viem";
 import { wagmiConfig } from "../wagmi";
 import { ccaAbi } from "./abi/cca";
 import { ccaLensAbi } from "./abi/ccaLens";
@@ -59,7 +59,8 @@ import {
   lockerTokenIdBinding,
   withdrawAccruedWrite,
 } from "./launchpadCca";
-import { openMarket, openMarketWrite } from "./migrate";
+import { positionManagerTransferAbi, tokenIdsMintedToLocker } from "./register";
+import { migrateOutcomeFromReceipt, openMarket, openMarketResult, openMarketWrite } from "./migrate";
 import {
   MaxPriceBelowFloorError,
   ethPerTokenToQ96,
@@ -184,7 +185,7 @@ describe("verified external ABIs", () => {
     );
   });
 
-  it("Universal Router ABI is execute; 2.1.2 command bytes stay TBD", () => {
+  it("Universal Router ABI is execute with V4_SWAP 0x10", () => {
     expect(names(universalRouterAbi, "function")).toEqual(["execute"]);
     expect(V4_SWAP_COMMAND).toBe(0x10);
   });
@@ -561,6 +562,38 @@ describe("chain writes: simulate then write then require success", () => {
     expect(openMarketWrite(AUCTION).args).toEqual([AUCTION]);
   });
 
+  it("reads MigrationFailed + FundsRecovered from a successful migrate receipt", async () => {
+    const topics = encodeEventTopics({
+      abi: lbpStrategyAbi,
+      eventName: "MigrationFailed",
+      args: { initializer: AUCTION },
+    });
+    const data = encodeAbiParameters([{ type: "bytes" }], ["0x"]);
+    const receipt = {
+      status: "success" as const,
+      logs: [{ address: CCA_SEPOLIA.lbpStrategy, topics, data }],
+    };
+    expect(migrateOutcomeFromReceipt(receipt)).toBe("failed");
+    const fns = okWrite();
+    fns.wait.mockResolvedValue(receipt);
+    await expect(openMarketResult(AUCTION, optionsOf(fns))).resolves.toEqual({
+      hash: HASH,
+      outcome: "failed",
+    });
+  });
+
+  it("reads tokenId from PositionManager mint Transfer logs", () => {
+    const locker = "0x3333333333333333333333333333333333333333" as const;
+    const topics = encodeEventTopics({
+      abi: positionManagerTransferAbi,
+      eventName: "Transfer",
+      args: { from: zeroAddress, to: locker, tokenId: 7n },
+    });
+    expect(tokenIdsMintedToLocker([{ address: CCA_SEPOLIA.positionManager, topics, data: "0x" }], locker)).toEqual([
+      7n,
+    ]);
+  });
+
   it("checkpoint throws when the receipt is not success", async () => {
     const fns = revertedWrite();
     await expect(checkpoint(AUCTION, optionsOf(fns))).rejects.toThrow(/checkpoint did not succeed/);
@@ -577,7 +610,7 @@ describe("chain writes: simulate then write then require success", () => {
 });
 
 describe("v4 swap encoding", () => {
-  it("keeps the ETH/token pool key and leaves 2.1.2 command bytes TBD", () => {
+  it("keeps the ETH/token pool key and encodes UR 2.1.2 V4_SWAP", () => {
     expect(ethTokenPoolKey(TOKEN, HOOKS)).toEqual({
       currency0: zeroAddress,
       currency1: TOKEN,
@@ -593,8 +626,9 @@ describe("v4 swap encoding", () => {
       amountOutMinimum: 2n,
       deadline: 1n,
     };
-    expect(() => encodeV4ExactInSingle(input)).toThrow(InterfaceCcaPendingError);
-    expect(() => encodeV4ExactInSingle(input)).toThrow(/V4_SWAP command/);
+    const encoded = encodeV4ExactInSingle(input);
+    expect(encoded.commands).toBe("0x10");
+    expect(encoded.actions).toBe("0x060c0f");
     expect(V4_SWAP_COMMAND).toBe(0x10);
   });
 });
@@ -659,19 +693,17 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
     expect(withdrawAccruedWrite(locker).functionName).toBe("withdrawAccrued");
   });
 
-  it("keeps salt, locker tokenId binding, collect action bytes, and backend errors TBD", () => {
+  it("records answered Launchpad / locker names from #42 / #44", () => {
     expect(() => initializeDistributionSalt()).toThrow(InterfaceCcaPendingError);
-    expect(() => lockerTokenIdBinding()).toThrow(/tokenId/);
-    expect(() => lockerCollectActionBytes()).toThrow(/collect action bytes/);
-    expect(() => backendLaunchErrorNames()).toThrow(/LbpNotSet/);
+    expect(lockerTokenIdBinding()).toEqual({ functionName: "register", args: ["token", "tokenId"] });
+    expect(lockerCollectActionBytes()).toBe("0x0111");
+    expect(backendLaunchErrorNames()).toEqual(
+      expect.arrayContaining(["CcaNotSet", "AuctionExists", "AuctionNotCreated"]),
+    );
     expect(INTERFACE_CCA_PENDING).toEqual(
       expect.arrayContaining([
-        "initializeDistribution salt",
-        "Universal Router 2.1.2 V4_SWAP command + inputs encoding",
-        "LiquidityLocker tokenId → token / prophet binding",
-        "Launchpad custom-error names (LbpNotSet and the like)",
-        "swap section copy",
-        "fee collect copy",
+        "floor / tick Q96 pending #42 recalculation",
+        "Universal Router 2.1.2 calldata not live-verified on Sepolia",
       ]),
     );
     expect(INTERFACE_CCA_TBD).toBe("TBD(INTERFACE_CCA)");
@@ -686,14 +718,14 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
       firstBidId: 0n,
     });
     expect(CCA_FORK_STEPS[2].calls).toEqual(["checkpoint", "exitBid", "claimTokens", "migrate"]);
-    expect(CCA_FORK_STEPS[3].encoding).toBe(INTERFACE_CCA_TBD);
+    expect(CCA_FORK_STEPS[3].encoding).toEqual({ command: 0x10, actions: [0x06, 0x0c, 0x0f] });
     const schedule = forkHappyPathSchedule(11_784_960n);
     expect(schedule.endBlock).toBe(11_784_985n);
     expect(schedule.claimBlock).toBe(11_784_985n);
     expect(schedule.migrationBlock).toBe(11_784_986n);
     expect(schedule.submitBidArity).toBe(5);
     expect(schedule.firstBidId).toBe(0n);
-    expect(schedule.swapEncoding).toBe(INTERFACE_CCA_TBD);
+    expect(schedule.swapEncoding).toEqual({ command: 0x10, actions: [0x06, 0x0c, 0x0f] });
   });
 });
 
@@ -750,10 +782,9 @@ describe("CCA log fromBlock", () => {
     expect(chunks[chunks.length - 1].toBlock).toBe(119_999n);
   });
 
-  it("fetchCcaEventLogs forwards fromBlock in 50k chunks", async () => {
+  it("fetchCcaEventLogs applies lookback even when fromBlock is passed", async () => {
     const seen: unknown[] = [];
     const logsA = [{ eventName: "BidSubmitted", id: 1 }];
-    const logsB = [{ eventName: "BidSubmitted", id: 2 }];
     const got = await fetchCcaEventLogs(
       {
         async getBlockNumber() {
@@ -761,21 +792,21 @@ describe("CCA log fromBlock", () => {
         },
         async getContractEvents(query) {
           seen.push(query);
-          return seen.length === 1 ? logsA : logsB;
+          return logsA;
         },
       },
       AUCTION,
       "BidSubmitted",
       12_000n,
     );
-    expect(got).toEqual([...logsA, ...logsB]);
+    expect(got).toEqual([...logsA, ...logsA]);
     expect(seen).toEqual([
-      bidSubmittedLogsQuery(AUCTION, 61_999n, 12_000n),
-      bidSubmittedLogsQuery(AUCTION, 90_000n, 62_000n),
+      bidSubmittedLogsQuery(AUCTION, 89_999n, 40_000n),
+      bidSubmittedLogsQuery(AUCTION, 90_000n, 90_000n),
     ]);
   });
 
-  it("fetchCcaEventLogs queries 120k blocks in 3 calls with no overlap or gap", async () => {
+  it("fetchCcaEventLogs keeps a later explicit fromBlock above the lookback", async () => {
     const seen: { fromBlock: bigint; toBlock: bigint }[] = [];
     const got = await fetchCcaEventLogs(
       {
@@ -789,17 +820,10 @@ describe("CCA log fromBlock", () => {
       },
       AUCTION,
       "BidSubmitted",
-      0n,
+      80_000n,
     );
-    expect(got).toEqual([{ n: 1 }, { n: 2 }, { n: 3 }]);
-    expect(seen).toEqual([
-      { fromBlock: 0n, toBlock: 49_999n },
-      { fromBlock: 50_000n, toBlock: 99_999n },
-      { fromBlock: 100_000n, toBlock: 119_999n },
-    ]);
-    for (let i = 1; i < seen.length; i++) {
-      expect(seen[i].fromBlock).toBe(seen[i - 1].toBlock + 1n);
-    }
+    expect(got).toEqual([{ n: 1 }]);
+    expect(seen).toEqual([{ fromBlock: 80_000n, toBlock: 119_999n }]);
   });
 
   it("fetchCcaEventLogs uses lookback when fromBlock is omitted, then the later startBlock", async () => {

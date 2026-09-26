@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { CURVE_SUPPLY } from "../lib/curve";
-import { GRADUATED_BODY, GRADUATED_LINK, GRADUATED_TITLE } from "../lib/graduation";
+import { CCA_COPY, SWAP_SECTION_COPY } from "../lib/cca";
 import { actions, type Coin } from "../lib/store";
 import { Web3Provider } from "../providers/Web3Provider";
 import { CoinPage } from "./CoinPage";
@@ -44,11 +44,9 @@ describe("chain-mode token detail", () => {
       </Web3Provider>,
     );
     await waitFor(() => expect(screen.getByText("Every badge is a name")).toBeInTheDocument());
-    expect(screen.getByText(GRADUATED_TITLE)).toBeInTheDocument();
-    expect(screen.getByText(GRADUATED_BODY)).toBeInTheDocument();
-    expect(screen.getByText(GRADUATED_LINK)).toBeInTheDocument();
-    expect(screen.queryByText("Amount (ETH)")).toBeNull();
-    expect(screen.queryByRole("button", { name: /Buy \$LINGO-2028/i })).toBeNull();
+    expect(screen.getByText(CCA_COPY.poolOpen)).toBeInTheDocument();
+    expect(screen.getByText(SWAP_SECTION_COPY.title)).toBeInTheDocument();
+    expect(screen.queryByText(CCA_COPY.placeBid)).toBeNull();
     expect(screen.queryByText("Prophecy not found")).toBeNull();
   });
 
@@ -96,10 +94,9 @@ describe("chain-mode token detail", () => {
         </MemoryRouter>
       </Web3Provider>,
     );
-    await waitFor(() => expect(screen.getByRole("button", { name: /Buy \$LINGO-2028/i })).toBeEnabled());
-    await userEvent.click(screen.getByRole("button", { name: /Buy \$LINGO-2028/i }));
-    await waitFor(() => expect(sendBuy).toHaveBeenCalledTimes(1));
-    expect(sendBuy.mock.calls[0]?.[0]).toMatchObject({ token: TOKEN });
+    await waitFor(() => expect(screen.getByRole("button", { name: CCA_COPY.placeBid })).toBeEnabled());
+    expect(screen.getByText(CCA_COPY.budgetEth)).toBeInTheDocument();
+    expect(sendBuy).not.toHaveBeenCalled();
     expect(sendSell).not.toHaveBeenCalled();
   });
 });

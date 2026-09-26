@@ -1,12 +1,16 @@
 /**
- * Designer FINAL auction copy (aligned to INTERFACE_CCA.md PR #40 @ b02a445 §7).
+ * Designer-approved copy v2 (INTERFACE_CCA.md PR #44 §7).
  * English only. No wording about profit, yield, or price outlooks.
  * `{n}`, `{blocks}`, `{raised}`, `{amount}`, `{budget}`, `{max}`,
- * `{claimBlock}`, `{migrationBlock}` are interpolated by the helpers below.
+ * `{claimBlock}`, `{migrationBlock}`, `{SYMBOL}`, `{minAmount}` are
+ * interpolated by the helpers below.
  */
 import { formatEther } from "viem";
 import { GRADUATION_ETH_WEI, SEPOLIA_BLOCK_SECONDS } from "./config";
-import { INTERFACE_CCA_TBD, InterfaceCcaPendingError } from "./launchpadCca";
+import { INTERFACE_CCA_TBD } from "./launchpadCca";
+
+/** No §7 line for missing product addresses. Do not invent one. */
+export const MISSING_ADDRESS_COPY = INTERFACE_CCA_TBD;
 
 export type AuctionCopyStatus =
   | "not_funded"
@@ -16,11 +20,13 @@ export type AuctionCopyStatus =
   | "ended_not_finalized"
   | "graduated"
   | "failed"
+  | "market_failed"
   | "pool_open";
 
 export type CcaErrorCopyVars = {
   claimBlock?: bigint | number | string;
   migrationBlock?: bigint | number | string;
+  SYMBOL?: string;
 };
 
 export const CCA_COPY = {
@@ -72,10 +78,65 @@ export const CCA_COPY = {
   openMarketBefore: "The market can open from block {migrationBlock}.",
   openingMarket: "Opening market…",
   marketOpen: "Market open. You can swap now.",
+
+  marketCouldntOpen: "Auction ended · market couldn't open",
+  marketFailedBody: "The market couldn't open. No pool was created.",
+  marketFailedHelp:
+    "This can't be tried again, so this token has no market for now. You can still get back unused ETH and claim your tokens.",
+  marketFailedToast: "Transaction confirmed, but the market couldn't open.",
 } as const;
 
-export const SWAP_SECTION_COPY = INTERFACE_CCA_TBD;
-export const FEE_COLLECT_COPY = INTERFACE_CCA_TBD;
+/** INTERFACE_CCA §7.10 — swap after Pool open. */
+export const SWAP_SECTION_COPY = {
+  title: "Swap",
+  beforeOpen: "Swapping opens when the market opens.",
+  feeNote: "Pool fee 1%. Fees are split 24% to the prophet and 76% to the protocol.",
+  youPayEth: "You pay (ETH)",
+  youGetAboutToken: "You get about {amount} {SYMBOL}",
+  atLeastToken: "At least {minAmount} {SYMBOL}",
+  buySymbol: "Buy {SYMBOL}",
+  buying: "Buying…",
+  bought: "Bought {amount} {SYMBOL}",
+  notEnoughEth: "Not enough ETH.",
+  youSellToken: "You sell ({SYMBOL})",
+  youGetAboutEth: "You get about {amount} ETH",
+  atLeastEth: "At least {minAmount} ETH",
+  allowUniswap: "Allow Uniswap to use your {SYMBOL}",
+  allowing: "Allowing…",
+  allowed: "{SYMBOL} allowed",
+  allowHelper: "One-time step before your first sale of this token.",
+  confirmSale: "Confirm {SYMBOL} for this sale",
+  confirming: "Confirming…",
+  readyToSell: "Ready to sell",
+  confirmHelper: "Lets the Uniswap router move the {SYMBOL} you sell. You may need this again later.",
+  stepCounter: "Step {n} of {total}",
+  sellSymbol: "Sell {SYMBOL}",
+  selling: "Selling…",
+  sold: "Sold {amount} {SYMBOL}",
+  notEnoughToken: "Not enough {SYMBOL}.",
+  swapCanceled: "Swap canceled.",
+} as const;
+
+/** INTERFACE_CCA §7.12 + designer register CTA. */
+export const FEE_COLLECT_COPY = {
+  title: "Trading fees",
+  collectFees: "Collect fees",
+  collectingFees: "Collecting fees…",
+  feesSent: "Fees sent",
+  helper:
+    "Sends the pool's trading fees: 24% to the prophet and 76% to the protocol. Anyone can do this. The locked pool stays as it is.",
+  noFeesYet: "No fees to collect yet.",
+  beforeOpen: "Fees start once the market opens.",
+  prophetLine: "You get 24% of this pool's trading fees.",
+  feesWaiting: "{amount} ETH in fees is waiting for you.",
+  withdrawFees: "Withdraw fees",
+  withdrawing: "Withdrawing…",
+  feesWithdrawn: "Fees withdrawn",
+  setupFeeCollection: "Set up fee collection",
+  settingUp: "Setting up…",
+  feeCollectionReady: "Fee collection ready",
+  registerHelper: "One-time step after the market opens. Anyone can do this.",
+} as const;
 
 export const CCA_BID_ERROR_COPY = {
   AuctionNotStarted: "The auction hasn't started yet.",
@@ -121,9 +182,25 @@ export const CCA_MIGRATE_ERROR_COPY = {
   MigrationNotYetAllowed: "Too early. The market can open from block {migrationBlock}.",
   InitializerNotRegistered: "This auction isn't linked to a market.",
   PoolManagerAlreadyUnlocked: "The market couldn't open. Try again.",
-  CurrencyRaisedMismatch: "The market couldn't open. Try again.",
-  NoPositionsCreated: "The market couldn't open. Try again.",
-  OnlySelfCall: "The market couldn't open. Try again.",
+} as const;
+
+export const CCA_SWAP_ERROR_COPY = {
+  V4TooLittleReceived: "The price moved before your swap went through. Try again.",
+  TransactionDeadlinePassed: "This swap took too long. Try again.",
+  ExecutionFailed: "The swap didn't go through. Try again.",
+  LengthMismatch: "The swap didn't go through. Try again.",
+  InsufficientAllowance: "Confirm {SYMBOL} for this sale again, then sell.",
+  AllowanceExpired: "Confirm {SYMBOL} for this sale again, then sell.",
+  PoolNotInitialized: "Swapping opens when the market opens.",
+} as const;
+
+export const CCA_FEE_ERROR_COPY = {
+  UnknownLock: "Fees start once the market opens.",
+  EthTransferFailed: "Fees couldn't be sent right now. Try again later.",
+  TokenTransferFailed: "Fees couldn't be sent right now. Try again later.",
+  NothingAccrued: "There are no fees to withdraw.",
+  PositionManagerNotSet: "Something went wrong. Try again later.",
+  Reentrant: "Something went wrong. Try again later.",
 } as const;
 
 export const CCA_LAUNCH_ERROR_MESSAGE = "Couldn't start the auction. Try again.";
@@ -176,6 +253,8 @@ export const CCA_ERROR_COPY = {
   ...CCA_EXIT_ERROR_COPY,
   ...CCA_CLAIM_ERROR_COPY,
   ...CCA_MIGRATE_ERROR_COPY,
+  ...CCA_SWAP_ERROR_COPY,
+  ...CCA_FEE_ERROR_COPY,
   ...CCA_LAUNCH_ERROR_COPY,
 } as const;
 
@@ -201,6 +280,7 @@ export function ccaErrorCopy(name: string, vars: CcaErrorCopyVars = {}): string 
   return fill(CCA_ERROR_COPY[name as CcaOfficialErrorName], {
     claimBlock: vars.claimBlock ?? "{claimBlock}",
     migrationBlock: vars.migrationBlock ?? "{migrationBlock}",
+    SYMBOL: vars.SYMBOL ?? "{SYMBOL}",
   });
 }
 
@@ -234,6 +314,8 @@ export function auctionStatusCopy(
       return CCA_COPY.graduated;
     case "failed":
       return CCA_COPY.goalNotReached;
+    case "market_failed":
+      return CCA_COPY.marketCouldntOpen;
     case "pool_open":
       return CCA_COPY.poolOpen;
   }
@@ -298,10 +380,22 @@ export function departedReplacesAuctionStatus(): false {
   return false;
 }
 
-export function swapSectionCopy(): never {
-  throw new InterfaceCcaPendingError("swap section copy");
+export function swapSectionCopy() {
+  return SWAP_SECTION_COPY;
 }
 
-export function feeCollectCopy(): never {
-  throw new InterfaceCcaPendingError("fee collect copy");
+export function feeCollectCopy() {
+  return FEE_COLLECT_COPY;
+}
+
+export function swapTokenLine(template: string, symbol: string, amount?: string, minAmount?: string): string {
+  return fill(template, {
+    SYMBOL: symbol,
+    amount: amount ?? "{amount}",
+    minAmount: minAmount ?? "{minAmount}",
+  });
+}
+
+export function swapStepCopy(n: number, total: number): string {
+  return fill(SWAP_SECTION_COPY.stepCounter, { n, total });
 }

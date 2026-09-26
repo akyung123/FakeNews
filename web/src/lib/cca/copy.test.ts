@@ -9,7 +9,9 @@ import {
   CCA_EXIT_ERROR_COPY,
   CCA_LAUNCH_ERROR_MESSAGE,
   CCA_LAUNCH_ERROR_NAMES,
+  CCA_FEE_ERROR_COPY,
   CCA_MIGRATE_ERROR_COPY,
+  CCA_SWAP_ERROR_COPY,
   FEE_COLLECT_COPY,
   SWAP_SECTION_COPY,
   auctionLiveCopy,
@@ -30,7 +32,6 @@ import {
   yourBidCopy,
 } from "./copy";
 import { ccaErrorCopyFor } from "./errors";
-import { INTERFACE_CCA_TBD, InterfaceCcaPendingError } from "./launchpadCca";
 
 /** Investment-sense wording only. Refund language ("returned") is allowed. */
 const BANNED = ["predict", "prediction", "profit", "yield", "moon", "guaranteed"];
@@ -99,6 +100,12 @@ describe("designer FINAL CCA copy", () => {
     expect(CCA_COPY.openMarketBefore).toBe("The market can open from block {migrationBlock}.");
     expect(CCA_COPY.openingMarket).toBe("Opening market…");
     expect(CCA_COPY.marketOpen).toBe("Market open. You can swap now.");
+    expect(CCA_COPY.marketCouldntOpen).toBe("Auction ended · market couldn't open");
+    expect(CCA_COPY.marketFailedBody).toBe("The market couldn't open. No pool was created.");
+    expect(CCA_COPY.marketFailedHelp).toBe(
+      "This can't be tried again, so this token has no market for now. You can still get back unused ETH and claim your tokens.",
+    );
+    expect(CCA_COPY.marketFailedToast).toBe("Transaction confirmed, but the market couldn't open.");
   });
 
   test("interpolates countdown, raised, bids, and block-gated lines", () => {
@@ -183,14 +190,10 @@ describe("designer FINAL CCA copy", () => {
       "Too early. The market can open from block 126.",
     );
     expect(CCA_MIGRATE_ERROR_COPY.InitializerNotRegistered).toBe("This auction isn't linked to a market.");
-    for (const name of [
-      "PoolManagerAlreadyUnlocked",
-      "CurrencyRaisedMismatch",
-      "NoPositionsCreated",
-      "OnlySelfCall",
-    ] as const) {
-      expect(CCA_MIGRATE_ERROR_COPY[name]).toBe("The market couldn't open. Try again.");
-    }
+    expect(CCA_MIGRATE_ERROR_COPY.PoolManagerAlreadyUnlocked).toBe("The market couldn't open. Try again.");
+    expect(CCA_ERROR_COPY).not.toHaveProperty("CurrencyRaisedMismatch");
+    expect(CCA_ERROR_COPY).not.toHaveProperty("NoPositionsCreated");
+    expect(CCA_ERROR_COPY).not.toHaveProperty("OnlySelfCall");
 
     for (const name of CCA_LAUNCH_ERROR_NAMES) {
       expect(CCA_ERROR_COPY[name]).toBe(CCA_LAUNCH_ERROR_MESSAGE);
@@ -209,6 +212,10 @@ describe("designer FINAL CCA copy", () => {
     expect(ccaErrorCopyFor(new Error("BatchClaimDifferentOwner"))).toBe(
       "These bids belong to different wallets. Claim them one by one.",
     );
+    expect(CCA_SWAP_ERROR_COPY.V4TooLittleReceived).toBe(
+      "The price moved before your swap went through. Try again.",
+    );
+    expect(CCA_FEE_ERROR_COPY.UnknownLock).toBe("Fees start once the market opens.");
   });
 
   test("hides claim and open-market when the goal was missed", () => {
@@ -222,17 +229,31 @@ describe("designer FINAL CCA copy", () => {
     ).toEqual({ claim: false, openMarket: false, exit: true });
   });
 
-  test("leaves swap section and fee collect TBD", () => {
-    expect(SWAP_SECTION_COPY).toBe(INTERFACE_CCA_TBD);
-    expect(FEE_COLLECT_COPY).toBe(INTERFACE_CCA_TBD);
-    expect(() => swapSectionCopy()).toThrow(InterfaceCcaPendingError);
-    expect(() => feeCollectCopy()).toThrow(/fee collect copy/);
+  test("pins swap and fee-collect copy v2", () => {
+    expect(SWAP_SECTION_COPY.title).toBe("Swap");
+    expect(SWAP_SECTION_COPY.beforeOpen).toBe("Swapping opens when the market opens.");
+    expect(SWAP_SECTION_COPY.youPayEth).toBe("You pay (ETH)");
+    expect(SWAP_SECTION_COPY.buySymbol).toBe("Buy {SYMBOL}");
+    expect(SWAP_SECTION_COPY.allowUniswap).toBe("Allow Uniswap to use your {SYMBOL}");
+    expect(FEE_COLLECT_COPY.collectFees).toBe("Collect fees");
+    expect(FEE_COLLECT_COPY.setupFeeCollection).toBe("Set up fee collection");
+    expect(FEE_COLLECT_COPY.settingUp).toBe("Setting up…");
+    expect(FEE_COLLECT_COPY.feeCollectionReady).toBe("Fee collection ready");
+    expect(FEE_COLLECT_COPY.registerHelper).toBe(
+      "One-time step after the market opens. Anyone can do this.",
+    );
+    expect(FEE_COLLECT_COPY.beforeOpen).toBe("Fees start once the market opens.");
+    expect(swapSectionCopy().sold).toBe("Sold {amount} {SYMBOL}");
+    expect(feeCollectCopy().helper).toContain("24% to the prophet");
+    expect(auctionStatusCopy("market_failed")).toBe("Auction ended · market couldn't open");
   });
 
   test("does not talk about profit, yield, or price outlooks", () => {
     const joined = [
       ...Object.values(CCA_COPY),
       ...Object.values(CCA_ERROR_COPY),
+      ...Object.values(SWAP_SECTION_COPY),
+      ...Object.values(FEE_COLLECT_COPY),
     ]
       .join(" ")
       .toLowerCase();

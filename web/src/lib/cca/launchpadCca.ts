@@ -1,11 +1,9 @@
 /**
  * Our Launchpad / LiquidityLocker surface on the CCA line.
- *
- * Names and arg order come from INTERFACE_CCA.md (PR #40 head b02a445)
- * where they are already specified. Items still marked TBD there stay
- * as `TBD(INTERFACE_CCA)` stubs — do not guess them.
+ * Names and arg order come from INTERFACE_CCA.md PR #44 and PR #42 (latest head).
  */
-import type { Address } from "viem";
+import type { Address, Hex } from "viem";
+import { encodePacked } from "viem";
 import { launchpadCcaAbi, lockerCcaAbi } from "./abi/launchpadCca";
 import type { CcaWriteRequest } from "./writes";
 
@@ -20,12 +18,21 @@ export class InterfaceCcaPendingError extends Error {
   }
 }
 
-/** `launchpad.auctionOf(token)` → `(auction, poolOpened)`. INTERFACE_CCA §4.2. */
+/** `launchpad.auctionOf(token)` → auction address. No poolOpened flag. */
 export function auctionOfRead(launchpad: Address, token: Address) {
   return {
     address: launchpad,
     abi: launchpadCcaAbi,
     functionName: "auctionOf" as const,
+    args: [token] as const,
+  };
+}
+
+export function isGraduatedRead(launchpad: Address, token: Address) {
+  return {
+    address: launchpad,
+    abi: launchpadCcaAbi,
+    functionName: "isGraduated" as const,
     args: [token] as const,
   };
 }
@@ -38,7 +45,7 @@ export function initializerFromAuction(auction: Address): Address {
   return auction;
 }
 
-/** `launchpad.hook()` — ProphecyHook in the pool key. INTERFACE_CCA §2. */
+/** `launchpad.hook()` — ProphecyHook in the pool key. */
 export function hookRead(launchpad: Address) {
   return {
     address: launchpad,
@@ -48,7 +55,7 @@ export function hookRead(launchpad: Address) {
   };
 }
 
-/** `launchpad.locker()`. INTERFACE_CCA §2. */
+/** `launchpad.locker()`. */
 export function lockerRead(launchpad: Address) {
   return {
     address: launchpad,
@@ -58,9 +65,27 @@ export function lockerRead(launchpad: Address) {
   };
 }
 
+export function lbpStrategyRead(launchpad: Address) {
+  return {
+    address: launchpad,
+    abi: launchpadCcaAbi,
+    functionName: "lbpStrategy" as const,
+    args: [] as const,
+  };
+}
+
+export function positionManagerRead(launchpad: Address) {
+  return {
+    address: launchpad,
+    abi: launchpadCcaAbi,
+    functionName: "positionManager" as const,
+    args: [] as const,
+  };
+}
+
 /**
  * `launch(slug, prophecy, deadline)` — not payable, no first buy.
- * Returns `(token, auction)`. INTERFACE_CCA §2.
+ * Returns the token only — read auction from Launched or auctionOf.
  */
 export function launchCcaWrite(
   launchpad: Address,
@@ -96,39 +121,35 @@ export function withdrawAccruedWrite(locker: Address): CcaWriteRequest {
   };
 }
 
-/** TBD(INTERFACE_CCA) §10.1: salt derivation for `initializeDistribution`. */
+/** Frontend must not pass a salt. Launchpad computes it on-chain. */
 export function initializeDistributionSalt(): never {
-  throw new InterfaceCcaPendingError("salt derivation for initializeDistribution");
+  throw new InterfaceCcaPendingError("frontend must not pass a salt");
 }
 
-/**
- * TBD(INTERFACE_CCA) §10.12: how the locker binds a received `tokenId`
- * to `token` / `prophet`.
- */
-export function lockerTokenIdBinding(): never {
-  throw new InterfaceCcaPendingError("LiquidityLocker tokenId → token / prophet binding");
+/** Binding after migrate: anyone `register(token, tokenId)`. */
+export function lockerTokenIdBinding(): { functionName: "register"; args: ["token", "tokenId"] } {
+  return { functionName: "register", args: ["token", "tokenId"] };
 }
 
-/**
- * TBD(INTERFACE_CCA) §10.13: PositionManager action bytes for a
- * fees-only collect (no liquidity decrease).
- */
-export function lockerCollectActionBytes(): never {
-  throw new InterfaceCcaPendingError("PositionManager fees-only collect action bytes");
+/** Fees-only collect: DECREASE_LIQUIDITY 0x01 then TAKE_PAIR 0x11, liquidity 0. */
+export function lockerCollectActionBytes(): Hex {
+  return encodePacked(["uint8", "uint8"], [0x01, 0x11]);
 }
 
-/** TBD(INTERFACE_CCA) §10.11: Launchpad custom-error names such as LbpNotSet. */
-export function backendLaunchErrorNames(): never {
-  throw new InterfaceCcaPendingError("Launchpad custom-error names (LbpNotSet and the like)");
+/** Launchpad custom-error names from PR #42. */
+export function backendLaunchErrorNames(): readonly string[] {
+  return [
+    "CcaNotSet",
+    "CcaAlreadySet",
+    "AuctionExists",
+    "AuctionNotCreated",
+    "InvalidHook",
+    "BadAuctionBlocks",
+    "ProphetRecipient",
+  ] as const;
 }
 
 export const INTERFACE_CCA_PENDING = [
-  "initializeDistribution salt",
-  "Universal Router 2.1.2 V4_SWAP command + inputs encoding",
-  "LiquidityLocker tokenId → token / prophet binding",
-  "Launchpad custom-error names (LbpNotSet and the like)",
-  "PositionManager fees-only collect action bytes",
-  "reservedTokenAmountForLP",
-  "swap section copy",
-  "fee collect copy",
+  "floor / tick Q96 pending #42 recalculation",
+  "Universal Router 2.1.2 calldata not live-verified on Sepolia",
 ] as const;

@@ -82,9 +82,10 @@ describe("DECISIONS #1 copy — new strings", () => {
     const held = renderApp("/coin/wifi");
     expect(held).toContain("Trade memos");
     expect(held).toContain("Add a one-line memo (optional)");
-    expect(held).toContain("Curve progress");
+    expect(held).toContain("Current clearing price");
     expect(held).toContain("Holder");
-    expect(held).toContain("53% 0.0106 of 0.02 ETH to graduate");
+    expect(held).toContain("of 0.02 ETH raised to open the market");
+    expect(held).toContain("Place bid");
     expect(held).not.toContain("0.0177 ETH");
     expect(held).not.toContain("Holder +");
     expect(held).not.toContain("Holder -");
@@ -99,8 +100,9 @@ describe("DECISIONS #1 copy — new strings", () => {
     const empty = renderApp("/n/curve-out.ringo.prophecy.eth");
     expect(empty).toContain("No trades yet. The first memo shows up here.");
     expect(empty).toContain("Trade memos");
-    expect(empty).toContain("Curve progress");
-    expect(empty).toContain("0% 0.0000 of 0.02 ETH to graduate");
+    expect(empty).toContain("Current clearing price");
+    expect(empty).toContain("of 0.02 ETH raised to open the market");
+    expect(empty).toContain("Place bid");
     expect(empty).toContain("curve-out");
     expect(empty).toContain("curve-out.ringo.prophecy.eth");
     expect(empty).toContain("Copy");
@@ -108,15 +110,13 @@ describe("DECISIONS #1 copy — new strings", () => {
     assertRemoved(empty);
 
     const graduated = renderApp("/n/two-min.ringo.prophecy.eth");
-    expect(graduated.split("Graduated to Uniswap V4").length - 1).toBe(1);
-    expect(graduated).toContain("The curve is closed. Trading continues on Uniswap.");
-    expect(graduated).toContain("View pool on Uniswap");
+    expect(graduated).toContain("Market open on Uniswap v4");
+    expect(graduated).toContain("Swap");
+    expect(graduated).toContain("Collect fees");
     expect(graduated).toContain("Trade memos");
-    expect(graduated).toContain("100% 0.0200 of 0.02 ETH to graduate");
-    expect(graduated).not.toContain("Curve progress");
+    expect(graduated).toContain("of 0.02 ETH raised to open the market");
+    expect(graduated).not.toContain("Place bid");
     expect(graduated).not.toContain("3.74 ETH");
-    expect(graduated).not.toContain(">Buy<");
-    expect(graduated).not.toContain(">Sell<");
     assertRemoved(graduated);
   });
 

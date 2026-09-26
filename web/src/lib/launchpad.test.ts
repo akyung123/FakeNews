@@ -19,6 +19,7 @@ import {
   registerProphetWrite,
   type RegisterProphetInput,
 } from "./launchpad";
+import { launchpadCcaAbi } from "./cca/abi/launchpadCca";
 import { launchpadAbi } from "./launchpadAbi";
 import { wagmiConfig } from "./wagmi";
 
@@ -224,7 +225,7 @@ describe("Launched log fromBlock", () => {
     expect(launchedFromBlock(12_345_678n, latest)).toBe(12_345_678n);
     const query = launchedLogsQuery(latest, MOCK_WORLD_LAUNCHPAD, 12_345_678n);
     expect(query.address).toBe(MOCK_WORLD_LAUNCHPAD);
-    expect(query.abi).toBe(launchpadAbi);
+    expect(query.abi).toBe(launchpadCcaAbi);
     expect(query.eventName).toBe("Launched");
     expect(query.fromBlock).toBe(12_345_678n);
     expect(query.toBlock).toBe(latest);
