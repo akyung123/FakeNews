@@ -95,15 +95,20 @@ contract CCAForkTest is CCAForkBase {
         uint256 protocolTokBefore = token.balanceOf(protocol);
         vm.prank(protocol);
         auction.sweepUnsoldTokens();
-        assertEq(token.balanceOf(protocol) - protocolTokBefore, AUCTION_SUPPLY, "unsold auction supply -> tokensRecipient");
+        assertEq(
+            token.balanceOf(protocol) - protocolTokBefore,
+            AUCTION_SUPPLY,
+            "unsold auction supply -> tokensRecipient (protocol)"
+        );
         assertEq(token.balanceOf(address(auction)), 0);
-        assertEq(token.balanceOf(LBP_STRATEGY), LP_RESERVE, "LP reserve stays on the strategy until a successful migrate");
+        assertEq(token.balanceOf(LBP_STRATEGY), LP_RESERVE);
 
+        // migrate does not revert: tryMigrate hits NotGraduated, then the strategy
+        // recovers reservedTokenAmountForLP to `recipient` (protocol). No v4 pool.
         _rollTo(migrationBlockAfter(auction.endBlock()));
-        vm.expectRevert();
         strategy.migrate(address(auction));
-        assertEq(token.balanceOf(LBP_STRATEGY), LP_RESERVE, "failed migrate does not move the LP reserve");
-        assertEq(token.balanceOf(protocol), AUCTION_SUPPLY);
+        assertEq(token.balanceOf(LBP_STRATEGY), 0, "failed migrate recovers the LP reserve");
+        assertEq(token.balanceOf(protocol), AUCTION_SUPPLY + LP_RESERVE, "protocol holds auction supply + recovered LP reserve");
     }
 
     function _runHappyPath(uint64 auctionBlocks, string memory label) internal {

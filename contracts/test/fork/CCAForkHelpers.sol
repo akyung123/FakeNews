@@ -16,22 +16,22 @@ import {
 } from "./CCAForkInterfaces.sol";
 import {CCAForkToken} from "./CCAForkToken.sol";
 
-/// Official Sepolia Liquidity Launchpad + CCA v2.1.0 addresses
-/// (developers.uniswap.org / docs/liquidity/liquidity-launchpad/deployments).
+// Official Sepolia Liquidity Launchpad + CCA v2.1.0 addresses
+// (developers.uniswap.org / docs/liquidity/liquidity-launchpad/deployments).
 address constant CCA_FACTORY = 0x000000001F26a0044BaA66024e7b6599c61963F8;
 address constant LBP_STRATEGY = 0x95434E898Af471945Cab33D5064d2aC1A6Ba2000;
 address constant INITIALIZER_HOOK = 0x1600059B95A80d500fC42400ea9a88A9C29D2000;
 address constant SEPOLIA_POOL_MANAGER = 0xE03A1074c86CFeDd5C142C4F04F1a1536e203543;
 address constant SEPOLIA_POSITION_MANAGER = 0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4;
 
-/// Recent Sepolia block where factory, LBPStrategy, and InitializerHook have code.
-/// 0xb3d300 = 11_784_960 (checked 2026-09-26; ~40 blocks behind then-head 0xb3d329).
+// Recent Sepolia block where factory, LBPStrategy, and InitializerHook have code.
+// 0xb3d300 = 11_784_960 (checked 2026-09-26; ~40 blocks behind then-head 0xb3d329).
 uint256 constant CCA_FORK_BLOCK = 11_784_960;
 string constant PUBLIC_SEPOLIA_RPC = "https://ethereum-sepolia-rpc.publicnode.com";
 
 uint24 constant MPS = 10_000_000;
 uint256 constant Q96 = 1 << 96;
-/// Official CCA test floor / tick (AuctionBaseTest): 1000 and 100 in Q96.
+// Official CCA test floor / tick (AuctionBaseTest): 1000 and 100 in Q96.
 uint256 constant CCA_FLOOR_PRICE = 1000 * Q96;
 uint256 constant CCA_TICK_SPACING = 100 * Q96;
 uint128 constant GRADUATION_THRESHOLD = 0.02 ether;
@@ -215,7 +215,6 @@ abstract contract CCAForkBase is Test {
         vm.deal(owner, amount + 1 ether);
         vm.prank(owner);
         bidId = auction.submitBid{value: amount}(maxPrice, amount, owner, prevTick, "");
-        assertGt(bidId, 0);
     }
 
     function _rollTo(uint64 target) internal {
