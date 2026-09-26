@@ -1,0 +1,335 @@
+import { encodeAbiParameters, encodeEventTopics, parseEther, parseUnits } from "viem";
+import { describe, expect, it, vi } from "vitest";
+import { launchpadAbi } from "./launchpadAbi";
+import { MOCK_WORLD_LAUNCHPAD } from "./mock";
+import { quoteBuyWei, toCurveWei } from "./curve";
+import { actions } from "./store";
+import { wagmiConfig } from "./wagmi";
+import {
+  applySlippage,
+  buyWrite,
+  claimCreatorFeeWrite,
+  createBuy,
+  createClaim,
+  createLaunch,
+  createSell,
+  ethInputToWei,
+  launchWrite,
+  liveTokenAddress,
+  minEthOutForSell,
+  minTokensOutForBuy,
+  sellWrite,
+  tokenFromLaunchedReceipt,
+  tradeDeadlineUnix,
+  TransactionRevertedError,
+  TX_DEADLINE_SECONDS,
+  WRITE_COPY,
+  type LaunchInput,
+  type WriteOptions,
+  type WriteReceipt,
+} from "./writes";
+
+const TOKEN = "0x1111111111111111111111111111111111111111" as const;
+const ACCOUNT = "0x2222222222222222222222222222222222222222" as const;
+const HASH = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
+
+const launchInput: LaunchInput = {
+  slug: "lingo-2028",
+  prophecy: "Every badge is a name",
+  deadline: 1_830_297_600n,
+  firstBuyWei: parseEther("0.001"),
+};
+
+function launchedReceipt(token = TOKEN): WriteReceipt {
+  const topics = encodeEventTopics({
+    abi: launchpadAbi,
+    eventName: "Launched",
+    args: { token, prophet: ACCOUNT },
+  });
+  const data = encodeAbiParameters(
+    [
+      { name: "prophetLabel", type: "string" },
+      { name: "slug", type: "string" },
+    ],
+    ["ringo", "lingo-2028"],
+  );
+  return {
+    status: "success",
+    logs: [
+      {
+        address: MOCK_WORLD_LAUNCHPAD,
+        topics: topics as unknown as string[],
+        data,
+      },
+    ],
+  };
+}
+
+function mocks(overrides: Partial<WriteOptions> = {}): WriteOptions & {
+  simulateContract: ReturnType<typeof vi.fn>;
+  writeContract: ReturnType<typeof vi.fn>;
+  waitForTransactionReceipt: ReturnType<typeof vi.fn>;
+  readContract: ReturnType<typeof vi.fn>;
+} {
+  const simulateContract = vi.fn(async (_c, request) => ({ request, result: undefined }));
+  const writeContract = vi.fn(async () => HASH);
+  const waitForTransactionReceipt = vi.fn(async () => ({ status: "success", logs: [] }));
+  const readContract = vi.fn(async (request: { functionName?: string }) => {
+    if (request.functionName === "allowance") return 0n;
+    if (request.functionName === "curve") return [0n, 0n, 0n, 0n, false] as const;
+    if (request.functionName === "balanceOf") return 0n;
+    return 0n;
+  });
+  return {
+    address: MOCK_WORLD_LAUNCHPAD,
+    simulateContract,
+    writeContract,
+    waitForTransactionReceipt,
+    readContract,
+    getAccount: () => ({ address: ACCOUNT }),
+    getBalance: async () => parseEther("1"),
+    ...overrides,
+  };
+}
+
+describe("slippage and deadline helpers", () => {
+  it("applies a 1% band and a 10-minute unix deadline", () => {
+    expect(applySlippage(10_000n)).toBe(9_900n);
+    expect(minTokensOutForBuy(0n)).toBe(0n);
+    const ethIn = parseEther("0.001");
+    const raw = quoteBuyWei(toCurveWei({ sold: 0, ethRaised: 0 }), ethIn).tokensOut;
+    expect(minTokensOutForBuy(ethIn)).toBe(applySlippage(raw));
+    expect(minTokensOutForBuy(ethIn)).toBeLessThan(raw);
+    const now = Date.parse("2026-09-26T00:00:00Z");
+    expect(tradeDeadlineUnix(now)).toBe(BigInt(Math.floor(now / 1000) + TX_DEADLINE_SECONDS));
+    expect(TX_DEADLINE_SECONDS).toBe(600);
+    expect(ethInputToWei("0")).toBe(0n);
+    expect(ethInputToWei("0.001")).toBe(parseEther("0.001"));
+    expect(liveTokenAddress("wifi")).toBeUndefined();
+    expect(liveTokenAddress(TOKEN)).toBe(TOKEN);
+  });
+
+  it("keeps designer write copy free of flagged wording", () => {
+    const text = `${WRITE_COPY.pending} ${WRITE_COPY.failed}`.toLowerCase();
+    expect(text).not.toMatch(/coin|profit|yield|prediction|true|false/);
+  });
+});
+
+describe("launch write", () => {
+  it("simulate → write → receipt, then reads the token from Launched", async () => {
+    const fns = mocks({
+      waitForTransactionReceipt: vi.fn(async () => launchedReceipt()),
+    });
+    const run = createLaunch(fns);
+    const token = await run(launchInput);
+    expect(token).toBe(TOKEN);
+    expect(fns.simulateContract).toHaveBeenCalledTimes(1);
+    expect(fns.writeContract).toHaveBeenCalledTimes(1);
+    expect(fns.waitForTransactionReceipt).toHaveBeenCalledTimes(1);
+    const request = launchWrite(launchInput, MOCK_WORLD_LAUNCHPAD);
+    expect(fns.simulateContract.mock.calls[0][0]).toBe(wagmiConfig);
+    expect(fns.simulateContract.mock.calls[0][1]).toMatchObject({
+      address: MOCK_WORLD_LAUNCHPAD,
+      functionName: "launch",
+      args: [launchInput.slug, launchInput.prophecy, launchInput.deadline, request.args[3]],
+      value: launchInput.firstBuyWei,
+    });
+    expect(fns.writeContract.mock.calls[0][1]).toMatchObject({ functionName: "launch" });
+    expect(tokenFromLaunchedReceipt(launchedReceipt())).toBe(TOKEN);
+  });
+
+  it("throws on a reverted receipt", async () => {
+    const fns = mocks({
+      waitForTransactionReceipt: vi.fn(async () => ({ status: "reverted", logs: [] })),
+    });
+    await expect(createLaunch(fns)(launchInput)).rejects.toBeInstanceOf(TransactionRevertedError);
+  });
+
+  it("does not send when simulation fails", async () => {
+    const fns = mocks({
+      simulateContract: vi.fn(async () => {
+        throw new Error("Slippage");
+      }),
+    });
+    await expect(createLaunch(fns)(launchInput)).rejects.toThrow(/Slippage/);
+    expect(fns.writeContract).not.toHaveBeenCalled();
+    expect(fns.waitForTransactionReceipt).not.toHaveBeenCalled();
+  });
+
+  it("is a no-op when the launchpad address is unset", async () => {
+    const fns = mocks({ address: undefined });
+    const token = await createLaunch(fns)(launchInput);
+    expect(token).toBeNull();
+    expect(fns.simulateContract).not.toHaveBeenCalled();
+    expect(fns.writeContract).not.toHaveBeenCalled();
+  });
+});
+
+describe("buy write", () => {
+  const input = {
+    token: TOKEN,
+    ethIn: parseEther("0.001"),
+    memo: "",
+    curve: { sold: 0, ethRaised: 0 },
+  };
+
+  it("simulate → write → success receipt", async () => {
+    const fns = mocks();
+    expect(await createBuy(fns)(input)).toBe(true);
+    expect(fns.simulateContract).toHaveBeenCalledTimes(1);
+    expect(fns.writeContract).toHaveBeenCalledTimes(1);
+    expect(fns.waitForTransactionReceipt).toHaveBeenCalledWith(wagmiConfig, { hash: HASH });
+    const request = buyWrite(input, MOCK_WORLD_LAUNCHPAD);
+    expect(fns.simulateContract.mock.calls[0][1]).toMatchObject({
+      functionName: "buy",
+      args: request.args,
+      value: input.ethIn,
+    });
+  });
+
+  it("throws on a reverted receipt", async () => {
+    const fns = mocks({
+      waitForTransactionReceipt: vi.fn(async () => ({ status: "reverted" })),
+    });
+    await expect(createBuy(fns)(input)).rejects.toBeInstanceOf(TransactionRevertedError);
+  });
+
+  it("does not send when simulation fails", async () => {
+    const fns = mocks({
+      simulateContract: vi.fn(async () => {
+        throw new Error("CurveComplete");
+      }),
+    });
+    await expect(createBuy(fns)(input)).rejects.toThrow(/CurveComplete/);
+    expect(fns.writeContract).not.toHaveBeenCalled();
+  });
+
+  it("is a no-op when the launchpad address is unset", async () => {
+    const fns = mocks({ address: undefined });
+    expect(await createBuy(fns)(input)).toBe(false);
+    expect(fns.simulateContract).not.toHaveBeenCalled();
+    expect(fns.writeContract).not.toHaveBeenCalled();
+  });
+});
+
+describe("sell write", () => {
+  const curve = { sold: 1_000_000, ethRaised: 0.001 };
+  const input = {
+    token: TOKEN,
+    tokensIn: parseUnits("1000", 18),
+    memo: "",
+    curve,
+    account: ACCOUNT,
+  };
+
+  it("approves when allowance is short, then sells", async () => {
+    const fns = mocks({
+      readContract: vi.fn(async (request: { functionName?: string }) => {
+        if (request.functionName === "allowance") return 0n;
+        return 0n;
+      }),
+    });
+    expect(await createSell(fns)(input)).toBe(true);
+    expect(fns.simulateContract).toHaveBeenCalledTimes(2);
+    expect(fns.writeContract).toHaveBeenCalledTimes(2);
+    expect(fns.simulateContract.mock.calls[0][1]).toMatchObject({
+      functionName: "approve",
+      args: [MOCK_WORLD_LAUNCHPAD, input.tokensIn],
+    });
+    expect(fns.simulateContract.mock.calls[1][1]).toMatchObject({
+      functionName: "sell",
+      args: sellWrite(input, MOCK_WORLD_LAUNCHPAD).args,
+    });
+    expect(minEthOutForSell(input.tokensIn, curve)).toBeGreaterThan(0n);
+  });
+
+  it("skips approve when allowance already covers the sell", async () => {
+    const fns = mocks({
+      readContract: vi.fn(async () => input.tokensIn),
+    });
+    expect(await createSell(fns)(input)).toBe(true);
+    expect(fns.simulateContract).toHaveBeenCalledTimes(1);
+    expect(fns.simulateContract.mock.calls[0][1]).toMatchObject({ functionName: "sell" });
+  });
+
+  it("throws on a reverted sell receipt", async () => {
+    const fns = mocks({
+      readContract: vi.fn(async () => input.tokensIn),
+      waitForTransactionReceipt: vi.fn(async () => ({ status: "reverted" })),
+    });
+    await expect(createSell(fns)(input)).rejects.toBeInstanceOf(TransactionRevertedError);
+  });
+
+  it("does not send sell when simulation fails", async () => {
+    const fns = mocks({
+      readContract: vi.fn(async () => input.tokensIn),
+      simulateContract: vi.fn(async () => {
+        throw new Error("ExceedsSold");
+      }),
+    });
+    await expect(createSell(fns)(input)).rejects.toThrow(/ExceedsSold/);
+    expect(fns.writeContract).not.toHaveBeenCalled();
+  });
+
+  it("is a no-op when the launchpad address is unset", async () => {
+    const fns = mocks({ address: undefined });
+    expect(await createSell(fns)(input)).toBe(false);
+    expect(fns.simulateContract).not.toHaveBeenCalled();
+    expect(fns.writeContract).not.toHaveBeenCalled();
+    expect(fns.readContract).not.toHaveBeenCalled();
+  });
+});
+
+describe("claimCreatorFee write", () => {
+  it("simulate → write → success receipt", async () => {
+    const fns = mocks();
+    expect(await createClaim(fns)()).toBe(true);
+    expect(fns.simulateContract.mock.calls[0][1]).toMatchObject(claimCreatorFeeWrite(MOCK_WORLD_LAUNCHPAD));
+    expect(fns.writeContract).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws on a reverted receipt", async () => {
+    const fns = mocks({
+      waitForTransactionReceipt: vi.fn(async () => ({ status: "reverted" })),
+    });
+    await expect(createClaim(fns)()).rejects.toBeInstanceOf(TransactionRevertedError);
+  });
+
+  it("does not send when simulation fails", async () => {
+    const fns = mocks({
+      simulateContract: vi.fn(async () => {
+        throw new Error("ZeroAmount");
+      }),
+    });
+    await expect(createClaim(fns)()).rejects.toThrow(/ZeroAmount/);
+    expect(fns.writeContract).not.toHaveBeenCalled();
+  });
+
+  it("is a no-op when the launchpad address is unset", async () => {
+    const fns = mocks({ address: undefined });
+    expect(await createClaim(fns)()).toBe(false);
+    expect(fns.simulateContract).not.toHaveBeenCalled();
+    expect(fns.writeContract).not.toHaveBeenCalled();
+  });
+});
+
+describe("mock store path", () => {
+  it("create / buy / sell still update the local store when writes no-op", async () => {
+    const fns = mocks({ address: undefined });
+    expect(await createLaunch(fns)(launchInput)).toBeNull();
+    expect(await createBuy(fns)({ token: TOKEN, ethIn: 1n })).toBe(false);
+    expect(await createSell(fns)({ token: TOKEN, tokensIn: 1n, account: ACCOUNT })).toBe(false);
+    expect(await createClaim(fns)()).toBe(false);
+
+    actions.reset();
+    const id = actions.create({
+      name: "mock-slug",
+      ticker: "MOCK",
+      prophecy: "A local-only prophecy",
+      firstBuy: 0.001,
+    });
+    expect(id).toMatch(/^[a-z0-9]{8}$/);
+    actions.buy(id, 0.001);
+    actions.sell(id, 1);
+  });
+});

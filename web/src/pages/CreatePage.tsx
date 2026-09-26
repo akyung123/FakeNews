@@ -20,6 +20,13 @@ import { createRegisterProphet, type RegisterProphetInput } from "../lib/launchp
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_ISSUE_SESSION, MOCK_PARENT_NAME, MOCK_RETURNING_SESSION } from "../lib/mock";
 import { actions } from "../lib/store";
 import {
+  createLaunch,
+  ethInputToWei,
+  refreshCoinFromChain,
+  WRITE_COPY,
+  type LaunchInput,
+} from "../lib/writes";
+import {
   createWorldClient,
   type WorldClient,
   type WorldErrorKind,
@@ -35,6 +42,7 @@ export type IssueScreenProps = {
   parentName?: string;
   onIssued?: (id: string) => void;
   registerProphet?: (input: RegisterProphetInput) => Promise<void>;
+  launchProphecy?: (input: LaunchInput) => Promise<`0x${string}` | null>;
 };
 
 export function resolveIssueSession(search: URLSearchParams, storedLabel = readStoredProphetLabel()): IssueSession {
@@ -57,6 +65,7 @@ export function IssueScreen({
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
   onIssued,
   registerProphet = createRegisterProphet(),
+  launchProphecy = createLaunch(),
 }: IssueScreenProps) {
   const navigate = useNavigate();
   const returningProphet = Boolean(session.prophetLabel);
@@ -68,6 +77,8 @@ export function IssueScreen({
   const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
   const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
+  const [writeBusy, setWriteBusy] = useState(false);
+  const [writeError, setWriteError] = useState<string | null>(null);
 
   const deadlineUnix = fromDatetimeLocalValue(deadlineLocal);
   const nowSeconds = Math.floor(now / 1000);
@@ -80,8 +91,14 @@ export function IssueScreen({
     nowSeconds,
   });
   const canLaunch = isLaunchEnabled({ returningProphet, worldStatus, formValid });
-  const pending = !returningProphet && worldStatus === "pending" ? ISSUE_COPY.pending : null;
-  const error = returningProphet || worldStatus === "pending" ? null : worldUserMessage(worldError);
+  const pending = writeBusy
+    ? WRITE_COPY.pending
+    : !returningProphet && worldStatus === "pending"
+      ? ISSUE_COPY.pending
+      : null;
+  const error =
+    writeError ??
+    (returningProphet || worldStatus === "pending" || writeBusy ? null : worldUserMessage(worldError));
   const submitLabel = launchButtonLabel({ returningProphet, worldStatus, canLaunch });
   const fullName = prophetLabel && slug ? prophecyName(slug, prophetLabel, parentName) : "";
 
@@ -102,32 +119,61 @@ export function IssueScreen({
         className="block create"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!canLaunch) return;
+          if (!canLaunch || writeBusy) return;
           if (!returningProphet && !verified) return;
           void (async () => {
-            if (!returningProphet && verified && registerProphet) {
-              try {
-                await registerProphet({
-                  label: prophetLabel,
-                  nullifier: verified.nullifier,
-                  serverSig: verified.serverSig,
+            setWriteBusy(true);
+            setWriteError(null);
+            try {
+              if (!returningProphet && verified && registerProphet) {
+                try {
+                  await registerProphet({
+                    label: prophetLabel,
+                    nullifier: verified.nullifier,
+                    serverSig: verified.serverSig,
+                  });
+                } catch (err) {
+                  const kind = worldErrorKindFromRegisterProphet(err);
+                  setWorldError(kind);
+                  setWorldStatus("failed");
+                  return;
+                }
+              }
+              const token = await launchProphecy({
+                slug,
+                prophecy: prophecy.trim(),
+                deadline: BigInt(deadlineUnix),
+                firstBuyWei: ethInputToWei(firstBuy),
+              });
+              if (token) {
+                actions.create({
+                  id: token,
+                  token,
+                  prophecy: prophecy.trim(),
+                  name: fullName || slug,
+                  ticker: slug.toUpperCase().slice(0, 11),
+                  firstBuy: Number(firstBuy) || 0,
                 });
-              } catch (err) {
-                const kind = worldErrorKindFromRegisterProphet(err);
-                setWorldError(kind);
-                setWorldStatus("failed");
+                await refreshCoinFromChain(token, token).catch(() => undefined);
+                if (!returningProphet) storeProphetLabel(prophetLabel);
+                if (onIssued) onIssued(token);
+                else navigate(`/coin/${token}`);
                 return;
               }
+              const id = actions.create({
+                prophecy: prophecy.trim(),
+                name: fullName || slug,
+                ticker: slug.toUpperCase().slice(0, 11),
+                firstBuy: Number(firstBuy) || 0,
+              });
+              if (!returningProphet) storeProphetLabel(prophetLabel);
+              if (onIssued) onIssued(id);
+              else navigate(`/coin/${id}`);
+            } catch {
+              setWriteError(WRITE_COPY.failed);
+            } finally {
+              setWriteBusy(false);
             }
-            const id = actions.create({
-              prophecy: prophecy.trim(),
-              name: fullName || slug,
-              ticker: slug.toUpperCase().slice(0, 11),
-              firstBuy: Number(firstBuy) || 0,
-            });
-            if (!returningProphet) storeProphetLabel(prophetLabel);
-            if (onIssued) onIssued(id);
-            else navigate(`/coin/${id}`);
           })();
         }}
       >
@@ -211,7 +257,7 @@ export function IssueScreen({
         />
 
         {pending ? (
-          <p className="banner-lock" data-testid="world-pending">
+          <p className="banner-lock" data-testid={writeBusy ? "write-pending" : "world-pending"}>
             {pending}
           </p>
         ) : null}
@@ -221,7 +267,7 @@ export function IssueScreen({
           </p>
         ) : null}
 
-        <button type="submit" className="btn primary full" disabled={!canLaunch}>
+        <button type="submit" className="btn primary full" disabled={!canLaunch || writeBusy}>
           {submitLabel}
         </button>
         {!returningProphet && worldStatus !== "success" ? (

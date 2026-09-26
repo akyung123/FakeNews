@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "../lib/issue";
 import type { RegisterProphetInput } from "../lib/launchpad";
+import { WRITE_COPY, type LaunchInput } from "../lib/writes";
 import { MOCK_ISSUE_SESSION, MOCK_RETURNING_SESSION, MOCK_WORLD_HEALTH, MOCK_RP_CONTEXT_RESPONSE, MOCK_WORLD_VERIFY } from "../lib/mock";
 import { WorldClientError, createWorldClient, type WorldClient } from "../lib/world";
 import { IssueScreen } from "./CreatePage";
@@ -12,7 +13,12 @@ const NOW = Date.parse("2026-09-26T00:00:00Z");
 
 function renderIssue(
   session = MOCK_ISSUE_SESSION,
-  extras: { world?: WorldClient; registerProphet?: IssueScreenProps["registerProphet"] } = {},
+  extras: {
+    world?: WorldClient;
+    registerProphet?: IssueScreenProps["registerProphet"];
+    launchProphecy?: IssueScreenProps["launchProphecy"];
+    onIssued?: (id: string) => void;
+  } = {},
 ) {
   return render(
     <MemoryRouter>
@@ -21,6 +27,8 @@ function renderIssue(
         world={extras.world ?? createWorldClient({ mock: true })}
         now={NOW}
         registerProphet={extras.registerProphet}
+        launchProphecy={extras.launchProphecy}
+        onIssued={extras.onIssued}
       />
     </MemoryRouter>,
   );
@@ -28,6 +36,7 @@ function renderIssue(
 
 type IssueScreenProps = {
   registerProphet?: (input: RegisterProphetInput) => Promise<void>;
+  launchProphecy?: (input: LaunchInput) => Promise<`0x${string}` | null>;
 };
 
 async function fillFirstTimeForm(user: ReturnType<typeof userEvent.setup>) {
@@ -223,6 +232,43 @@ describe("Screen 2 button gating", () => {
       },
     ]));
     expect(MOCK_WORLD_VERIFY).not.toHaveProperty("label");
+  });
+
+  it("shows a write error and stays put when launch fails", async () => {
+    const user = userEvent.setup();
+    const issued: string[] = [];
+    renderIssue(MOCK_RETURNING_SESSION, {
+      launchProphecy: async () => {
+        throw new Error("Slippage");
+      },
+      onIssued: (id) => issued.push(id),
+    });
+    await fillReturningForm(user);
+    await user.click(launchButton());
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(WRITE_COPY.failed));
+    expect(issued).toEqual([]);
+    expect(launchButton()).toBeEnabled();
+  });
+
+  it("navigates with the launched token address only after a successful write", async () => {
+    const user = userEvent.setup();
+    const issued: string[] = [];
+    const token = "0x1111111111111111111111111111111111111111" as const;
+    let seen: LaunchInput | undefined;
+    renderIssue(MOCK_RETURNING_SESSION, {
+      launchProphecy: async (input) => {
+        seen = input;
+        return token;
+      },
+      onIssued: (id) => issued.push(id),
+    });
+    await fillReturningForm(user);
+    await user.click(launchButton());
+    await waitFor(() => expect(issued).toEqual([token]));
+    expect(seen?.slug).toBe("coffee-last");
+    expect(seen?.prophecy).toBe("Coffee lasts until the last pitch");
+    expect(seen?.deadline).toBeGreaterThan(0n);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("skips World ID for a returning prophet and enables Issue once the form is valid", async () => {

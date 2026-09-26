@@ -9,8 +9,9 @@ import {
   type ProphetPageData,
   type ProphetProphecy,
 } from "../lib/prophetData";
+import { createClaim, WRITE_COPY } from "../lib/writes";
 
-export function ProphetPage() {
+export function ProphetPage({ claimFee = createClaim() }: { claimFee?: () => Promise<unknown> } = {}) {
   const { name = "" } = useParams();
   const data = getProphetPage(name);
   if (!data) {
@@ -26,13 +27,21 @@ export function ProphetPage() {
       </main>
     );
   }
-  return <ProphetView data={data} />;
+  return <ProphetView data={data} claimFee={claimFee} />;
 }
 
-function ProphetView({ data }: { data: ProphetPageData }) {
+function ProphetView({
+  data,
+  claimFee,
+}: {
+  data: ProphetPageData;
+  claimFee: () => Promise<unknown>;
+}) {
   const departed = data.prophecies.filter((p) => p.departed);
   const nextBuy = data.prophecies.find((p) => !p.departed);
   const [claimed, setClaimed] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const feeWei = claimed ? 0n : data.claimableFeeWei;
 
   return (
@@ -58,11 +67,29 @@ function ProphetView({ data }: { data: ProphetPageData }) {
         <button
           type="button"
           className="btn primary"
-          disabled={claimed || feeWei === 0n}
-          onClick={() => setClaimed(true)}
+          disabled={claimed || feeWei === 0n || pending}
+          onClick={() => {
+            void (async () => {
+              setPending(true);
+              setError(null);
+              try {
+                await claimFee();
+                setClaimed(true);
+              } catch {
+                setError(WRITE_COPY.failed);
+              } finally {
+                setPending(false);
+              }
+            })();
+          }}
         >
           {claimed ? "Claimed" : "Claim fees"}
         </button>
+        {error ? (
+          <p className="banner-error" role="alert">
+            {error}
+          </p>
+        ) : null}
       </section>
 
       <div className="prophet-split">

@@ -19,6 +19,8 @@ export type Coin = CurveState & {
   creator: string;
   createdAt: number;
   history: { at: number; mcap: number }[];
+  /** Sepolia token address after a live launch. Mock coins leave this unset. */
+  token?: `0x${string}`;
 };
 
 /** A one-line memo attached to a trade. */
@@ -171,10 +173,25 @@ export function useStore(): State {
 }
 
 export const actions = {
-  create(input: { name: string; ticker: string; prophecy: string; firstBuy: number }): string {
-    const id = newId();
+  create(input: {
+    name: string;
+    ticker: string;
+    prophecy: string;
+    firstBuy: number;
+    id?: string;
+    token?: `0x${string}`;
+  }): string {
+    const id = input.id ?? newId();
     const now = Date.now();
-    let next = applyCreate(state, { id, ...input, creator: YOU, createdAt: now });
+    let next = applyCreate(state, {
+      id,
+      name: input.name,
+      ticker: input.ticker,
+      prophecy: input.prophecy,
+      creator: YOU,
+      createdAt: now,
+      token: input.token,
+    });
     if (input.firstBuy > 0) next = applyBuy(next, YOU, id, Math.min(input.firstBuy, next.balance), now);
     set(next);
     return id;
@@ -187,6 +204,34 @@ export const actions = {
   },
   comment(coinId: string, text: string) {
     set(applyComment(state, YOU, coinId, text, Date.now()));
+  },
+  applyChainSnapshot(input: {
+    coinId: string;
+    sold: number;
+    ethRaised: number;
+    balance: number;
+    tokensHeld: number;
+  }) {
+    const coin = state.coins.find((c) => c.id === input.coinId);
+    const now = Date.now();
+    let next: State = { ...state, balance: input.balance };
+    if (coin) {
+      const updated: Coin = { ...coin, sold: input.sold, ethRaised: input.ethRaised };
+      updated.history = [...coin.history, { at: now, mcap: marketCap(updated) }];
+      next = { ...next, coins: state.coins.map((c) => (c.id === input.coinId ? updated : c)) };
+    }
+    const prev = state.positions[YOU]?.[input.coinId] ?? { tokens: 0, cost: 0 };
+    next = {
+      ...next,
+      positions: {
+        ...state.positions,
+        [YOU]: {
+          ...state.positions[YOU],
+          [input.coinId]: { tokens: input.tokensHeld, cost: prev.cost },
+        },
+      },
+    };
+    set(next);
   },
   reset() {
     set(seed(Date.now()));

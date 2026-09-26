@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { parseUnits } from "viem";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
+import { hasLaunchpad } from "../lib/contracts";
 import { graduated, progress, quoteBuy, quoteSell, TOTAL_SUPPLY } from "../lib/curve";
 import { isEnsName, slugOf } from "../lib/ensName";
 import { ago, eth, tokens } from "../lib/format";
@@ -14,8 +16,23 @@ import {
   useStore,
   type Coin,
 } from "../lib/store";
+import {
+  createBuy,
+  createSell,
+  ethInputToWei,
+  liveTokenAddress,
+  refreshCoinFromChain,
+  WRITE_COPY,
+  type BuyInput,
+  type SellInput,
+} from "../lib/writes";
 
-export function CoinPage() {
+export type CoinPageProps = {
+  sendBuy?: (input: BuyInput) => Promise<boolean>;
+  sendSell?: (input: SellInput) => Promise<boolean>;
+};
+
+export function CoinPage({ sendBuy = createBuy(), sendSell = createSell() }: CoinPageProps = {}) {
   const { id = "", name = "" } = useParams();
   const s = useStore();
   const lookup = id || name;
@@ -81,7 +98,13 @@ export function CoinPage() {
       </div>
 
       <aside className="stack side">
-        <TradeBox coin={coin} balance={s.balance} held={pos?.tokens ?? 0} />
+        <TradeBox
+          coin={coin}
+          balance={s.balance}
+          held={pos?.tokens ?? 0}
+          sendBuy={sendBuy}
+          sendSell={sendSell}
+        />
         {pos ? (
           <section className="block you-hold">
             <p className="faint small">You hold</p>
@@ -95,9 +118,23 @@ export function CoinPage() {
   );
 }
 
-function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: number }) {
+function TradeBox({
+  coin,
+  balance,
+  held,
+  sendBuy,
+  sendSell,
+}: {
+  coin: Coin;
+  balance: number;
+  held: number;
+  sendBuy: (input: BuyInput) => Promise<boolean>;
+  sendSell: (input: SellInput) => Promise<boolean>;
+}) {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("0.001");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const value = Number(amount) || 0;
   const closed = graduated(coin);
 
@@ -106,8 +143,43 @@ function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: 
   const sellQuote = quoteSell(coin, sellTokens).eth;
 
   function submit() {
-    if (side === "buy") actions.buy(coin.id, value);
-    else actions.sell(coin.id, sellTokens);
+    if (pending) return;
+    const token = liveTokenAddress(coin.id, coin.token);
+    const onChain = hasLaunchpad() && Boolean(token);
+    if (!onChain || !token) {
+      if (side === "buy") actions.buy(coin.id, value);
+      else actions.sell(coin.id, sellTokens);
+      return;
+    }
+    void (async () => {
+      setPending(true);
+      setError(null);
+      try {
+        if (side === "buy") {
+          const sent = await sendBuy({
+            token,
+            ethIn: ethInputToWei(value),
+            memo: "",
+            curve: coin,
+          });
+          if (!sent) actions.buy(coin.id, value);
+        } else {
+          const tokensIn = parseUnits(sellTokens.toFixed(8), 18);
+          const sent = await sendSell({
+            token,
+            tokensIn,
+            memo: "",
+            curve: coin,
+          });
+          if (!sent) actions.sell(coin.id, sellTokens);
+        }
+        await refreshCoinFromChain(coin.id, token).catch(() => undefined);
+      } catch {
+        setError(WRITE_COPY.failed);
+      } finally {
+        setPending(false);
+      }
+    })();
   }
 
   return (
@@ -136,10 +208,15 @@ function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: 
           ? `You get ≈ ${tokens(buyQuote.tokens)} $${coin.ticker}`
           : `You get ≈ ${eth(sellQuote, 4)}`}
       </p>
+      {error ? (
+        <p className="banner-error" role="alert">
+          {error}
+        </p>
+      ) : null}
       <button
         type="button"
         className={`btn ${side === "buy" ? "primary" : "sell"} full`}
-        disabled={closed || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
+        disabled={pending || closed || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
         onClick={submit}
       >
         {closed ? "Curve sold out" : side === "buy" ? `Buy $${coin.ticker}` : `Sell $${coin.ticker}`}
