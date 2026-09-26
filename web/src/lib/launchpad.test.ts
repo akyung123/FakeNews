@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { webEnv } from "./env";
 import { MOCK_WORLD_LAUNCHPAD, MOCK_WORLD_VERIFY } from "./mock";
 import {
   createRegisterProphet,
+  ensAdapterRead,
+  readEnsAdapter,
   registerProphetArgs,
   registerProphetWrite,
   type RegisterProphetInput,
@@ -41,5 +44,23 @@ describe("registerProphet write shape", () => {
     });
     expect(called).toBe(false);
     expect(() => registerProphetWrite(input)).toThrow(/not set/i);
+  });
+
+  it("reads the ENS adapter from launchpad.ens(), not ENS_ADAPTER_ADDRESS", async () => {
+    const adapter = "0x3333333333333333333333333333333333333333" as const;
+    const request = ensAdapterRead(MOCK_WORLD_LAUNCHPAD);
+    expect(request.functionName).toBe("ens");
+    expect(request.args).toEqual([]);
+    expect(request.abi).toBe(launchpadAbi);
+    const seen: unknown[] = [];
+    const got = await readEnsAdapter({
+      async readContract(req) {
+        seen.push(req);
+        return adapter;
+      },
+    }, MOCK_WORLD_LAUNCHPAD);
+    expect(got).toBe(adapter);
+    expect(seen).toEqual([ensAdapterRead(MOCK_WORLD_LAUNCHPAD)]);
+    expect(JSON.stringify({ request, env: import.meta.env })).not.toMatch(/ENS_ADAPTER_ADDRESS/);
   });
 });

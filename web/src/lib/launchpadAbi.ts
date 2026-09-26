@@ -1,10 +1,10 @@
 /**
- * Launchpad ABI generated from contracts/src/Launchpad.sol on
- * cursor/launchpad-ens-world-eec2 (PR #25).
+ * Launchpad ABI from contracts/src/Launchpad.sol at d34aff8 (PR #25).
  *
- * Constructor is (protocolFeeRecipient, worldSigner, ens). Uniswap addresses
- * are not constructor args on this ABI — graduation may add a one-time
- * setUniswap later. Launched has no deadline; read it from ENS text.
+ * Constructor ends at ens: (protocolFeeRecipient, worldSigner, ens).
+ * Uniswap addresses are not constructor args; graduation adds one-time
+ * setUniswap(poolManager, hook, locker). Launched has no deadline.
+ * The web never reads ENS_ADAPTER_ADDRESS — call launchpad.ens().
  */
 export const launchpadAbi = [
   {

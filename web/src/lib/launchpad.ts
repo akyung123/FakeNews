@@ -25,6 +25,26 @@ export function registerProphetWrite(input: RegisterProphetInput, address = cont
   };
 }
 
+/** Adapter address. Deploy uses ENS_ADAPTER_ADDRESS; the web calls this view. */
+export function ensAdapterRead(address = contracts.launchpad) {
+  if (!address) {
+    throw new Error("Launchpad address is not set");
+  }
+  return {
+    address,
+    abi: launchpadAbi,
+    functionName: "ens" as const,
+    args: [] as const,
+  };
+}
+
+export async function readEnsAdapter(
+  client: { readContract: (request: ReturnType<typeof ensAdapterRead>) => Promise<`0x${string}`> },
+  address = contracts.launchpad,
+): Promise<`0x${string}`> {
+  return client.readContract(ensAdapterRead(address));
+}
+
 /**
  * Screen 2 write. Missing launchpad address → no-op so mock mode still issues.
  * Label is not in the world/ signed payload (INTERFACE §3).

@@ -47,9 +47,14 @@ describe("Launchpad ABI from #25", () => {
     expect(ev.inputs.some((input) => input.name === "deadline")).toBe(false);
   });
 
-  it("does not take Uniswap addresses in the constructor and has no setUniswap yet", () => {
+  it("constructor ends at ens; setUniswap is not in this ABI (graduation PR)", () => {
     const ctor = entry("constructor");
     if (!ctor || ctor.type !== "constructor") throw new Error("missing constructor");
+    expect(ctor.inputs.map((input) => input.name)).toEqual([
+      "protocolFeeRecipient",
+      "worldSigner",
+      "ens",
+    ]);
     expect(ctor.inputs.some((input) => /pool|hook|locker|uniswap/i.test(input.name))).toBe(false);
     expect(launchpadAbi.some((item) => "name" in item && item.name === "setUniswap")).toBe(false);
   });
