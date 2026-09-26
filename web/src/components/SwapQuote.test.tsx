@@ -65,7 +65,7 @@ function renderSwap(quoteSwap: (input: { zeroForOne: boolean; amountIn: bigint }
       chain
       demo={false}
       chainId={11155111}
-      loadAuction={async () => snap}
+      loadAuction={async () => ({ ...snap })}
       quoteSwap={quoteSwap as never}
       writes={writes}
       readApprovals={async () => ({ erc20: 2n ** 200n, permit2Amount: 2n ** 159n, permit2Expiration: 2 ** 47 })}
@@ -121,5 +121,22 @@ describe("swap quote from the V4 Quoter", () => {
     expect(decoded.amountIn).toBe(parseEther("0.001"));
     expect(decoded.amountOutMinimum).toBe(990n * WAD);
     expect(decoded.poolKey).toMatchObject({ fee: 10_000, tickSpacing: 200 });
+  });
+});
+
+describe("quote after a swap", () => {
+  it("asks the Quoter again once the swap has landed and the panel reloaded", async () => {
+    const user = userEvent.setup();
+    const quoteSwap = vi.fn(async () => 1_000n * WAD);
+    renderSwap(quoteSwap, {
+      simulateContract: vi.fn(async () => ({})),
+      writeContract: vi.fn(async () => `0x${"ab".repeat(32)}` as const),
+      waitForTransactionReceipt: vi.fn(async () => ({ status: "success" })),
+    });
+    const buy = await screen.findByRole("button", { name: "Buy $BRANCHING-M" });
+    await waitFor(() => expect(buy).toBeEnabled());
+    const before = quoteSwap.mock.calls.length;
+    await user.click(buy);
+    await waitFor(() => expect(quoteSwap.mock.calls.length).toBeGreaterThan(before));
   });
 });

@@ -193,8 +193,9 @@ export function CcaTrade({
       clearTimeout(timer);
     };
     // swapAmountIn is derived from swapAmount; coin only matters for the demo curve.
+    // `snap` changes after every write's reload, so a swap that moved the pool re-quotes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showSwap, swapSide, swapAmount, mockSwap, token, snap?.hook, quoteSwap]);
+  }, [showSwap, swapSide, swapAmount, mockSwap, token, snap, quoteSwap]);
 
   // Sell approvals, read from the chain. null while unknown.
   const sellOnChain = showSwap && swapSide === "sell" && chain && writeTarget && !mockSwap;
