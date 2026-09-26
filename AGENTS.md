@@ -6,7 +6,7 @@ People and agents both start here. The human-oriented guide is [`CONTRIBUTING.md
 
 A launchpad that turns a one-line prophecy into a token. Buying raises the price and selling lowers it. When the curve supply sells out, liquidity moves into a Uniswap V4 pool and is locked.
 
-- **No judging.** No oracle, no True / False. The only status on screen is Departed (deadline passed).
+- **No judging.** No oracle, no True / False. The only status on screen is Departed (`now >= deadline`, computed by the UI; no on-chain status).
 - **The address book is the core feature.**
   - `ringo.prophecy.eth` → the prophet's wallet
   - `lingo-2028.ringo.prophecy.eth` → that prophecy's token
@@ -16,10 +16,10 @@ A launchpad that turns a one-line prophecy into a token. Buying raises the price
 
 | Path | Role | Check |
 |------|------|-------|
-| `contracts/` | Foundry: `Launchpad`, `ProphecyToken`, `ProphecyHook`, `LiquidityLocker` (currently a skeleton with older names) | `cd contracts && forge build && forge test` |
-| `web/` | Vite + React 19 + viem. Currently a prototype without a chain | `cd web && bun install && bun run build` |
-| `world/` (not yet) | World ID verification server | `cd world && bun test` |
-| `docs/` | Spec, decisions, interface, plan, notes | — |
+| `contracts/` | Foundry: `Launchpad`, `ProphecyToken`, ENS adapter, `ProphecyHook`, `LiquidityLocker` | `cd contracts && forge build && forge test` |
+| `web/` | Vite + React 19 + wagmi + viem. Prototype screens; Issue can send `registerProphet` | `cd web && bun install && bun run build` |
+| `world/` | World ID verification server | `cd world && bun test` |
+| `docs/` | PRD, spec, decisions, interface, plan, notes | — |
 
 ## Rules you must not break
 

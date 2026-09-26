@@ -17,13 +17,13 @@
 
 **Launch a prophecy. It starts trading the moment you say it.**
 
-You write one sentence about the future. That sentence becomes a token with its own readable name. Anyone who finds it plausible can buy it, and anyone can sell it.
+You write one sentence. That sentence becomes a token with its own readable name. Anyone can buy it, and anyone can sell it.
 
 ## 2. The idea in plain words
 
 A memecoin is a token that stands for a joke or a picture. People buy it because others are buying it. There is usually nothing behind it and nobody is on record as its author.
 
-Prophecy keeps the fun of a memecoin and swaps the picture for **a sentence about the future**, signed with **a name**:
+Prophecy keeps the fun of a memecoin and swaps the picture for **a one-line sentence**, signed with **a name**:
 
 > `ringo.prophecy.eth` says: *"Every hackathon badge is an ENS name by 2028."*
 > That prophecy is `badges-2028.ringo.prophecy.eth`, and you can buy it right now.
@@ -38,11 +38,11 @@ What Prophecy does **not** do: it never decides whether a prophecy came true. Th
 
 ## 3. The problem
 
-People want their opinions to carry weight. Today they have few ways to turn "I believe this" into something with real value:
+People want their opinions to carry weight. Today they have few ways to turn "I believe this" into a lasting public record:
 
 | Today | What goes wrong |
 |---|---|
-| Posting a bold take on social media | Posts can be edited or deleted. Nobody holds a stake in being early |
+| Posting a bold take on social media | Posts can be edited or deleted. There is no lasting authorship record |
 | Launching a memecoin | The coin means nothing and has no author on record. The creator can make a new wallet and start over |
 | Sharing a token | A token is a 42-character `0x…` address. Hard to read, easy to fake |
 | Prediction markets | Need a referee (an oracle) to decide the outcome. Slow, disputed and complicated |
@@ -59,15 +59,15 @@ Prophecy gives an opinion three things: **a permanent author**, **a readable nam
 What a prophet does **not** get:
 
 - **Free tokens.** A prophet starts with zero. They can buy first in the same step as issuing, at the same price as anyone else.
-- **Money for being right.** Fees come from people trading, not from the prophecy coming true. A popular wrong prophecy earns more than an ignored right one.
+- **Money for being right.** Fees come from people trading, not from the prophecy coming true. A popular wrong prophecy collects more fees than an ignored right one.
 - **Control over the sentence.** After issuing, the prophet cannot edit it either.
 
 ## 5. Who it is for
 
 | User | What they want | What they do |
 |---|---|---|
-| **Memecoin traders** | A new, fast thing to trade that is easy to find and share | Buy early, sell later, leave a one-line memo with each trade |
-| **People with strong opinions** (creators, founders, analysts, fans) | Make a bold public call and have it on record under their name | Verify once, get a prophet name, issue prophecies, earn fees when people trade them |
+| **Memecoin traders** | A new, fast thing to trade that is easy to find and share | Buy or sell, leave a one-line memo with each trade |
+| **People with strong opinions** (creators, founders, analysts, fans) | Make a bold public call and have it on record under their name | Verify once, get a prophet name, issue prophecies, collect fees when people trade them |
 | **Communities that rally around a shared belief** | A public place to put money behind what the group believes | Buy and hold a prophecy together, point others to it by name |
 
 > **Needs team feedback.** Two groups fit the third row naturally: **political communities** and **religious or cult-like groups**. Both are made of people who want their beliefs to carry weight, which is exactly what Prophecy offers. It is also a sensitive positioning, and we have not agreed on whether to name it publicly. Please comment on the PR.
@@ -81,8 +81,8 @@ Who is **not** a target right now:
 
 These are settled. Changing one means a new row in [`DECISIONS.md`](DECISIONS.md), agreed by a person.
 
-1. **No judging.** No oracle, no True / False, no payout. The only status the product shows is **Departed** (the deadline has passed). (#1, #9)
-2. **Written once, never edited.** The sentence and deadline live only in that prophecy's own ENS record, and nobody holds the permission to change them. (#5)
+1. **No judging.** No oracle, no True / False, no payout. The only status the product shows is **Departed**. The UI computes that as `now >= deadline`; there is no on-chain status. (#1, #9)
+2. **Written once, never edited.** The sentence and deadline live only in that prophecy's own ENS record, and nobody holds the permission to change them. `Launchpad.launch` takes a `deadline` argument and the ENS adapter writes it as the `deadline` text record (unix seconds). It is not stored in Launchpad storage or in the `Launched` event. (#5)
 3. **The name is the product.** `ringo.prophecy.eth` → the prophet's wallet. `badges-2028.ringo.prophecy.eth` → the prophecy's token. (#8)
 4. **One prophet name per person.** A human check (World ID) happens once, when you create your prophet name. Browsing and buying need no check. (#10)
 5. **Liquidity cannot be pulled.** When a prophecy sells out on the curve, its money moves into a Uniswap pool and is locked. Nobody can withdraw it; only trading fees come out. (#11)
@@ -104,15 +104,17 @@ Life of one prophecy, in five steps.
                  └─ buying raises the price, selling lowers it
                  └─ each trade can carry a one-line memo
 
-4a. Deadline   The deadline passes → the prophecy shows "Departed".
-                 └─ nothing is deleted; it can still be traded
+4a. Deadline   now >= deadline → the UI shows "Departed".
+                 └─ nothing is deleted; buy and sell do not read the deadline
 
 4b. Sold out   All tokens for sale on the curve are bought → "graduation".
                  └─ the money and the rest of the tokens move into a Uniswap pool
                  └─ that pool is locked; trading continues there
 ```
 
-4a and 4b are independent. A prophecy can depart without graduating, graduate before it departs, or both.
+4a and 4b are independent. A prophecy can depart without graduating, graduate before it departs, or both. Buy and sell keep working after the deadline; graduation is what blocks the curve.
+
+**On main today.** `launch(slug, prophecy, deadline, minTokensOut)` writes the deadline to ENS. The prophet page shows Departed from prototype data (`now >= deadline`). The list and detail screens do not show Departed or the deadline. The issue form collects a deadline but does not send `launch`; it still writes a prototype coin in `localStorage`.
 
 ### The numbers a teammate should know
 
@@ -120,12 +122,11 @@ All of these are demo-sized so people can see things happen during a live event.
 
 | What | Value | What it means for a user |
 |---|---|---|
-| Tokens per prophecy | 1,000,000,000 | About 79% are sold on the curve, about 21% go to the Uniswap pool at graduation |
+| Tokens per prophecy | 1,000,000,000 | 793.1 million sold on the curve, 206.9 million go to the Uniswap pool at graduation |
 | Money needed to graduate | **0.02 test ETH** | A handful of people can graduate a prophecy in one session |
-| A 0.001 test ETH buy at launch | about **16.6%** of the curve supply | The first buyers get a lot; later buyers pay more |
-| Price at graduation vs. launch | about **14.7×** | Early believers are rewarded if others follow |
+| A 0.001 test ETH buy at launch | about **16.6%** of the curve supply | The first 0.001 ETH buy takes that share; a later buy of the same size takes fewer tokens |
 | Fee on every curve trade | **1.25%** | 0.30% to the prophet, 0.95% to the protocol |
-| Fee after graduation | 1% Uniswap pool fee | Split the same way: about 24% to the prophet, 76% to the protocol |
+| Fee after graduation | 1% Uniswap pool fee | Split 24 : 76 (prophet : protocol) |
 
 **Why the price moves:** there is no order book. The price is set by a formula (a "bonding curve"): every buy leaves fewer tokens for sale, so the next token costs more. Every sell puts tokens back, so the price drops. The formula never runs out of tokens and never needs a referee.
 
@@ -133,9 +134,9 @@ All of these are demo-sized so people can see things happen during a live event.
 
 ### A visitor (no wallet needed to look)
 
-- See the list of prophecies: newest first, and top by market cap.
-- Open a prophecy by its name and read the sentence, deadline, price and recent trades with their memos.
-- Open a prophet's page and see everything they have issued, including departed prophecies.
+- See the list of prophecies: newest first, and top by market cap. **Not built on main:** the list does not show a Departed count.
+- Open a prophecy by its name and read the sentence, price and recent trades with their memos. **Not built on main:** the detail screen does not show the deadline or a Departed badge.
+- Open a prophet's page and see everything they have issued, including departed prophecies (prototype data; Departed is `now >= deadline`).
 
 ### A buyer (wallet, no World ID)
 
@@ -146,7 +147,7 @@ All of these are demo-sized so people can see things happen during a live event.
 ### A prophet (wallet and World ID)
 
 - Verify with World ID once and pick a prophet name (3–16 letters or digits). If verification is cancelled or fails, issuing stays off. Buying and browsing still work.
-- Issue a prophecy: a short name (slug), one sentence (up to 140 characters) and a deadline. Optionally buy first in the same step.
+- Issue a prophecy: a short name (slug), one sentence (up to 140 characters) and a deadline. Optionally buy first in the same step. **Not built on main:** the issue form collects a deadline and the issue button can turn on, but the app does not send `launch`.
 - Collect their fees at any time from the prophet page.
 - Edit display details such as the avatar. The sentence and deadline cannot be edited.
 
@@ -163,7 +164,7 @@ Four screens. Look: black background, desktop first, left sidebar, text only, bl
 | 3 | **Prophecy detail** | Found by name; buy and sell; recent trades with memos | True / False, odds, "probability" |
 | 4 | **Prophet page** | Wallet, prophecies held, departed prophecies next to the next one to buy, claimable fees, sell button | A plain balance screen with nothing to act on |
 
-Every sentence and deadline on screen is read from ENS. Nothing is typed into the app's code.
+**On main today.** Screen 4 shows Departed from prototype data. Screens 1 and 3 do not show Departed or the deadline. Helpers in `web/src/lib/ens.ts` can read `prophecy` and `deadline` text records; list, detail and prophet pages still use prototype data, not live ENS. Nothing in the app's code is the live sentence: sample copy lives in `web/src/lib/mock.ts` for the prototype only.
 
 ## 10. Example prophecies
 
@@ -186,15 +187,15 @@ Rules these follow (INTERFACE section 1): prophet names are 3–16 characters of
 ### In scope for the hackathon
 
 - Prophet names with World ID, one per person.
-- Issuing prophecies with a locked sentence and deadline.
-- Buy and sell on the bonding curve, with memos.
+- Issuing prophecies with a locked sentence and deadline (`Launchpad.launch` writes both to ENS). **Not built on main:** the web app does not send that `launch` yet.
+- Buy and sell on the bonding curve, with memos. **Not built on main:** the web app does not send real buy or sell transactions.
 - Graduation into a locked Uniswap V4 pool, with fees split to the prophet and the protocol.
-- The four screens, reading names and sentences from ENS on Sepolia.
+- The four screens. **On main:** issue can send `registerProphet`; list, detail and prophet pages still use prototype data. Reading live names and sentences from ENS on those screens is not built.
 - A 2–4 minute demo (SPEC "Demo"):
   1. Verification succeeds and a prophet name is created.
-  2. A sentence is issued and its name points to the token.
-  3. Another wallet buys by name, and selling lowers the price.
-  4. A departed prophecy sits under the name and the count shows "Departed 1".
+  2. A sentence is issued and its name points to the token. **Not built on main:** no `launch` transaction from the app.
+  3. Another wallet buys by name, and selling lowers the price. **Not built on main:** no on-chain buy or sell from the app.
+  4. A departed prophecy sits under the name. **On main:** the prophet page can show this from prototype data (`now >= deadline`). The list's "Departed 1" count is not built.
   5. Failure paths: a second wallet cannot issue, editing the sentence fails, cancelling verification blocks issuing.
 
 ### Later, if there is time
