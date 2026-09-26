@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolManager} from "v4-core/src/PoolManager.sol";
@@ -18,24 +16,21 @@ import {ProphecyHook} from "../src/uniswap/ProphecyHook.sol";
 import {HookMiner} from "../src/uniswap/HookMiner.sol";
 import {Graduation} from "../src/uniswap/Graduation.sol";
 import {LiquidityLocker} from "../src/uniswap/LiquidityLocker.sol";
+import {LaunchpadTestBase} from "./LaunchpadHelpers.sol";
 
-contract GraduationTest is Test {
+contract GraduationTest is LaunchpadTestBase {
     using StateLibrary for IPoolManager;
     using PoolIdLibrary for PoolKey;
 
     IPoolManager internal manager;
     ProphecyHook internal hook;
     LiquidityLocker internal locker;
-    Launchpad internal launchpad;
-
-    address internal prophet = address(0xA11CE);
-    address internal protocol = address(0xFEE);
 
     receive() external payable {}
 
     function setUp() public {
         manager = new PoolManager(address(this));
-        launchpad = new Launchpad(protocol, address(0x51C));
+        _deployLaunchpad();
         vm.deal(prophet, 10 ether);
 
         bytes memory ctorArgs = abi.encode(manager, address(this));
@@ -65,8 +60,7 @@ contract GraduationTest is Test {
     }
 
     function test_specGraduationReservesGapUnderLimit() public {
-        vm.prank(prophet);
-        address token = launchpad.launch("lingo-2028", "", 0, 0);
+        address token = _registerAndLaunch();
         vm.prank(prophet);
         launchpad.buy{value: 1 ether}(token, 0, "");
 
@@ -82,8 +76,7 @@ contract GraduationTest is Test {
     }
 
     function test_seedFullRangeAtVirtualReservePrice() public {
-        vm.prank(prophet);
-        address token = launchpad.launch("lingo-2028", "", 0, 0);
+        address token = _registerAndLaunch();
         vm.prank(prophet);
         launchpad.buy{value: 1 ether}(token, 0, "");
         (uint256 vEth, uint256 vToken, uint256 realEth,, bool complete) = launchpad.curve(token);

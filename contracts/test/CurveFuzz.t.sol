@@ -1,19 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-
 import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
+import {LaunchpadTestBase} from "./LaunchpadHelpers.sol";
 
-contract CurveFuzzTest is Test {
-    Launchpad internal launchpad;
-    address internal prophet = address(0xA11CE);
-
+contract CurveFuzzTest is LaunchpadTestBase {
     address[] internal traders;
 
     function setUp() public {
-        launchpad = new Launchpad(address(0xFEE), address(0x51C));
+        _deployLaunchpad();
         vm.deal(prophet, 100 ether);
         traders.push(address(0x101));
         traders.push(address(0x102));
@@ -24,8 +20,7 @@ contract CurveFuzzTest is Test {
     }
 
     function _launch() internal returns (address token) {
-        vm.prank(prophet);
-        token = launchpad.launch("lingo-2028", "", 0, 0);
+        return _registerAndLaunch();
     }
 
     function _assertSolvent(address token) internal view {
