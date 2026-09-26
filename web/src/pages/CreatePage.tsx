@@ -22,8 +22,11 @@ import {
   createLaunch,
   ethInputToWei,
   refreshCoinFromChain,
+  writeErrorMessage,
+  writePhaseCopy,
   WRITE_COPY,
   type LaunchInput,
+  type WritePhase,
 } from "../lib/writes";
 import {
   createWorldClient,
@@ -64,7 +67,7 @@ export function IssueScreen({
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
   onIssued,
   registerProphet = createRegisterProphet(),
-  launchProphecy = createLaunch(),
+  launchProphecy,
 }: IssueScreenProps) {
   const navigate = useNavigate();
   const returningProphet = Boolean(session.prophetLabel);
@@ -78,7 +81,9 @@ export function IssueScreen({
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
   const [registerStatus, setRegisterStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
   const [writeBusy, setWriteBusy] = useState(false);
+  const [writePhase, setWritePhase] = useState<WritePhase | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
+  const [writeSuccess, setWriteSuccess] = useState<string | null>(null);
 
   const deadlineUnix = fromDatetimeLocalValue(deadlineLocal);
   const nowSeconds = Math.floor(now / 1000);
@@ -94,7 +99,7 @@ export function IssueScreen({
   const registerBusy = registerStatus === "pending";
   const busy = registerBusy || writeBusy;
   const pending = writeBusy
-    ? WRITE_COPY.pending
+    ? writePhaseCopy(writePhase) ?? WRITE_COPY.pending
     : registerBusy
       ? ISSUE_COPY.registerPending
       : !returningProphet && worldStatus === "pending"
@@ -147,8 +152,13 @@ export function IssueScreen({
               }
             }
             setWriteBusy(true);
+            setWritePhase("wallet");
+            setWriteSuccess(null);
             try {
-              const token = await launchProphecy({
+              const runLaunch =
+                launchProphecy ??
+                ((input: LaunchInput) => createLaunch({ onPhase: setWritePhase })(input));
+              const token = await runLaunch({
                 slug,
                 prophecy: prophecy.trim(),
                 deadline: BigInt(deadlineUnix),
@@ -165,6 +175,7 @@ export function IssueScreen({
                 });
                 await refreshCoinFromChain(token, token).catch(() => undefined);
                 if (!returningProphet) storeProphetLabel(prophetLabel);
+                setWriteSuccess(WRITE_COPY.launchSuccess);
                 if (onIssued) onIssued(token);
                 else navigate(`/coin/${token}`);
                 return;
@@ -178,10 +189,11 @@ export function IssueScreen({
               if (!returningProphet) storeProphetLabel(prophetLabel);
               if (onIssued) onIssued(id);
               else navigate(`/coin/${id}`);
-            } catch {
-              setWriteError(WRITE_COPY.failed);
+            } catch (err) {
+              setWriteError(writeErrorMessage(err));
             } finally {
               setWriteBusy(false);
+              setWritePhase(null);
             }
           })();
         }}
@@ -273,6 +285,11 @@ export function IssueScreen({
         {registerStatus === "success" ? (
           <p className="up" data-testid="register-success">
             {ISSUE_COPY.registerSuccess}
+          </p>
+        ) : null}
+        {writeSuccess ? (
+          <p className="up" data-testid="write-success">
+            {writeSuccess}
           </p>
         ) : null}
         {error ? (

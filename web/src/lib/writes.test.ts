@@ -15,8 +15,10 @@ import {
   createSell,
   ethInputToWei,
   launchWrite,
+  LaunchedParseError,
   liveTokenAddress,
   minEthOutForSell,
+  minOutAfterSlippage,
   minTokensOutForBuy,
   sellWrite,
   tokenFromLaunchedReceipt,
@@ -74,8 +76,11 @@ function mocks(overrides: Partial<WriteOptions> = {}): WriteOptions & {
   const simulateContract = vi.fn(async (_c, request) => ({ request, result: undefined }));
   const writeContract = vi.fn(async () => HASH);
   const waitForTransactionReceipt = vi.fn(async () => ({ status: "success", logs: [] }));
-  const readContract = vi.fn(async (request: { functionName?: string }) => {
+  const readContract = vi.fn(async (...args: unknown[]) => {
+    const request = (args[1] ?? args[0]) as { functionName?: string };
     if (request.functionName === "allowance") return 0n;
+    if (request.functionName === "quoteBuy") return [100_000n, 1n] as const;
+    if (request.functionName === "quoteSell") return [50_000n, 1n] as const;
     if (request.functionName === "curve") return [0n, 0n, 0n, 0n, false] as const;
     if (request.functionName === "balanceOf") return 0n;
     return 0n;
@@ -93,12 +98,16 @@ function mocks(overrides: Partial<WriteOptions> = {}): WriteOptions & {
 }
 
 describe("slippage and deadline helpers", () => {
-  it("applies a 1% band and a 10-minute unix deadline", () => {
+  it("applies a 1% band that stays non-zero for a positive quote", () => {
     expect(applySlippage(10_000n)).toBe(9_900n);
+    expect(minOutAfterSlippage(10_000n)).toBe(9_900n);
+    expect(minOutAfterSlippage(10_000n)).toBeGreaterThan(0n);
+    expect(minOutAfterSlippage(1n)).toBe(1n);
     expect(minTokensOutForBuy(0n)).toBe(0n);
     const ethIn = parseEther("0.001");
     const raw = quoteBuyWei(toCurveWei({ sold: 0, ethRaised: 0 }), ethIn).tokensOut;
-    expect(minTokensOutForBuy(ethIn)).toBe(applySlippage(raw));
+    expect(minTokensOutForBuy(ethIn)).toBe(minOutAfterSlippage(raw));
+    expect(minTokensOutForBuy(ethIn)).toBeGreaterThan(0n);
     expect(minTokensOutForBuy(ethIn)).toBeLessThan(raw);
     const now = Date.parse("2026-09-26T00:00:00Z");
     expect(tradeDeadlineUnix(now)).toBe(BigInt(Math.floor(now / 1000) + TX_DEADLINE_SECONDS));
@@ -110,8 +119,18 @@ describe("slippage and deadline helpers", () => {
   });
 
   it("keeps designer write copy free of flagged wording", () => {
-    const text = `${WRITE_COPY.pending} ${WRITE_COPY.failed}`.toLowerCase();
-    expect(text).not.toMatch(/coin|profit|yield|prediction|true|false/);
+    const text = Object.values(WRITE_COPY).join(" ").toLowerCase();
+    expect(text).not.toMatch(/coin|profit|yield|prediction|true|false|%/);
+    expect(WRITE_COPY.pending).toBe("Confirm in your wallet.");
+    expect(WRITE_COPY.waiting).toBe("Waiting for Sepolia…");
+    expect(WRITE_COPY.launchSuccess).toBe("Token is live.");
+    expect(WRITE_COPY.tradeSuccess).toBe("Trade confirmed.");
+    expect(WRITE_COPY.claimSuccess).toBe("Fees claimed.");
+    expect(WRITE_COPY.failed).toBe("Transaction failed. Nothing was charged except gas. Try again.");
+    expect(WRITE_COPY.launchedMissing).toBe(
+      "Token launched, but we couldn't find its page. Check your wallet activity.",
+    );
+    expect(WRITE_COPY.approve).toBe("Approve tokens to sell");
   });
 });
 
@@ -136,6 +155,14 @@ describe("launch write", () => {
     });
     expect(fns.writeContract.mock.calls[0][1]).toMatchObject({ functionName: "launch" });
     expect(tokenFromLaunchedReceipt(launchedReceipt())).toBe(TOKEN);
+  });
+
+  it("throws LaunchedParseError when Launched is missing after a successful receipt", async () => {
+    const fns = mocks({
+      waitForTransactionReceipt: vi.fn(async () => ({ status: "success", logs: [] })),
+    });
+    await expect(createLaunch(fns)(launchInput)).rejects.toBeInstanceOf(LaunchedParseError);
+    expect(fns.writeContract).toHaveBeenCalledTimes(1);
   });
 
   it("throws on a reverted receipt", async () => {
@@ -179,12 +206,20 @@ describe("buy write", () => {
     expect(fns.simulateContract).toHaveBeenCalledTimes(1);
     expect(fns.writeContract).toHaveBeenCalledTimes(1);
     expect(fns.waitForTransactionReceipt).toHaveBeenCalledWith(wagmiConfig, { hash: HASH });
-    const request = buyWrite(input, MOCK_WORLD_LAUNCHPAD);
+    const minTokensOut = minOutAfterSlippage(100_000n);
+    expect(minTokensOut).toBeGreaterThan(0n);
+    const request = buyWrite(input, MOCK_WORLD_LAUNCHPAD, minTokensOut);
     expect(fns.simulateContract.mock.calls[0][1]).toMatchObject({
       functionName: "buy",
       args: request.args,
       value: input.ethIn,
     });
+    expect(
+      fns.readContract.mock.calls.some((call) => {
+        const req = (call[1] ?? call[0]) as { functionName?: string };
+        return req.functionName === "quoteBuy";
+      }),
+    ).toBe(true);
   });
 
   it("throws on a reverted receipt", async () => {
@@ -224,8 +259,10 @@ describe("sell write", () => {
 
   it("approves when allowance is short, then sells", async () => {
     const fns = mocks({
-      readContract: vi.fn(async (request: { functionName?: string }) => {
+      readContract: vi.fn(async (...args: unknown[]) => {
+        const request = (args[1] ?? args[0]) as { functionName?: string };
         if (request.functionName === "allowance") return 0n;
+        if (request.functionName === "quoteSell") return [50_000n, 1n] as const;
         return 0n;
       }),
     });
@@ -236,16 +273,23 @@ describe("sell write", () => {
       functionName: "approve",
       args: [MOCK_WORLD_LAUNCHPAD, input.tokensIn],
     });
+    const minEthOut = minOutAfterSlippage(50_000n);
+    expect(minEthOut).toBeGreaterThan(0n);
     expect(fns.simulateContract.mock.calls[1][1]).toMatchObject({
       functionName: "sell",
-      args: sellWrite(input, MOCK_WORLD_LAUNCHPAD).args,
+      args: sellWrite(input, MOCK_WORLD_LAUNCHPAD, minEthOut).args,
     });
     expect(minEthOutForSell(input.tokensIn, curve)).toBeGreaterThan(0n);
   });
 
   it("skips approve when allowance already covers the sell", async () => {
     const fns = mocks({
-      readContract: vi.fn(async () => input.tokensIn),
+      readContract: vi.fn(async (...args: unknown[]) => {
+        const request = (args[1] ?? args[0]) as { functionName?: string };
+        if (request.functionName === "allowance") return input.tokensIn;
+        if (request.functionName === "quoteSell") return [50_000n, 1n] as const;
+        return 0n;
+      }),
     });
     expect(await createSell(fns)(input)).toBe(true);
     expect(fns.simulateContract).toHaveBeenCalledTimes(1);
@@ -254,7 +298,12 @@ describe("sell write", () => {
 
   it("throws on a reverted sell receipt", async () => {
     const fns = mocks({
-      readContract: vi.fn(async () => input.tokensIn),
+      readContract: vi.fn(async (...args: unknown[]) => {
+        const request = (args[1] ?? args[0]) as { functionName?: string };
+        if (request.functionName === "allowance") return input.tokensIn;
+        if (request.functionName === "quoteSell") return [50_000n, 1n] as const;
+        return 0n;
+      }),
       waitForTransactionReceipt: vi.fn(async () => ({ status: "reverted" })),
     });
     await expect(createSell(fns)(input)).rejects.toBeInstanceOf(TransactionRevertedError);
@@ -262,7 +311,12 @@ describe("sell write", () => {
 
   it("does not send sell when simulation fails", async () => {
     const fns = mocks({
-      readContract: vi.fn(async () => input.tokensIn),
+      readContract: vi.fn(async (...args: unknown[]) => {
+        const request = (args[1] ?? args[0]) as { functionName?: string };
+        if (request.functionName === "allowance") return input.tokensIn;
+        if (request.functionName === "quoteSell") return [50_000n, 1n] as const;
+        return 0n;
+      }),
       simulateContract: vi.fn(async () => {
         throw new Error("ExceedsSold");
       }),

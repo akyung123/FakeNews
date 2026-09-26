@@ -9,9 +9,9 @@ import {
   type ProphetPageData,
   type ProphetProphecy,
 } from "../lib/prophetData";
-import { createClaim, WRITE_COPY } from "../lib/writes";
+import { createClaim, writeErrorMessage, writePhaseCopy, WRITE_COPY, type WritePhase } from "../lib/writes";
 
-export function ProphetPage({ claimFee = createClaim() }: { claimFee?: () => Promise<unknown> } = {}) {
+export function ProphetPage({ claimFee }: { claimFee?: () => Promise<unknown> } = {}) {
   const { name = "" } = useParams();
   const data = getProphetPage(name);
   if (!data) {
@@ -35,12 +35,13 @@ function ProphetView({
   claimFee,
 }: {
   data: ProphetPageData;
-  claimFee: () => Promise<unknown>;
+  claimFee?: () => Promise<unknown>;
 }) {
   const departed = data.prophecies.filter((p) => p.departed);
   const nextBuy = data.prophecies.find((p) => !p.departed);
   const [claimed, setClaimed] = useState(false);
   const [pending, setPending] = useState(false);
+  const [phase, setPhase] = useState<WritePhase | null>(null);
   const [error, setError] = useState<string | null>(null);
   const feeWei = claimed ? 0n : data.claimableFeeWei;
 
@@ -71,20 +72,26 @@ function ProphetView({
           onClick={() => {
             void (async () => {
               setPending(true);
+              setPhase("wallet");
               setError(null);
               try {
-                await claimFee();
+                await (claimFee ?? createClaim({ onPhase: setPhase }))();
                 setClaimed(true);
-              } catch {
-                setError(WRITE_COPY.failed);
+              } catch (err) {
+                setError(writeErrorMessage(err));
               } finally {
                 setPending(false);
+                setPhase(null);
               }
             })();
           }}
         >
-          {claimed ? "Claimed" : "Claim fees"}
+          {claimed ? WRITE_COPY.claimSuccess : "Claim fees"}
         </button>
+        {pending && writePhaseCopy(phase) ? (
+          <p className="banner-lock">{writePhaseCopy(phase)}</p>
+        ) : null}
+        {claimed ? <p className="up">{WRITE_COPY.claimSuccess}</p> : null}
         {error ? (
           <p className="banner-error" role="alert">
             {error}

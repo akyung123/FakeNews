@@ -14,7 +14,7 @@ import { launchpadAbi } from "./launchpadAbi";
 import { actions } from "./store";
 import { wagmiConfig } from "./wagmi";
 
-/** 1% band under the local curve quote. */
+/** 1% band under the contract quote (INTERFACE quoteBuy / quoteSell). */
 export const SLIPPAGE_BPS = 100n;
 export const BPS_DENOM = 10_000n;
 
@@ -23,14 +23,45 @@ export const TX_DEADLINE_SECONDS = 10 * 60;
 
 export const WRITE_COPY = {
   pending: "Confirm in your wallet.",
-  failed: "The transaction did not go through. Please try again.",
+  waiting: "Waiting for Sepolia…",
+  launchSuccess: "Token is live.",
+  tradeSuccess: "Trade confirmed.",
+  claimSuccess: "Fees claimed.",
+  failed: "Transaction failed. Nothing was charged except gas. Try again.",
+  launchedMissing: "Token launched, but we couldn't find its page. Check your wallet activity.",
+  approve: "Approve tokens to sell",
 } as const;
+
+export type WritePhase = "wallet" | "waiting" | "approve";
 
 export class TransactionRevertedError extends Error {
   constructor() {
-    super("Transaction failed");
+    super(WRITE_COPY.failed);
     this.name = "TransactionRevertedError";
   }
+}
+
+export class LaunchedParseError extends Error {
+  constructor() {
+    super(WRITE_COPY.launchedMissing);
+    this.name = "LaunchedParseError";
+  }
+}
+
+export function isLaunchedParseError(error: unknown): boolean {
+  return error instanceof LaunchedParseError || (error instanceof Error && error.name === "LaunchedParseError");
+}
+
+export function writeErrorMessage(error: unknown): string {
+  if (isLaunchedParseError(error)) return WRITE_COPY.launchedMissing;
+  return WRITE_COPY.failed;
+}
+
+export function writePhaseCopy(phase: WritePhase | null): string | null {
+  if (phase === "approve") return WRITE_COPY.approve;
+  if (phase === "waiting") return WRITE_COPY.waiting;
+  if (phase === "wallet") return WRITE_COPY.pending;
+  return null;
 }
 
 export type WriteReceipt = {
@@ -63,6 +94,7 @@ export type WriteOptions = {
     config: typeof wagmiConfig,
     args: { address: Address },
   ) => Promise<bigint | { value: bigint }>;
+  onPhase?: (phase: WritePhase) => void;
 };
 
 export type LaunchInput = {
@@ -77,6 +109,7 @@ export type BuyInput = {
   ethIn: bigint;
   memo?: string;
   curve?: CurveState;
+  onPhase?: (phase: WritePhase) => void;
 };
 
 export type SellInput = {
@@ -85,11 +118,19 @@ export type SellInput = {
   memo?: string;
   curve?: CurveState;
   account?: Address;
+  onPhase?: (phase: WritePhase) => void;
 };
 
 export function applySlippage(quoted: bigint, bps = SLIPPAGE_BPS): bigint {
   if (quoted === 0n) return 0n;
   return (quoted * (BPS_DENOM - bps)) / BPS_DENOM;
+}
+
+/** Quote minus 1%. Positive quotes never collapse to 0. */
+export function minOutAfterSlippage(quoted: bigint, bps = SLIPPAGE_BPS): bigint {
+  if (quoted === 0n) return 0n;
+  const slipped = applySlippage(quoted, bps);
+  return slipped === 0n ? 1n : slipped;
 }
 
 export function tradeDeadlineUnix(nowMs = Date.now()): bigint {
@@ -104,12 +145,12 @@ export function ethInputToWei(value: string | number): bigint {
 
 export function minTokensOutForBuy(ethIn: bigint, curve: CurveState = { sold: 0, ethRaised: 0 }): bigint {
   if (ethIn === 0n) return 0n;
-  return applySlippage(quoteBuyWei(toCurveWei(curve), ethIn).tokensOut);
+  return minOutAfterSlippage(quoteBuyWei(toCurveWei(curve), ethIn).tokensOut);
 }
 
 export function minEthOutForSell(tokensIn: bigint, curve: CurveState): bigint {
   if (tokensIn === 0n) return 0n;
-  return applySlippage(quoteSellWei(toCurveWei(curve), tokensIn).ethPayout);
+  return minOutAfterSlippage(quoteSellWei(toCurveWei(curve), tokensIn).ethPayout);
 }
 
 /** Only address-id coins (a just-launched token) go on chain. Mock ids stay local. */
@@ -130,27 +171,22 @@ export function launchWrite(input: LaunchInput, address: Address) {
   };
 }
 
-export function buyWrite(input: BuyInput, address: Address) {
+export function buyWrite(input: BuyInput, address: Address, minTokensOut: bigint) {
   return {
     address,
     abi: launchpadAbi,
     functionName: "buy" as const,
-    args: [input.token, minTokensOutForBuy(input.ethIn, input.curve), input.memo ?? ""] as const,
+    args: [input.token, minTokensOut, input.memo ?? ""] as const,
     value: input.ethIn,
   };
 }
 
-export function sellWrite(input: SellInput, address: Address) {
+export function sellWrite(input: SellInput, address: Address, minEthOut: bigint) {
   return {
     address,
     abi: launchpadAbi,
     functionName: "sell" as const,
-    args: [
-      input.token,
-      input.tokensIn,
-      minEthOutForSell(input.tokensIn, input.curve ?? { sold: 0, ethRaised: 0 }),
-      input.memo ?? "",
-    ] as const,
+    args: [input.token, input.tokensIn, minEthOut, input.memo ?? ""] as const,
   };
 }
 
@@ -173,14 +209,19 @@ export function approveWrite(token: Address, spender: Address, amount: bigint) {
 }
 
 export function tokenFromLaunchedReceipt(receipt: WriteReceipt): Address {
-  const parsed = parseEventLogs({
-    abi: launchpadAbi,
-    eventName: "Launched",
-    logs: (receipt.logs ?? []) as never,
-  });
-  const token = parsed[0]?.args?.token;
-  if (!token) throw new Error("Launched event missing");
-  return token;
+  try {
+    const parsed = parseEventLogs({
+      abi: launchpadAbi,
+      eventName: "Launched",
+      logs: (receipt.logs ?? []) as never,
+    });
+    const token = parsed[0]?.args?.token;
+    if (!token) throw new LaunchedParseError();
+    return token;
+  } catch (error) {
+    if (error instanceof LaunchedParseError) throw error;
+    throw new LaunchedParseError();
+  }
 }
 
 function resolveAddress(options: WriteOptions): Address | undefined {
@@ -198,16 +239,75 @@ function clients(options: WriteOptions) {
   };
 }
 
+function emitPhase(options: WriteOptions, extra: { onPhase?: (phase: WritePhase) => void } | undefined, phase: WritePhase) {
+  extra?.onPhase?.(phase);
+  options.onPhase?.(phase);
+}
+
 async function sendWrite(
   request: Record<string, unknown>,
   options: WriteOptions,
+  phase: "wallet" | "approve" = "wallet",
+  extra?: { onPhase?: (phase: WritePhase) => void },
 ): Promise<WriteReceipt> {
   const { simulate, write, wait } = clients(options);
+  emitPhase(options, extra, phase);
   const simulated = await simulate(wagmiConfig, request);
   const hash = await write(wagmiConfig, simulated.request);
+  emitPhase(options, extra, "waiting");
   const receipt = await wait(wagmiConfig, { hash });
   if (receipt.status !== "success") throw new TransactionRevertedError();
   return receipt;
+}
+
+export async function readQuoteBuy(
+  token: Address,
+  ethIn: bigint,
+  options: WriteOptions = {},
+  fallback?: CurveState,
+): Promise<bigint> {
+  const address = resolveAddress(options);
+  if (address) {
+    try {
+      const { read } = clients(options);
+      const result = (await read(wagmiConfig, {
+        address,
+        abi: launchpadAbi,
+        functionName: "quoteBuy",
+        args: [token, ethIn],
+      })) as readonly [bigint, bigint];
+      return result[0];
+    } catch {
+      // fall through to the local curve quote
+    }
+  }
+  if (!fallback) return 0n;
+  return quoteBuyWei(toCurveWei(fallback), ethIn).tokensOut;
+}
+
+export async function readQuoteSell(
+  token: Address,
+  tokensIn: bigint,
+  options: WriteOptions = {},
+  fallback?: CurveState,
+): Promise<bigint> {
+  const address = resolveAddress(options);
+  if (address) {
+    try {
+      const { read } = clients(options);
+      const result = (await read(wagmiConfig, {
+        address,
+        abi: launchpadAbi,
+        functionName: "quoteSell",
+        args: [token, tokensIn],
+      })) as readonly [bigint, bigint];
+      return result[0];
+    } catch {
+      // fall through to the local curve quote
+    }
+  }
+  if (!fallback) return 0n;
+  return quoteSellWei(toCurveWei(fallback), tokensIn).ethPayout;
 }
 
 export function createLaunch(
@@ -225,7 +325,14 @@ export function createBuy(options: WriteOptions = {}): (input: BuyInput) => Prom
   const address = resolveAddress(options);
   return async (input) => {
     if (!address) return false;
-    await sendWrite(buyWrite(input, address) as unknown as Record<string, unknown>, options);
+    const quoted = await readQuoteBuy(input.token, input.ethIn, options, input.curve);
+    const minTokensOut = minOutAfterSlippage(quoted);
+    await sendWrite(
+      buyWrite(input, address, minTokensOut) as unknown as Record<string, unknown>,
+      options,
+      "wallet",
+      input,
+    );
     return true;
   };
 }
@@ -238,6 +345,9 @@ export function createSell(options: WriteOptions = {}): (input: SellInput) => Pr
     const owner = input.account ?? accountOf().address;
     if (!owner) throw new Error("Connect a wallet");
 
+    const quoted = await readQuoteSell(input.token, input.tokensIn, options, input.curve);
+    const minEthOut = minOutAfterSlippage(quoted);
+
     const allowance = (await read(wagmiConfig, {
       address: input.token,
       abi: erc20Abi,
@@ -246,10 +356,20 @@ export function createSell(options: WriteOptions = {}): (input: SellInput) => Pr
     })) as bigint;
 
     if (allowance < input.tokensIn) {
-      await sendWrite(approveWrite(input.token, address, input.tokensIn) as unknown as Record<string, unknown>, options);
+      await sendWrite(
+        approveWrite(input.token, address, input.tokensIn) as unknown as Record<string, unknown>,
+        options,
+        "approve",
+        input,
+      );
     }
 
-    await sendWrite(sellWrite(input, address) as unknown as Record<string, unknown>, options);
+    await sendWrite(
+      sellWrite(input, address, minEthOut) as unknown as Record<string, unknown>,
+      options,
+      "wallet",
+      input,
+    );
     return true;
   };
 }

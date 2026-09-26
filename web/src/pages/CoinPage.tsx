@@ -22,9 +22,12 @@ import {
   ethInputToWei,
   liveTokenAddress,
   refreshCoinFromChain,
+  writeErrorMessage,
+  writePhaseCopy,
   WRITE_COPY,
   type BuyInput,
   type SellInput,
+  type WritePhase,
 } from "../lib/writes";
 
 export type CoinPageProps = {
@@ -134,7 +137,9 @@ function TradeBox({
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("0.001");
   const [pending, setPending] = useState(false);
+  const [phase, setPhase] = useState<WritePhase | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const value = Number(amount) || 0;
   const closed = graduated(coin);
 
@@ -153,7 +158,9 @@ function TradeBox({
     }
     void (async () => {
       setPending(true);
+      setPhase("wallet");
       setError(null);
+      setSuccess(null);
       try {
         if (side === "buy") {
           const sent = await sendBuy({
@@ -161,6 +168,7 @@ function TradeBox({
             ethIn: ethInputToWei(value),
             memo: "",
             curve: coin,
+            onPhase: setPhase,
           });
           if (!sent) actions.buy(coin.id, value);
         } else {
@@ -170,14 +178,17 @@ function TradeBox({
             tokensIn,
             memo: "",
             curve: coin,
+            onPhase: setPhase,
           });
           if (!sent) actions.sell(coin.id, sellTokens);
         }
         await refreshCoinFromChain(coin.id, token).catch(() => undefined);
-      } catch {
-        setError(WRITE_COPY.failed);
+        setSuccess(WRITE_COPY.tradeSuccess);
+      } catch (err) {
+        setError(writeErrorMessage(err));
       } finally {
         setPending(false);
+        setPhase(null);
       }
     })();
   }
@@ -208,6 +219,10 @@ function TradeBox({
           ? `You get ≈ ${tokens(buyQuote.tokens)} $${coin.ticker}`
           : `You get ≈ ${eth(sellQuote, 4)}`}
       </p>
+      {pending && writePhaseCopy(phase) ? (
+        <p className="banner-lock">{writePhaseCopy(phase)}</p>
+      ) : null}
+      {success ? <p className="up">{success}</p> : null}
       {error ? (
         <p className="banner-error" role="alert">
           {error}
@@ -219,7 +234,13 @@ function TradeBox({
         disabled={pending || closed || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
         onClick={submit}
       >
-        {closed ? "Curve sold out" : side === "buy" ? `Buy $${coin.ticker}` : `Sell $${coin.ticker}`}
+        {pending && phase === "approve"
+          ? WRITE_COPY.approve
+          : closed
+            ? "Curve sold out"
+            : side === "buy"
+              ? `Buy $${coin.ticker}`
+              : `Sell $${coin.ticker}`}
       </button>
       <p className="faint small">Cash {eth(balance)}</p>
     </section>

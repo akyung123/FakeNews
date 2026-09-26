@@ -6,6 +6,7 @@ import { Web3Provider } from "./providers/Web3Provider";
 import { gwei, mcap } from "./lib/format";
 import { ISSUE_COPY } from "./lib/issue";
 import { SEED_EVENTS } from "./lib/mock";
+import { WRITE_COPY } from "./lib/writes";
 
 const NEW_MEMOS = [
   "I've met this router before.",
@@ -164,6 +165,26 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(create).toContain("It becomes a token.");
     expect(create).not.toContain("Confirm the prophet name in your wallet.");
     expect(create).not.toContain("Prophet name is on Sepolia.");
+    assertRemoved(create);
+  });
+
+  test("live write copy is the designer sentences in ETH, with no coin or outlook wording", () => {
+    expect(WRITE_COPY.pending).toBe("Confirm in your wallet.");
+    expect(WRITE_COPY.waiting).toBe("Waiting for Sepolia…");
+    expect(WRITE_COPY.launchSuccess).toBe("Token is live.");
+    expect(WRITE_COPY.tradeSuccess).toBe("Trade confirmed.");
+    expect(WRITE_COPY.claimSuccess).toBe("Fees claimed.");
+    expect(WRITE_COPY.failed).toBe("Transaction failed. Nothing was charged except gas. Try again.");
+    expect(WRITE_COPY.launchedMissing).toBe(
+      "Token launched, but we couldn't find its page. Check your wallet activity.",
+    );
+    expect(WRITE_COPY.approve).toBe("Approve tokens to sell");
+    const text = Object.values(WRITE_COPY).join(" ");
+    expect(text.toLowerCase()).not.toMatch(/coin|profit|yield|prediction|outlook/);
+    expect(text).not.toContain("%");
+    const create = renderApp("/create");
+    expect(create).toContain("It becomes a token.");
+    expect(create).not.toContain(WRITE_COPY.failed);
     assertRemoved(create);
   });
 

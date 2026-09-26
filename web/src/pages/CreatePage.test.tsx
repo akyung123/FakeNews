@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "../lib/issue";
 import type { RegisterProphetInput } from "../lib/launchpad";
-import { WRITE_COPY, type LaunchInput } from "../lib/writes";
+import { LaunchedParseError, WRITE_COPY, type LaunchInput } from "../lib/writes";
 import { MOCK_ISSUE_SESSION, MOCK_RETURNING_SESSION, MOCK_WORLD_HEALTH, MOCK_RP_CONTEXT_RESPONSE, MOCK_WORLD_VERIFY } from "../lib/mock";
 import { WorldClientError, createWorldClient, type WorldClient } from "../lib/world";
 import { IssueScreen } from "./CreatePage";
@@ -305,6 +305,25 @@ describe("Screen 2 button gating", () => {
     await fillReturningForm(user);
     await user.click(launchButton());
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(WRITE_COPY.failed));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Transaction failed. Nothing was charged except gas. Try again.",
+    );
+    expect(issued).toEqual([]);
+    expect(launchButton()).toBeEnabled();
+  });
+
+  it("shows the launched-missing banner and does not navigate when Launched cannot be parsed", async () => {
+    const user = userEvent.setup();
+    const issued: string[] = [];
+    renderIssue(MOCK_RETURNING_SESSION, {
+      launchProphecy: async () => {
+        throw new LaunchedParseError();
+      },
+      onIssued: (id) => issued.push(id),
+    });
+    await fillReturningForm(user);
+    await user.click(launchButton());
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(WRITE_COPY.launchedMissing));
     expect(issued).toEqual([]);
     expect(launchButton()).toBeEnabled();
   });
@@ -328,6 +347,7 @@ describe("Screen 2 button gating", () => {
     expect(seen?.prophecy).toBe("Coffee lasts until the last pitch");
     expect(seen?.deadline).toBeGreaterThan(0n);
     expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByTestId("write-success")).toHaveTextContent(WRITE_COPY.launchSuccess);
   });
 
   it("skips World ID for a returning prophet and enables Issue once the form is valid", async () => {
