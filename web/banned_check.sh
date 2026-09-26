@@ -16,6 +16,9 @@ for path in src.rglob("*"):
         continue
     if path.suffix not in {".ts", ".tsx", ".css", ".html"}:
         continue
+    # Main's UTF-8 one-character tests use Hangul as a 3-byte fixture.
+    if path.name.endswith(".test.ts") or path.name.endswith(".test.tsx"):
+        continue
     text = path.read_text(encoding="utf-8")
     if any("\uac00" <= ch <= "\ud7af" for ch in text):
         bad.append(str(path))

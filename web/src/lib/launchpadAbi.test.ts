@@ -5,7 +5,7 @@ function entry(type: string, name?: string) {
   return launchpadAbi.find((item) => item.type === type && (!name || ("name" in item && item.name === name)));
 }
 
-describe("Launchpad ABI from #25", () => {
+describe("Launchpad ABI from #26", () => {
   it("constructor is (protocolFeeRecipient, worldSigner, ens)", () => {
     const ctor = entry("constructor");
     expect(ctor).toBeDefined();
@@ -15,6 +15,14 @@ describe("Launchpad ABI from #25", () => {
       ["worldSigner", "address"],
       ["ens", "address"],
     ]);
+  });
+
+  it("exposes creatorFeeOf(wallet) → uint256", () => {
+    const fn = entry("function", "creatorFeeOf");
+    if (!fn || fn.type !== "function") throw new Error("missing creatorFeeOf");
+    expect(fn.stateMutability).toBe("view");
+    expect(fn.inputs.map((input) => [input.name, input.type])).toEqual([["wallet", "address"]]);
+    expect(fn.outputs.map((output) => output.type)).toEqual(["uint256"]);
   });
 
   it("exposes ens() and prophetOf(wallet) → label", () => {
@@ -47,7 +55,47 @@ describe("Launchpad ABI from #25", () => {
     expect(ev.inputs.some((input) => input.name === "deadline")).toBe(false);
   });
 
-  it("constructor ends at ens; setUniswap is not in this ABI (graduation PR)", () => {
+  it("includes the seven write-facing custom errors for revert decoding", () => {
+    const names = launchpadAbi.filter((item) => item.type === "error").map((item) => item.name);
+    const writeFacing = [
+      "NullifierUsed",
+      "LabelTaken",
+      "AlreadyProphet",
+      "SlugTaken",
+      "Slippage",
+      "CurveComplete",
+      "ZeroAmount",
+    ] as const;
+    expect(writeFacing).toHaveLength(7);
+    expect(writeFacing).toEqual([
+      "NullifierUsed",
+      "LabelTaken",
+      "AlreadyProphet",
+      "SlugTaken",
+      "Slippage",
+      "CurveComplete",
+      "ZeroAmount",
+    ]);
+    for (const name of writeFacing) {
+      expect(names).toContain(name);
+    }
+    for (const extra of [
+      "InvalidSignature",
+      "NotProphet",
+      "MemoTooLong",
+      "BadProphecy",
+      "BadSlug",
+      "BadLabel",
+      "UnexpectedEth",
+      "NotDeployer",
+      "UniswapAlreadySet",
+      "UniswapNotSet",
+    ]) {
+      expect(names).toContain(extra);
+    }
+  });
+
+  it("constructor ends at ens; setUniswap is a deployer-only add-on", () => {
     const ctor = entry("constructor");
     if (!ctor || ctor.type !== "constructor") throw new Error("missing constructor");
     expect(ctor.inputs.map((input) => input.name)).toEqual([
@@ -56,6 +104,41 @@ describe("Launchpad ABI from #25", () => {
       "ens",
     ]);
     expect(ctor.inputs.some((input) => /pool|hook|locker|uniswap/i.test(input.name))).toBe(false);
-    expect(launchpadAbi.some((item) => "name" in item && item.name === "setUniswap")).toBe(false);
+    const setUniswap = entry("function", "setUniswap");
+    if (!setUniswap || setUniswap.type !== "function") throw new Error("missing setUniswap");
+    expect(setUniswap.inputs.map((input) => [input.name, input.type])).toEqual([
+      ["poolManager", "address"],
+      ["hook", "address"],
+      ["locker", "address"],
+    ]);
+  });
+
+  it("curve returns complete; Graduated carries poolId", () => {
+    const curve = entry("function", "curve");
+    if (!curve || curve.type !== "function") throw new Error("missing curve");
+    expect(curve.outputs.map((output) => "name" in output && output.name)).toEqual([
+      "vEth",
+      "vToken",
+      "realEth",
+      "sold",
+      "complete",
+    ]);
+    expect(launchpadAbi.some((item) => "name" in item && item.name === "getState")).toBe(false);
+
+    const ev = entry("event", "Graduated");
+    if (!ev || ev.type !== "event") throw new Error("missing Graduated");
+    expect(ev.inputs.map((input) => input.name)).toEqual([
+      "token",
+      "poolId",
+      "ethToPool",
+      "tokensToPool",
+      "sqrtPriceX96",
+      "fee",
+      "tickSpacing",
+      "hooks",
+    ]);
+    const poolId = ev.inputs.find((input) => input.name === "poolId");
+    expect(poolId?.indexed).toBe(true);
+    expect(poolId?.type).toBe("bytes32");
   });
 });

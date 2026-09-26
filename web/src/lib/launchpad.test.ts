@@ -3,12 +3,17 @@ import { readLaunchpadDeployBlock, webEnv } from "./env";
 import { MOCK_WORLD_LAUNCHPAD, MOCK_WORLD_VERIFY } from "./mock";
 import {
   assertSuccessfulReceipt,
+  createReadCreatorFee,
+  createReadProphetOf,
   createRegisterProphet,
+  creatorFeeOfRead,
+  curveRead,
+  ensAdapterRead,
   fetchLaunchedLogs,
   LAUNCHED_LOOKBACK_BLOCKS,
   launchedFromBlock,
   launchedLogsQuery,
-  ensAdapterRead,
+  prophetOfRead,
   readEnsAdapter,
   registerProphetArgs,
   registerProphetWrite,
@@ -16,6 +21,44 @@ import {
 } from "./launchpad";
 import { launchpadAbi } from "./launchpadAbi";
 import { wagmiConfig } from "./wagmi";
+
+describe("creatorFeeOf lookup", () => {
+  it("reads creatorFeeOf(wallet) → uint256 and returns 0 when unset", async () => {
+    const wallet = "0x1111111111111111111111111111111111111111" as const;
+    const read = vi.fn(async () => 1_200_000_000_000_000n);
+    const lookup = createReadCreatorFee({ address: MOCK_WORLD_LAUNCHPAD, readContract: read });
+    await expect(lookup(wallet)).resolves.toBe(1_200_000_000_000_000n);
+    expect(read).toHaveBeenCalledWith(wagmiConfig, creatorFeeOfRead(wallet, MOCK_WORLD_LAUNCHPAD));
+    expect(creatorFeeOfRead(wallet, MOCK_WORLD_LAUNCHPAD)).toMatchObject({
+      functionName: "creatorFeeOf",
+      args: [wallet],
+    });
+    const empty = createReadCreatorFee({
+      address: MOCK_WORLD_LAUNCHPAD,
+      readContract: async () => 0n,
+    });
+    await expect(empty(wallet)).resolves.toBe(0n);
+    const missing = createReadCreatorFee({ address: undefined });
+    await expect(missing(wallet)).resolves.toBe(0n);
+  });
+});
+
+describe("prophetOf lookup", () => {
+  it("returns the on-chain label and an empty string when unset", async () => {
+    const wallet = "0x1111111111111111111111111111111111111111" as const;
+    const read = vi.fn(async () => "ringo");
+    const lookup = createReadProphetOf({ address: MOCK_WORLD_LAUNCHPAD, readContract: read });
+    await expect(lookup(wallet)).resolves.toBe("ringo");
+    expect(read).toHaveBeenCalledWith(wagmiConfig, prophetOfRead(wallet, MOCK_WORLD_LAUNCHPAD));
+    const empty = createReadProphetOf({
+      address: MOCK_WORLD_LAUNCHPAD,
+      readContract: async () => "",
+    });
+    await expect(empty(wallet)).resolves.toBe("");
+    const missing = createReadProphetOf({ address: undefined });
+    await expect(missing(wallet)).resolves.toBe("");
+  });
+});
 
 describe("registerProphet write shape", () => {
   const input: RegisterProphetInput = {
@@ -160,6 +203,15 @@ describe("registerProphet write shape", () => {
     expect(seen).toEqual([ensAdapterRead(MOCK_WORLD_LAUNCHPAD)]);
     expect(webEnv).not.toHaveProperty("ensAdapterAddress");
     expect(Object.keys(webEnv).join(",")).not.toMatch(/ENS_ADAPTER/);
+  });
+
+  it("reads curve(token) for the complete flag", () => {
+    const token = "0xa555555555555555555555555555555555555555" as const;
+    const request = curveRead(token, MOCK_WORLD_LAUNCHPAD);
+    expect(request.functionName).toBe("curve");
+    expect(request.args).toEqual([token]);
+    expect(request.abi).toBe(launchpadAbi);
+    expect(launchpadAbi.some((item) => "name" in item && item.name === "getState")).toBe(false);
   });
 });
 

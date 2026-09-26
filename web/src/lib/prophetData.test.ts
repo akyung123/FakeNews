@@ -1,15 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import { MOCK_PARENT_NAME, MOCK_PROPHECIES, MOCK_PROPHETS } from "./mock";
 import {
+  canClaimCreatorFee,
   curveProgress,
   getProphecyByName,
   getProphetPage,
   isDeparted,
+  isMockProphetRecord,
   normalizeProphetLabel,
   prophecyDetailPath,
   prophecyEnsName,
   prophecyTradeLabel,
   prophetEnsName,
+  prophetPageFromChain,
   prototypeCoinFromName,
 } from "./prophetData";
 
@@ -64,11 +67,12 @@ describe("getProphetPage", () => {
     const open = page.prophecies.filter((p) => !p.departed);
     expect(page.departedCount).toBe(2);
     expect(departed.map((p) => p.slug).sort()).toEqual(["last-talk", "two-min"]);
-    expect(open.map((p) => p.slug).sort()).toEqual(["badges-2028", "curve-out"]);
-    const graduated = page.prophecies.find((p) => p.complete)!;
-    expect(graduated.slug).toBe("two-min");
-    expect(graduated.departed).toBe(true);
-    expect(graduated.curveProgress).toBe(1);
+    expect(open.map((p) => p.slug).sort()).toEqual(["badges-2028", "curve-out", "sold-out"]);
+    const graduated = page.prophecies.filter((p) => p.complete).map((p) => p.slug).sort();
+    expect(graduated).toEqual(["sold-out", "two-min"]);
+    expect(page.prophecies.find((p) => p.slug === "two-min")!.departed).toBe(true);
+    expect(page.prophecies.find((p) => p.slug === "sold-out")!.departed).toBe(false);
+    expect(page.prophecies.find((p) => p.slug === "sold-out")!.curveProgress).toBe(1);
   });
 
   test("returns null for an unknown prophet", () => {
@@ -80,6 +84,25 @@ describe("getProphetPage", () => {
     expect(mina.prophecies).toHaveLength(1);
     expect(mina.prophecies[0].ensName).toBe("name-points.mina.prophecy.eth");
     expect(mina.claimableFeeWei).toBe(0n);
+  });
+});
+
+describe("chain vs mock prophet claim", () => {
+  test("mock rows hide claim in chain mode; a live own page still claims", () => {
+    const mock = getProphetPage("ringo", NOW)!;
+    expect(isMockProphetRecord(mock)).toBe(true);
+    expect(canClaimCreatorFee(mock, { chain: true })).toBe(false);
+    expect(canClaimCreatorFee(mock, { chain: false })).toBe(true);
+
+    const own = prophetPageFromChain({
+      label: "alice",
+      wallet: "0x3333333333333333333333333333333333333333",
+      claimableFeeWei: 1n,
+    });
+    expect(own.fromChain).toBe(true);
+    expect(isMockProphetRecord(own)).toBe(false);
+    expect(canClaimCreatorFee(own, { chain: true })).toBe(true);
+    expect(canClaimCreatorFee(mock, { chain: true, claimFee: async () => undefined })).toBe(true);
   });
 });
 

@@ -1,4 +1,5 @@
-import { simulateContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { isAddress, type Address } from "viem";
+import { readContract, simulateContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { launchpadAbi } from "./launchpadAbi";
 import { contracts } from "./contracts";
 import { webEnv } from "./env";
@@ -42,6 +43,74 @@ export function assertSuccessfulReceipt(receipt: { status?: string } | null | un
   }
 }
 
+export type ProphetOfOptions = {
+  address?: Address | undefined;
+  readContract?: (
+    config: typeof wagmiConfig,
+    request: ReturnType<typeof prophetOfRead>,
+  ) => Promise<unknown>;
+};
+
+export type CreatorFeeOfOptions = {
+  address?: Address | undefined;
+  readContract?: (
+    config: typeof wagmiConfig,
+    request: ReturnType<typeof creatorFeeOfRead>,
+  ) => Promise<unknown>;
+};
+
+export function prophetOfRead(wallet: Address, address = contracts.launchpad) {
+  if (!address) {
+    throw new Error("Launchpad address is not set");
+  }
+  return {
+    address,
+    abi: launchpadAbi,
+    functionName: "prophetOf" as const,
+    args: [wallet] as const,
+  };
+}
+
+export function creatorFeeOfRead(wallet: Address, address = contracts.launchpad) {
+  if (!address) {
+    throw new Error("Launchpad address is not set");
+  }
+  return {
+    address,
+    abi: launchpadAbi,
+    functionName: "creatorFeeOf" as const,
+    args: [wallet] as const,
+  };
+}
+
+/** INTERFACE `creatorFeeOf(address wallet) returns (uint256)`. 0 when unset or unread. */
+export function createReadCreatorFee(
+  options: CreatorFeeOfOptions = {},
+): (wallet: string) => Promise<bigint> {
+  const address = "address" in options ? options.address : contracts.launchpad;
+  return async (wallet) => {
+    if (!address || !isAddress(wallet)) return 0n;
+    const read = options.readContract ?? (readContract as CreatorFeeOfOptions["readContract"]);
+    if (!read) return 0n;
+    const fee = await read(wagmiConfig, creatorFeeOfRead(wallet, address));
+    return typeof fee === "bigint" ? fee : 0n;
+  };
+}
+
+/** Empty string means this wallet is not a prophet yet (NotProphet on launch). */
+export function createReadProphetOf(
+  options: ProphetOfOptions = {},
+): (wallet: string) => Promise<string> {
+  const address = "address" in options ? options.address : contracts.launchpad;
+  return async (wallet) => {
+    if (!address || !isAddress(wallet)) return "";
+    const read = options.readContract ?? (readContract as ProphetOfOptions["readContract"]);
+    if (!read) return "";
+    const label = await read(wagmiConfig, prophetOfRead(wallet, address));
+    return typeof label === "string" ? label : "";
+  };
+}
+
 export function registerProphetArgs(input: RegisterProphetInput) {
   return [input.label, BigInt(input.nullifier), input.serverSig] as const;
 }
@@ -55,6 +124,19 @@ export function registerProphetWrite(input: RegisterProphetInput, address = cont
     abi: launchpadAbi,
     functionName: "registerProphet" as const,
     args: registerProphetArgs(input),
+  };
+}
+
+/** curve(token) → complete is the on-chain graduation flag (PR #26). */
+export function curveRead(token: `0x${string}`, address = contracts.launchpad) {
+  if (!address) {
+    throw new Error("Launchpad address is not set");
+  }
+  return {
+    address,
+    abi: launchpadAbi,
+    functionName: "curve" as const,
+    args: [token] as const,
   };
 }
 

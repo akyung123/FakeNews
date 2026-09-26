@@ -3,10 +3,11 @@ name: pages
 # Public preview for web/. Zero extra secrets (default GITHUB_TOKEN only).
 # A person must enable Pages once: Settings → Pages → source GitHub Actions.
 # Until that is on, the deploy job will fail. Expected URL:
-#   https://akyung123.github.io/Prophecy/
+#   https://<owner>.github.io/<repo>/
+#   (this repo: https://prism-toggle-ai.github.io/FakeNews/)
 #
-# Vite base is set here (`vite build --base /Prophecy/`). No change to
-# web/vite.config.* — other lanes own that file.
+# Vite base is set here from the repo name (`vite build --base $BASE_PATH`).
+# No change to web/vite.config.* — other lanes own that file.
 #
 # Preview/demo must never ship mock World ID (PR #20: ON unless exactly 0 or false).
 # VITE_WORLD_MOCK is hard-coded OFF here. Public VITE_* come from Actions variables.
@@ -36,6 +37,8 @@ jobs:
     env:
       # Hard-coded OFF. Must never be ON for preview/demo builds.
       VITE_WORLD_MOCK: "0"
+      # Project Pages live at /<repo>/. Follow the current repository name.
+      BASE_PATH: /${{ github.event.repository.name }}/
     defaults:
       run:
         working-directory: web
@@ -58,6 +61,10 @@ jobs:
           VITE_WORLD_MOCK: "0"
           VITE_RPC_URL: ${{ vars.VITE_RPC_URL }}
           VITE_LAUNCHPAD_ADDRESS: ${{ vars.VITE_LAUNCHPAD_ADDRESS }}
+          # Optional. Empty = web uses a recent block range for Launched logs.
+          VITE_LAUNCHPAD_DEPLOY_BLOCK: ${{ vars.VITE_LAUNCHPAD_DEPLOY_BLOCK }}
+          VITE_HOOK_ADDRESS: ${{ vars.VITE_HOOK_ADDRESS }}
+          VITE_LOCKER_ADDRESS: ${{ vars.VITE_LOCKER_ADDRESS }}
           VITE_CHAIN_ID: ${{ vars.VITE_CHAIN_ID }}
           VITE_PARENT_NAME: ${{ vars.VITE_PARENT_NAME }}
           VITE_UNIVERSAL_RESOLVER: ${{ vars.VITE_UNIVERSAL_RESOLVER }}
@@ -67,19 +74,19 @@ jobs:
           VITE_WORLD_APP_ID: ${{ vars.VITE_WORLD_APP_ID }}
           VITE_WORLD_ACTION: ${{ vars.VITE_WORLD_ACTION }}
           VITE_WORLD_RP_ID: ${{ vars.VITE_WORLD_RP_ID }}
-        run: bunx tsc --noEmit && bunx vite build --base /Prophecy/
+        run: bunx tsc --noEmit && bunx vite build --base "$BASE_PATH"
       - name: Guard Pages asset prefix
         run: |
           html=dist/index.html
           test -f "$html"
-          bad="$(grep -oE '(src|href)="[^"]+"' "$html" | grep -E '(src|href)="/' | grep -vE '(src|href)="/Prophecy/' || true)"
+          bad="$(grep -oE '(src|href)="[^"]+"' "$html" | grep -E '(src|href)="/' | grep -vE "(src|href)=\"${BASE_PATH}" || true)"
           if [[ -n "$bad" ]]; then
-            echo "Asset/favicon URLs must start with /Prophecy/:" >&2
+            echo "Asset/favicon URLs must start with ${BASE_PATH}:" >&2
             echo "$bad" >&2
             exit 1
           fi
-          if ! grep -qE '(src|href)="/Prophecy/' "$html"; then
-            echo "dist/index.html has no /Prophecy/ asset URLs. Was vite build --base /Prophecy/ used?" >&2
+          if ! grep -qE "(src|href)=\"${BASE_PATH}" "$html"; then
+            echo "dist/index.html has no ${BASE_PATH} asset URLs. Was vite build --base ${BASE_PATH} used?" >&2
             exit 1
           fi
       - name: SPA fallback

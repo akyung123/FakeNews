@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { WorldGate } from "../components/WorldGate";
 import {
   fromDatetimeLocalValue,
   isIssueFormValid,
+  isIssueSubmitEnabled,
   isLaunchEnabled,
+  isRegisterSubmitEnabled,
   ISSUE_COPY,
   launchButtonLabel,
   prophecyName,
@@ -13,11 +15,23 @@ import {
   toDatetimeLocalValue,
   worldUserMessage,
   type IssueSession,
+  type RegisterStatus,
   type WorldStatus,
 } from "../lib/issue";
-import { createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
+import { createReadProphetOf, createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_ISSUE_SESSION, MOCK_PARENT_NAME, MOCK_RETURNING_SESSION } from "../lib/mock";
 import { actions } from "../lib/store";
+import { MAX_PROPHECY_BYTES, utf8ByteLength } from "../lib/limits";
+import {
+  createLaunch,
+  ethInputToWei,
+  refreshCoinFromChain,
+  writeErrorMessage,
+  writePhaseCopy,
+  WRITE_COPY,
+  type LaunchInput,
+  type WritePhase,
+} from "../lib/writes";
 import {
   createWorldClient,
   type WorldClient,
@@ -34,6 +48,8 @@ export type IssueScreenProps = {
   parentName?: string;
   onIssued?: (id: string) => void;
   registerProphet?: (input: RegisterProphetInput) => Promise<void>;
+  launchProphecy?: (input: LaunchInput) => Promise<`0x${string}` | null>;
+  lookupProphet?: (wallet: string) => Promise<string>;
 };
 
 export function resolveIssueSession(search: URLSearchParams, storedLabel = readStoredProphetLabel()): IssueSession {
@@ -56,9 +72,13 @@ export function IssueScreen({
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
   onIssued,
   registerProphet = createRegisterProphet(),
+  launchProphecy,
+  lookupProphet,
 }: IssueScreenProps) {
   const navigate = useNavigate();
-  const returningProphet = Boolean(session.prophetLabel);
+  const readProphet = useMemo(() => lookupProphet ?? createReadProphetOf(), [lookupProphet]);
+  const [onChainLabel, setOnChainLabel] = useState("");
+  const returningProphet = Boolean(session.prophetLabel || onChainLabel);
   const [prophetLabel, setProphetLabel] = useState(session.prophetLabel ?? "");
   const [prophecy, setProphecy] = useState("");
   const [slug, setSlug] = useState("");
@@ -67,10 +87,26 @@ export function IssueScreen({
   const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
   const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
-  const [registerStatus, setRegisterStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
+  const [registerStatus, setRegisterStatus] = useState<RegisterStatus>("idle");
+  const [writeBusy, setWriteBusy] = useState(false);
+  const [writePhase, setWritePhase] = useState<WritePhase | null>(null);
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const [writeSuccess, setWriteSuccess] = useState<string | null>(null);
 
   const deadlineUnix = fromDatetimeLocalValue(deadlineLocal);
   const nowSeconds = Math.floor(now / 1000);
+  useEffect(() => {
+    let cancelled = false;
+    void readProphet(session.wallet).then((label) => {
+      if (cancelled || !label) return;
+      setOnChainLabel(label);
+      setProphetLabel((prev) => prev || label);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [readProphet, session.wallet]);
+
   const formValid = isIssueFormValid({
     prophetLabel,
     prophecy,
@@ -79,22 +115,25 @@ export function IssueScreen({
     firstBuy,
     nowSeconds,
   });
-  const canLaunch = isLaunchEnabled({ returningProphet, worldStatus, formValid });
+  const gate = { returningProphet, worldStatus, formValid, registerStatus };
+  const canLaunch = isLaunchEnabled(gate);
+  const canRegister = isRegisterSubmitEnabled(gate);
+  const canSubmit = isIssueSubmitEnabled(gate);
   const registerBusy = registerStatus === "pending";
-  const pending =
-    registerBusy
+  const busy = registerBusy || writeBusy;
+  const pending = writeBusy
+    ? writePhaseCopy(writePhase) ?? WRITE_COPY.pending
+    : registerBusy
       ? ISSUE_COPY.registerPending
       : !returningProphet && worldStatus === "pending"
         ? ISSUE_COPY.pending
         : null;
   const error =
-    registerStatus === "failed"
-      ? ISSUE_COPY.registerFailed
-      : returningProphet || worldStatus === "pending" || registerBusy
-        ? null
-        : worldUserMessage(worldError);
-  const submitLabel = launchButtonLabel({ returningProphet, worldStatus, canLaunch });
+    writeError ??
+    (returningProphet || worldStatus === "pending" || busy ? null : worldUserMessage(worldError));
+  const submitLabel = launchButtonLabel({ returningProphet, worldStatus, canLaunch, canRegister });
   const fullName = prophetLabel && slug ? prophecyName(slug, prophetLabel, parentName) : "";
+  const pendingTestId = writeBusy ? "write-pending" : registerBusy ? "register-pending" : "world-pending";
 
   return (
     <main className="narrow stack">
@@ -123,10 +162,11 @@ export function IssueScreen({
         className="block create"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!canLaunch || registerBusy) return;
-          if (!returningProphet && !verified) return;
+          if (!canSubmit || busy) return;
           void (async () => {
-            if (!returningProphet && verified && registerProphet) {
+            setWriteError(null);
+            if (canRegister) {
+              if (!verified) return;
               setRegisterStatus("pending");
               try {
                 await registerProphet({
@@ -135,20 +175,59 @@ export function IssueScreen({
                   serverSig: verified.serverSig,
                 });
                 setRegisterStatus("success");
-              } catch {
-                setRegisterStatus("failed");
+              } catch (err) {
+                const message = writeErrorMessage(err, "registerProphet");
+                setRegisterStatus(message ? "failed" : "idle");
+                setWriteError(message);
+              }
+              return;
+            }
+            if (!canLaunch) return;
+            setWriteBusy(true);
+            setWritePhase("wallet");
+            setWriteSuccess(null);
+            try {
+              const runLaunch =
+                launchProphecy ??
+                ((input: LaunchInput) => createLaunch({ onPhase: setWritePhase })(input));
+              const token = await runLaunch({
+                slug,
+                prophecy: prophecy.trim(),
+                deadline: BigInt(deadlineUnix),
+                firstBuyWei: ethInputToWei(firstBuy),
+              });
+              if (token) {
+                actions.create({
+                  id: token,
+                  token,
+                  fromChain: true,
+                  prophecy: prophecy.trim(),
+                  name: fullName || slug,
+                  ticker: slug.toUpperCase().slice(0, 11),
+                  firstBuy: Number(firstBuy) || 0,
+                });
+                await refreshCoinFromChain(token, token).catch(() => undefined);
+                if (!returningProphet) storeProphetLabel(prophetLabel);
+                setWriteSuccess(WRITE_COPY.launchSuccess);
+                if (onIssued) onIssued(token);
+                else navigate(`/coin/${token}`);
                 return;
               }
+              const id = actions.create({
+                prophecy: prophecy.trim(),
+                name: fullName || slug,
+                ticker: slug.toUpperCase().slice(0, 11),
+                firstBuy: Number(firstBuy) || 0,
+              });
+              if (!returningProphet) storeProphetLabel(prophetLabel);
+              if (onIssued) onIssued(id);
+              else navigate(`/coin/${id}`);
+            } catch (err) {
+              setWriteError(writeErrorMessage(err));
+            } finally {
+              setWriteBusy(false);
+              setWritePhase(null);
             }
-            const id = actions.create({
-              prophecy: prophecy.trim(),
-              name: fullName || slug,
-              ticker: slug.toUpperCase().slice(0, 11),
-              firstBuy: Number(firstBuy) || 0,
-            });
-            if (!returningProphet) storeProphetLabel(prophetLabel);
-            if (onIssued) onIssued(id);
-            else navigate(`/coin/${id}`);
           })();
         }}
       >
@@ -174,12 +253,11 @@ export function IssueScreen({
           <textarea
             aria-label="Prophecy"
             rows={3}
-            maxLength={140}
             value={prophecy}
             placeholder={MOCK_ISSUE_PLACEHOLDER.prophecy}
             onChange={(e) => setProphecy(e.target.value)}
           />
-          <span className="faint small">{prophecy.length}/140 · written once, then locked</span>
+          <span className="faint small">{utf8ByteLength(prophecy)}/{MAX_PROPHECY_BYTES} · written once, then locked</span>
         </label>
 
         <div className="row2">
@@ -232,7 +310,7 @@ export function IssueScreen({
         />
 
         {pending ? (
-          <p className="banner-lock" data-testid={registerBusy ? "register-pending" : "world-pending"}>
+          <p className="banner-lock" data-testid={pendingTestId}>
             {pending}
           </p>
         ) : null}
@@ -241,13 +319,23 @@ export function IssueScreen({
             {ISSUE_COPY.registerSuccess}
           </p>
         ) : null}
+        {writeSuccess ? (
+          <p className="up" data-testid="write-success">
+            {writeSuccess}
+          </p>
+        ) : null}
         {error ? (
           <p className="banner-error" role="alert">
             {error}
           </p>
         ) : null}
 
-        <button type="submit" className="btn primary full" disabled={!canLaunch || registerBusy}>
+        <button
+          type="submit"
+          className="btn primary full"
+          data-testid={canLaunch ? "launch-submit" : canRegister ? "register-submit" : "issue-submit"}
+          disabled={!canSubmit || busy}
+        >
           {submitLabel}
         </button>
         {!returningProphet && worldStatus !== "success" ? (

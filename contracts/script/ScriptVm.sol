@@ -14,6 +14,10 @@ interface Vm {
     function envExists(string calldata name) external view returns (bool);
     function addr(uint256 privateKey) external pure returns (address);
     function toString(address value) external pure returns (string memory);
+    function toString(uint256 value) external pure returns (string memory);
+    function toString(bytes32 value) external pure returns (string memory);
+    function getNonce(address account) external view returns (uint64);
+    function computeCreateAddress(address deployer, uint256 nonce) external pure returns (address);
     function startBroadcast() external;
     function startBroadcast(uint256 privateKey) external;
     function stopBroadcast() external;
@@ -22,12 +26,31 @@ interface Vm {
 abstract contract ScriptVm {
     Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
+    /// forge-std DEFAULT_SENDER. Used when DEPLOYER_PRIVATE_KEY is unset (anvil dry-run).
+    address internal constant FOUNDRY_DEFAULT_SENDER = address(uint160(uint256(keccak256("foundry default caller"))));
+
     function _start() internal {
         if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
             vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         } else {
             vm.startBroadcast();
         }
+    }
+
+    function _deployer() internal view returns (address) {
+        if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
+            return vm.addr(vm.envUint("DEPLOYER_PRIVATE_KEY"));
+        }
+        return FOUNDRY_DEFAULT_SENDER;
+    }
+
+    /// Single wallet: TEAM_WALLET defaults to the deployer. A different value reverts
+    /// so setSubregistry / registrar grants cannot be signed by the wrong key.
+    function _teamWallet() internal view returns (address team) {
+        address deployer = _deployer();
+        team = vm.envOr("TEAM_WALLET", address(0));
+        if (team == address(0)) return deployer;
+        require(team == deployer, "TEAM_WALLET must equal deployer");
     }
 
     /// Foundry console, no forge-std import (that lane owns lib/).

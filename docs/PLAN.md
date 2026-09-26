@@ -16,14 +16,14 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] Protocol fee recipient
 - [ ] Who owns which lane (write names here)
 
-## 1. ENS setup (`contracts/script`, one team wallet)
+## 1. ENS setup (`contracts/script`, `infra/scripts`, one wallet)
 
-- [ ] Get Sepolia ETH, `mint` MockUSDC
-- [ ] Register `prophecy.eth`: `commit`, wait 60s, `register` ([ENSV2 section 6](ENSV2.md#6-building-a-subname-registrar))
-- [ ] Deploy the parent UserRegistry, `setSubregistry`, `setParent`
-- [ ] Grant the Launchpad `ROLE_REGISTRAR`
+- [ ] Get Sepolia ETH on the deployer (person). Script mints MockUSDC when `mint(address,uint256)` is public
+- [x] Scripted register of `prophecy.eth`: `commit`, wait ~70s, `register` via `infra/scripts/deploy-sepolia.sh` ([ENSV2 section 6](ENSV2.md#6-building-a-subname-registrar)) @cursor
+- [x] Deploy the parent UserRegistry, `setSubregistry`, `setParent` (scripted; `TEAM_WALLET` = deployer) @cursor
+- [x] Grant the adapter (`ProphecyEns`) `ROLE_REGISTRAR` — not the Launchpad @cursor
 - [ ] Create one subname by hand and check that `getEnsAddress` resolves it
-- [ ] (Last) Lock
+- [ ] (Last) Lock — **do not run from the deploy script.** Irreversible. A person confirms.
   - revoke the dangerous roles on the parent registry
   - on the `.eth` side, revoke `SET_SUBREGISTRY` for `prophecy`
 
@@ -47,6 +47,9 @@ Lanes follow folders. One lane = one person (or one agent session).
   - [x] Three fuzz tests: solvency (done @cursor-agent), a round trip never gains (done @cursor-agent), graduation vs pool start price gap < 0.0068% @cursor-agent
   - [x] World: reusing a nullifier reverts, a bad signature reverts @cursor
 - [x] Sepolia deploy script (skill `deploy-sepolia`) @cursor-agent
+- [x] Single-wallet Sepolia ENS + Launchpad: adapter then Launchpad in one broadcast (predicted CREATE); wrapper sleeps ~70s for commit-reveal; no parent lock @cursor
+- [x] After send, write `deployments/sepolia.json` (or gitignored `deployments/anvil.json` on a fork) and print launchpad + deploy block for web `Launched` fromBlock @cursor
+- [x] After Launchpad: CREATE2 Hook (mined flags, Launchpad ctor input), Locker, deployer `setUniswap` once; record hook / locker / poolManager @cursor
 
 ## 3. Web (`web/`)
 
@@ -58,10 +61,11 @@ Lanes follow folders. One lane = one person (or one agent session).
   - cancelling or failing disables it
 - [x] Screen 3: prophecy detail @cursor
   - find the token by name
-  - buy and sell
+  - [x] buy and sell @cursor-agent
   - no True / False
   - optional one-line memo on buy and sell; recent trades listed with their memos
   - [x] replace the prototype's holder talk with trade memos @cursor
+  - [x] hide Buy/Sell after graduation; Uniswap V4 panel @cursor-agent
 - [x] Screen 4: prophet page. Departed prophecies next to the next buy, claimable fees, sell button @cursor
 - [ ] Every sentence is read from ENS. Nothing hardcoded
 - [ ] Republish the demo page (skill `demo-publish`)

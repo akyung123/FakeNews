@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {ProphecyEns} from "../src/ens/ProphecyEns.sol";
+import {EnsDeploy} from "./EnsDeploy.sol";
 import {SepoliaConfig} from "./SepoliaConfig.sol";
 import {ScriptVm} from "./ScriptVm.sol";
 
-/// Surfaces that already exist on Sepolia (ENSV2 `71a3b73`). Our Launchpad is still landing.
+/// Surfaces that already exist on Sepolia (ENSV2 `71a3b73`).
 interface IVerifiableFactory {
-    function deployProxy(address implementation, bytes32 salt, bytes calldata data) external returns (address);
+    function deployProxy(address implementation, uint256 salt, bytes calldata data) external returns (address);
 }
 
 struct Grant {
@@ -26,14 +28,14 @@ interface IETHRegistry {
 }
 
 /// After prophecy.eth is registered, order is:
-///   deploy UserRegistry → deploy Launchpad (#8) → deploy adapter (#17)
-///   → setSubregistry/setParent → grant ROLE_REGISTRAR.
+///   deployUserRegistry → Deploy.s.sol (adapter then Launchpad, one broadcast)
+///   → linkParent → grantAdapterRegistrar.
+/// Do not lock the parent name here (irreversible; later lock PR).
 ///
 ///   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployUserRegistry()"
 ///   ./script/run-sepolia.sh script/Deploy.s.sol
-///   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployAdapter()"
 ///   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "linkParent()"
-///   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "grantLaunchpadRegistrar()"
+///   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "grantAdapterRegistrar()"
 ///
 /// Role bits from docs/ENSV2.md section 3. Do not grant UNREGISTER or SET_SUBREGISTRY.
 contract SetupParent is ScriptVm {
@@ -44,20 +46,13 @@ contract SetupParent is ScriptVm {
 
     event ParentRegistry(address registry);
     event Linked(string label, address registry);
-    event RegistrarGranted(address launchpad);
-    event AdapterPlan(
-        address launchpad,
-        address parentRegistry,
-        string parentDnsName,
-        address factory,
-        address userRegistryImpl,
-        address resolverImpl
-    );
+    event RegistrarGranted(address adapter);
+    event AdapterDeployed(address adapter, address predictedLaunchpad);
 
     function deployUserRegistry() external {
         require(_sepolia(), "sepolia or anvil only");
-        address owner = vm.envAddress("TEAM_WALLET");
-        bytes32 salt = vm.envOr("USER_REGISTRY_SALT", keccak256("UserRegistry"));
+        address owner = _teamWallet();
+        uint256 salt = uint256(vm.envOr("USER_REGISTRY_SALT", keccak256("UserRegistry")));
         uint256 initRoles = (ROLE_REGISTRAR | ROLE_RENEW | ROLE_SET_PARENT) * (1 + ADMIN);
 
         Grant[] memory grants = new Grant[](1);
@@ -65,37 +60,34 @@ contract SetupParent is ScriptVm {
         bytes memory init = abi.encodeCall(IUserRegistry.initialize, (grants));
 
         _start();
-        address registry = IVerifiableFactory(SepoliaConfig.VERIFIABLE_FACTORY).deployProxy(
-            SepoliaConfig.USER_REGISTRY_IMPL, salt, init
-        );
+        address registry = IVerifiableFactory(SepoliaConfig.VERIFIABLE_FACTORY)
+            .deployProxy(SepoliaConfig.USER_REGISTRY_IMPL, salt, init);
         vm.stopBroadcast();
 
         emit ParentRegistry(registry);
+        _pasteLine(string.concat("PARENT_USER_REGISTRY=", vm.toString(registry)));
     }
 
-    /// TODO(#17): `new ProphecyEns(launchpad, parentRegistry, parentDnsName, factory, userRegistryImpl, resolverImpl)`.
-    /// Exact wiring waits for #17 and #8 to merge. Dry-run emits the planned args.
+    /// Standalone adapter CREATE with predicted Launchpad at nonce+1.
+    /// Preferred path is Deploy.s.sol (adapter + Launchpad in one broadcast).
+    /// If you use this, the next CREATE from the same wallet must be Launchpad
+    /// (`Deploy.s.sol` with ENS_ADAPTER_ADDRESS set).
     function deployAdapter() external {
         require(_sepolia(), "sepolia or anvil only");
-        address launchpad = vm.envOr("LAUNCHPAD_ADDRESS", address(0));
-        address parentRegistry = vm.envOr("PARENT_USER_REGISTRY", address(0));
+        address parentRegistry = vm.envAddress("PARENT_USER_REGISTRY");
         string memory label = vm.envOr("PARENT_LABEL", string("prophecy"));
-        string memory parentDnsName = string.concat(label, ".eth");
+        address deployer = _deployer();
+        _teamWallet();
 
-        emit AdapterPlan(
-            launchpad,
-            parentRegistry,
-            parentDnsName,
-            SepoliaConfig.VERIFIABLE_FACTORY,
-            SepoliaConfig.USER_REGISTRY_IMPL,
-            SepoliaConfig.PERMISSIONED_RESOLVER_IMPL
-        );
+        _start();
+        uint64 n = vm.getNonce(deployer);
+        address predictedPad = vm.computeCreateAddress(deployer, uint256(n) + 1);
+        ProphecyEns adapter = EnsDeploy.deployAdapter(predictedPad, parentRegistry, label);
+        vm.stopBroadcast();
 
-        if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
-            require(launchpad != address(0), "set LAUNCHPAD_ADDRESS after Launchpad deploy");
-            require(parentRegistry != address(0), "set PARENT_USER_REGISTRY");
-            revert("TODO(#17): wire ProphecyEns constructor after merge");
-        }
+        emit AdapterDeployed(address(adapter), predictedPad);
+        _pasteLine(string.concat("ENS_ADAPTER_ADDRESS=", vm.toString(address(adapter))));
+        _pasteLine(string.concat("PREDICTED_LAUNCHPAD=", vm.toString(predictedPad)));
     }
 
     function linkParent() external {
@@ -103,27 +95,38 @@ contract SetupParent is ScriptVm {
         string memory label = vm.envOr("PARENT_LABEL", string("prophecy"));
         address registry = vm.envAddress("PARENT_USER_REGISTRY");
         uint256 labelhash = uint256(keccak256(bytes(label)));
+        address team = _teamWallet();
 
         _start();
         IETHRegistry(SepoliaConfig.ETH_REGISTRY).setSubregistry(labelhash, registry);
         IUserRegistry(registry).setParent(SepoliaConfig.ETH_REGISTRY, label);
-        IUserRegistry(registry).revokeRootRoles(ROLE_SET_PARENT * (1 + ADMIN), vm.envAddress("TEAM_WALLET"));
+        IUserRegistry(registry).revokeRootRoles(ROLE_SET_PARENT * (1 + ADMIN), team);
         vm.stopBroadcast();
 
         emit Linked(label, registry);
+        // TODO(lock PR): do not revoke SET_SUBREGISTRY on .eth for this label here.
+        // That emancipation is irreversible and needs a person to confirm.
     }
 
-    function grantLaunchpadRegistrar() external {
+    /// ROLE_REGISTRAR on the parent UserRegistry goes to ProphecyEns (the
+    /// msg.sender of parentRegistry.register), not to Launchpad.
+    function grantAdapterRegistrar() external {
         require(_sepolia(), "sepolia or anvil only");
         address registry = vm.envAddress("PARENT_USER_REGISTRY");
-        address launchpad = vm.envAddress("LAUNCHPAD_ADDRESS");
-        require(launchpad != address(0), "set LAUNCHPAD_ADDRESS when Launchpad lands");
+        address adapter = vm.envAddress("ENS_ADAPTER_ADDRESS");
+        require(adapter != address(0), "set ENS_ADAPTER_ADDRESS");
+        require(adapter != address(uint160(0xe05)), "ENS_ADAPTER_ADDRESS cannot be placeholder 0xe05");
 
         _start();
-        IUserRegistry(registry).grantRootRoles(ROLE_REGISTRAR, launchpad);
+        IUserRegistry(registry).grantRootRoles(ROLE_REGISTRAR, adapter);
         vm.stopBroadcast();
 
-        emit RegistrarGranted(launchpad);
+        emit RegistrarGranted(adapter);
+        _pasteLine(string.concat("ADAPTER_REGISTRAR=", vm.toString(adapter)));
+    }
+
+    function grantLaunchpadRegistrar() external pure {
+        revert("use grantAdapterRegistrar (ROLE_REGISTRAR goes to ProphecyEns)");
     }
 
     function _sepolia() internal view returns (bool) {
