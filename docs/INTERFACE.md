@@ -111,7 +111,7 @@ Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web 
 
 ## 6. Curve quote vectors
 
-Canonical rows live in backend M1 PR #8 as `contracts/test/Curve.vectors.json`. Web keeps a byte-matching copy at `web/src/lib/Curve.vectors.json` (and [`curve-vectors.json`](curve-vectors.json)) so tests run before that PR merges. Do not re-derive the numbers. Do not edit `contracts/` from this lane.
+Canonical rows live in backend M1 PR #8 as `contracts/test/Curve.vectors.json`. Web keeps a byte-matching copy at `web/src/lib/Curve.vectors.json` so tests run before that PR merges. Do not re-derive the numbers. Do not edit `contracts/` from this lane.
 
 - Web: `web/src/lib/curve.vectors.test.ts` imports the web copy.
 - Contracts: forge tests read `contracts/test/Curve.vectors.json`.
