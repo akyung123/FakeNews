@@ -11,7 +11,6 @@ import {
   readStoredProphetLabel,
   storeProphetLabel,
   toDatetimeLocalValue,
-  worldErrorKindFromRegisterProphet,
   worldUserMessage,
   type IssueSession,
   type WorldStatus,
@@ -68,6 +67,7 @@ export function IssueScreen({
   const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
   const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
+  const [registerStatus, setRegisterStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
 
   const deadlineUnix = fromDatetimeLocalValue(deadlineLocal);
   const nowSeconds = Math.floor(now / 1000);
@@ -80,8 +80,19 @@ export function IssueScreen({
     nowSeconds,
   });
   const canLaunch = isLaunchEnabled({ returningProphet, worldStatus, formValid });
-  const pending = !returningProphet && worldStatus === "pending" ? ISSUE_COPY.pending : null;
-  const error = returningProphet || worldStatus === "pending" ? null : worldUserMessage(worldError);
+  const registerBusy = registerStatus === "pending";
+  const pending =
+    registerBusy
+      ? ISSUE_COPY.registerPending
+      : !returningProphet && worldStatus === "pending"
+        ? ISSUE_COPY.pending
+        : null;
+  const error =
+    registerStatus === "failed"
+      ? ISSUE_COPY.registerFailed
+      : returningProphet || worldStatus === "pending" || registerBusy
+        ? null
+        : worldUserMessage(worldError);
   const submitLabel = launchButtonLabel({ returningProphet, worldStatus, canLaunch });
   const fullName = prophetLabel && slug ? prophecyName(slug, prophetLabel, parentName) : "";
 
@@ -102,20 +113,20 @@ export function IssueScreen({
         className="block create"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!canLaunch) return;
+          if (!canLaunch || registerBusy) return;
           if (!returningProphet && !verified) return;
           void (async () => {
             if (!returningProphet && verified && registerProphet) {
+              setRegisterStatus("pending");
               try {
                 await registerProphet({
                   label: prophetLabel,
                   nullifier: verified.nullifier,
                   serverSig: verified.serverSig,
                 });
-              } catch (err) {
-                const kind = worldErrorKindFromRegisterProphet(err);
-                setWorldError(kind);
-                setWorldStatus("failed");
+                setRegisterStatus("success");
+              } catch {
+                setRegisterStatus("failed");
                 return;
               }
             }
@@ -211,8 +222,13 @@ export function IssueScreen({
         />
 
         {pending ? (
-          <p className="banner-lock" data-testid="world-pending">
+          <p className="banner-lock" data-testid={registerBusy ? "register-pending" : "world-pending"}>
             {pending}
+          </p>
+        ) : null}
+        {registerStatus === "success" ? (
+          <p className="up" data-testid="register-success">
+            {ISSUE_COPY.registerSuccess}
           </p>
         ) : null}
         {error ? (
@@ -221,7 +237,7 @@ export function IssueScreen({
           </p>
         ) : null}
 
-        <button type="submit" className="btn primary full" disabled={!canLaunch}>
+        <button type="submit" className="btn primary full" disabled={!canLaunch || registerBusy}>
           {submitLabel}
         </button>
         {!returningProphet && worldStatus !== "success" ? (
