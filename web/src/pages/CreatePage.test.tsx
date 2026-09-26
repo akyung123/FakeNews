@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { UserRejectedRequestError } from "viem";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "../lib/issue";
 import type { RegisterProphetInput } from "../lib/launchpad";
 import { LaunchedParseError, WRITE_COPY, launchWrite, type LaunchInput } from "../lib/writes";
@@ -43,19 +43,24 @@ type IssueScreenProps = {
 async function fillFirstTimeForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/Prophet name/i), "mina");
   await user.type(screen.getByLabelText(/^Prophecy$/i), "Coffee lasts until the last pitch");
-  await user.type(screen.getByLabelText(/^Slug$/i), "coffee-last");
+  await user.type(screen.getByLabelText(/^Short name$/i), "coffee-last");
 }
 
 async function fillReturningForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/^Prophecy$/i), "Coffee lasts until the last pitch");
-  await user.type(screen.getByLabelText(/^Slug$/i), "coffee-last");
+  await user.type(screen.getByLabelText(/^Short name$/i), "coffee-last");
 }
 
 function launchButton() {
   return screen.getByRole("button", {
-    name: (name) => name === ISSUE_COPY.launch || name === ISSUE_COPY.disabledLaunch,
+    name: (name) =>
+      name === ISSUE_COPY.launch || name === ISSUE_COPY.register || name === ISSUE_COPY.disabledLaunch,
   });
 }
+
+beforeEach(() => {
+  sessionStorage.clear();
+});
 
 function failingWorld(kind: "portal_rejected" | "malformed_payload" | "network"): WorldClient {
   const base = createWorldClient({ mock: true });
@@ -150,7 +155,7 @@ describe("Screen 2 button gating", () => {
 
     await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
     await waitFor(() => expect(launchButton()).toBeEnabled());
-    expect(launchButton()).toHaveTextContent(ISSUE_COPY.launch);
+    expect(launchButton()).toHaveTextContent(ISSUE_COPY.register);
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -270,7 +275,7 @@ describe("Screen 2 button gating", () => {
     expect(screen.queryByTestId("register-success")).toBeNull();
     expect(issued).toEqual([]);
     expect(document.body.textContent).not.toContain(ISSUE_COPY.registerFailed);
-    expect(launchButton()).toHaveTextContent(ISSUE_COPY.launch);
+    expect(launchButton()).toHaveTextContent(ISSUE_COPY.register);
     assertNoRawCodes();
   });
 
@@ -488,7 +493,7 @@ describe("Screen 2 button gating", () => {
     renderIssue(MOCK_RETURNING_SESSION);
     await user.click(screen.getByLabelText(/^Prophecy$/i));
     await user.paste("한".repeat(47));
-    await user.type(screen.getByLabelText(/^Slug$/i), "coffee-last");
+    await user.type(screen.getByLabelText(/^Short name$/i), "coffee-last");
     expect(launchButton()).toBeDisabled();
     expect(screen.queryByTestId("launch-submit")).toBeNull();
   });

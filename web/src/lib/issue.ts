@@ -18,20 +18,26 @@ export const ISSUE_COPY = {
   prove: "Prove you are human",
   cancel: "Cancel verification",
   fail: "Simulate failure",
-  launch: "Issue prophecy",
+  launch: "Launch prophecy",
+  register: "Claim your name",
   disabledLaunch: "Verify with World ID to launch",
   pending: "Still checking. The first check can take up to a minute.",
   pendingSlow: "Taking longer than expected — the World server or the network may be slow right now.",
   retry: "Retry",
   registerPending: "Confirm your name in your wallet.",
   registerSuccess: "Your name is claimed on Sepolia.",
+  launchNext: "Next: press Launch prophecy and sign once more in your wallet.",
   registerFailed: "Name claim failed. Nothing was charged except gas. Try again.",
   cancelled: "Verification cancelled. Launching stays locked until you verify.",
   portalRejected: "World ID couldn't confirm this check. Try again in World App.",
   checkFailed: "Something went wrong with the check. Please try again.",
+  worldBlocked:
+    "We can't reach the World server. If you use an ad blocker, turn it off for this site and try again.",
   nullifierReuse: "This human already has a prophet name. One human, one name.",
   step1: "Step 1 of 2",
   step2: "Step 2 of 2",
+  launchStep1: "Step 1 · Claim your name",
+  launchStep2: "Step 2 · Launch your prophecy",
   oneTransaction: "One transaction",
   claimTitle: "Claim your name",
   claimLead: "One name per person. World ID is asked only here.",
@@ -107,20 +113,21 @@ export function isIssueSubmitEnabled(input: {
   return isLaunchEnabled(input) || isRegisterSubmitEnabled(input);
 }
 
+/** Step 1 claims the name (World + registerProphet); step 2 launches with the same inputs. */
 export function launchButtonLabel(input: {
   returningProphet: boolean;
   worldStatus: WorldStatus;
-  canLaunch: boolean;
-  canRegister?: boolean;
+  registerStatus?: RegisterStatus;
 }): string {
-  if (input.canLaunch || input.canRegister) return ISSUE_COPY.launch;
-  if (!input.returningProphet && input.worldStatus !== "success") return ISSUE_COPY.disabledLaunch;
-  return ISSUE_COPY.launch;
+  if (isNamedProphet(input)) return ISSUE_COPY.launch;
+  if (input.worldStatus !== "success") return ISSUE_COPY.disabledLaunch;
+  return ISSUE_COPY.register;
 }
 
 /** Designer copy only. Never returns a raw server or revert code. */
 export function worldUserMessage(kind: WorldErrorKind | null | undefined): string | null {
   if (!kind) return null;
+  if (kind === "blocked") return ISSUE_COPY.worldBlocked;
   if (kind === "cancelled") return ISSUE_COPY.cancelled;
   if (kind === "portal_rejected") return ISSUE_COPY.portalRejected;
   if (kind === "nullifier_reuse") return ISSUE_COPY.nullifierReuse;
@@ -157,6 +164,47 @@ export function readStoredProphetLabel(): string | null {
 export function storeProphetLabel(label: string): void {
   try {
     sessionStorage.setItem(PROPHET_STORAGE_KEY, label);
+  } catch {
+    // storage blocked
+  }
+}
+
+export type LaunchDraft = {
+  prophetLabel: string;
+  prophecy: string;
+  slug: string;
+};
+
+const DRAFT_STORAGE_KEY = "prophecy:launch-draft";
+
+/** What the Launch form held before a reload. Cleared once the prophecy is launched. */
+export function readLaunchDraft(): LaunchDraft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<Record<keyof LaunchDraft, unknown>>;
+    const text = (v: unknown) => (typeof v === "string" ? v : "");
+    return { prophetLabel: text(value.prophetLabel), prophecy: text(value.prophecy), slug: text(value.slug) };
+  } catch {
+    return null;
+  }
+}
+
+export function storeLaunchDraft(draft: LaunchDraft): void {
+  try {
+    if (!draft.prophetLabel && !draft.prophecy && !draft.slug) {
+      sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+      return;
+    }
+    sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {
+    // storage blocked
+  }
+}
+
+export function clearLaunchDraft(): void {
+  try {
+    sessionStorage.removeItem(DRAFT_STORAGE_KEY);
   } catch {
     // storage blocked
   }

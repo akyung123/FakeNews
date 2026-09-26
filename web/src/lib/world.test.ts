@@ -312,7 +312,21 @@ describe("world client", () => {
     expect(resolved.isMock).toBe(false);
   });
 
-  it("falls back to the existing mock World step only when the signature server is down", async () => {
+  it("falls back to the existing mock World step when the signature server answers with an error", async () => {
+    const live = createWorldClient({
+      mock: false,
+      serverUrl: "http://world.test",
+      launchpad: MOCK_WORLD_LAUNCHPAD,
+      fetch: async () => new Response("", { status: 503 }),
+    });
+    const mock = createWorldClient({ mock: true });
+    const resolved = await worldClientWithServerFallback(live, () => mock);
+    expect(resolved).toBe(mock);
+    expect(resolved.isMock).toBe(true);
+    expect(live.isMock).toBe(false);
+  });
+
+  it("does not fall back to mock when the request is blocked before it reaches the server", async () => {
     const live = createWorldClient({
       mock: false,
       serverUrl: "http://world.test",
@@ -321,11 +335,14 @@ describe("world client", () => {
         throw new TypeError("Failed to fetch");
       },
     });
-    const mock = createWorldClient({ mock: true });
-    const resolved = await worldClientWithServerFallback(live, () => mock);
-    expect(resolved).toBe(mock);
-    expect(resolved.isMock).toBe(true);
-    expect(live.isMock).toBe(false);
+    let mocked = false;
+    const failure = await worldClientWithServerFallback(live, () => {
+      mocked = true;
+      return createWorldClient({ mock: true });
+    }).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(WorldClientError);
+    expect((failure as WorldClientError).kind).toBe("blocked");
+    expect(mocked).toBe(false);
   });
 
   it("does not remock an already-mock World client", async () => {

@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
+  clearLaunchDraft,
   isIssueFormValid,
   isIssueSubmitEnabled,
   isLaunchEnabled,
@@ -10,6 +11,8 @@ import {
   ISSUE_COPY,
   launchButtonLabel,
   prophecyName,
+  readLaunchDraft,
+  storeLaunchDraft,
   worldErrorKindFromRegisterProphet,
   worldErrorMessage,
   worldUserMessage,
@@ -86,23 +89,22 @@ describe("launch button gating", () => {
   });
 
   it("uses the designer disabled label until World succeeds", () => {
+    expect(launchButtonLabel({ returningProphet: false, worldStatus: "idle" })).toBe(ISSUE_COPY.disabledLaunch);
+    expect(launchButtonLabel({ returningProphet: false, worldStatus: "pending" })).toBe(ISSUE_COPY.disabledLaunch);
+    expect(launchButtonLabel({ returningProphet: false, worldStatus: "cancelled" })).toBe(
+      ISSUE_COPY.disabledLaunch,
+    );
+  });
+
+  it("claims the name in step 1, then launches with the same button in step 2", () => {
+    expect(launchButtonLabel({ returningProphet: false, worldStatus: "success" })).toBe("Claim your name");
     expect(
-      launchButtonLabel({ returningProphet: false, worldStatus: "idle", canLaunch: false }),
-    ).toBe(ISSUE_COPY.disabledLaunch);
+      launchButtonLabel({ returningProphet: false, worldStatus: "success", registerStatus: "pending" }),
+    ).toBe(ISSUE_COPY.register);
     expect(
-      launchButtonLabel({ returningProphet: false, worldStatus: "pending", canLaunch: false }),
-    ).toBe(ISSUE_COPY.disabledLaunch);
-    expect(
-      launchButtonLabel({ returningProphet: false, worldStatus: "cancelled", canLaunch: false }),
-    ).toBe(ISSUE_COPY.disabledLaunch);
-    expect(
-      launchButtonLabel({
-        returningProphet: false,
-        worldStatus: "success",
-        canLaunch: false,
-        canRegister: true,
-      }),
-    ).toBe(ISSUE_COPY.launch);
+      launchButtonLabel({ returningProphet: false, worldStatus: "success", registerStatus: "success" }),
+    ).toBe("Launch prophecy");
+    expect(launchButtonLabel({ returningProphet: true, worldStatus: "idle" })).toBe("Launch prophecy");
   });
 });
 
@@ -164,5 +166,41 @@ describe("designer World copy mapping", () => {
     );
     const text = `${ISSUE_COPY.registerPending} ${ISSUE_COPY.registerSuccess} ${ISSUE_COPY.registerFailed}`.toLowerCase();
     expect(text).not.toMatch(/coin|profit|yield|prediction|true|false/);
+  });
+});
+
+describe("World server blocked copy", () => {
+  it("tells the person to turn off an ad blocker when the World server can't be reached", () => {
+    expect(worldUserMessage("blocked")).toBe(
+      "We can't reach the World server. If you use an ad blocker, turn it off for this site and try again.",
+    );
+  });
+});
+
+describe("launch draft storage", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("round-trips the three inputs through sessionStorage", () => {
+    expect(readLaunchDraft()).toBeNull();
+    storeLaunchDraft({ prophetLabel: "mina", prophecy: "Coffee lasts", slug: "coffee-last" });
+    expect(readLaunchDraft()).toEqual({ prophetLabel: "mina", prophecy: "Coffee lasts", slug: "coffee-last" });
+  });
+
+  it("drops the draft when it is cleared or emptied", () => {
+    storeLaunchDraft({ prophetLabel: "mina", prophecy: "Coffee lasts", slug: "coffee-last" });
+    clearLaunchDraft();
+    expect(readLaunchDraft()).toBeNull();
+    storeLaunchDraft({ prophetLabel: "mina", prophecy: "", slug: "" });
+    storeLaunchDraft({ prophetLabel: "", prophecy: "", slug: "" });
+    expect(readLaunchDraft()).toBeNull();
+  });
+
+  it("ignores a malformed draft", () => {
+    sessionStorage.setItem("prophecy:launch-draft", "{not json");
+    expect(readLaunchDraft()).toBeNull();
+    sessionStorage.setItem("prophecy:launch-draft", JSON.stringify({ prophecy: 3, slug: "coffee-last" }));
+    expect(readLaunchDraft()).toEqual({ prophetLabel: "", prophecy: "", slug: "coffee-last" });
   });
 });

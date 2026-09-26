@@ -29,7 +29,8 @@ export type WorldErrorKind =
   | "portal_rejected"
   | "malformed_payload"
   | "network"
-  | "nullifier_reuse";
+  | "nullifier_reuse"
+  | "blocked";
 
 export class WorldClientError extends Error {
   readonly kind: WorldErrorKind;
@@ -184,9 +185,11 @@ async function errorFromResponse(response: Response): Promise<WorldClientError> 
 }
 
 /**
- * Live World ID stays on the signature server. If that server is down,
- * only this client falls back to the existing mock World step. Auction
- * writes stay on the real chain.
+ * Live World ID stays on the signature server. If the server answers with an
+ * error, only this client falls back to the existing mock World step. If the
+ * request never gets an answer (an ad blocker, a network drop), the check
+ * stays live and the person is told to unblock the server: a mock signature
+ * would only fail later on chain. Auction writes stay on the real chain.
  */
 export async function worldClientWithServerFallback(
   client: WorldClient = createWorldClient(),
@@ -196,7 +199,8 @@ export async function worldClientWithServerFallback(
   try {
     await client.checkHealth();
     return client;
-  } catch {
+  } catch (error) {
+    if (error instanceof WorldClientError && error.kind === "blocked") throw error;
     return createMock();
   }
 }
@@ -279,8 +283,13 @@ export function createWorldClient(options: WorldClientOptions = {}): WorldClient
       }
     },
     async checkHealth() {
+      let response: Response;
       try {
-        const response = await doFetch(`${serverUrl}/health`, { method: "GET" });
+        response = await doFetch(`${serverUrl}/health`, { method: "GET" });
+      } catch {
+        throw new WorldClientError("blocked");
+      }
+      try {
         if (!response.ok) throw await errorFromResponse(response);
         return (await response.json()) as WorldHealth;
       } catch (error) {
