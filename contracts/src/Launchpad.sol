@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {CurveMath} from "./CurveMath.sol";
@@ -10,6 +11,7 @@ import {ProphecyToken} from "./ProphecyToken.sol";
 /// Bonding-curve launchpad. Price is the ratio of two reserves; fees sit in a
 /// separate ledger so they never move that price.
 contract Launchpad is ReentrancyGuard {
+    using SafeERC20 for IERC20;
     uint256 public constant TOTAL_SUPPLY = 1_000_000_000e18;
     uint256 public constant CURVE_SUPPLY = 793_100_000e18;
     uint256 public constant LP_SUPPLY = 206_900_000e18;
@@ -127,8 +129,8 @@ contract Launchpad is ReentrancyGuard {
         _creatorFees[c.prophet] += creatorShare;
         protocolFees += protocolShare;
 
-        IERC20(token).transferFrom(msg.sender, address(this), tokensIn);
-        emit Trade(token, msg.sender, false, payout, tokensIn, fee, c.vEth, c.vToken, memo);
+        _emitTrade(token, msg.sender, false, payout, tokensIn, fee, c.vEth, c.vToken, memo);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), tokensIn);
         _sendEth(msg.sender, payout);
     }
 
@@ -228,11 +230,23 @@ contract Launchpad is ReentrancyGuard {
         _creatorFees[c.prophet] += creatorShare;
         protocolFees += protocolShare;
 
-        IERC20(token).transfer(buyer, preview.tokensOut);
-        emit Trade(
-            token, buyer, true, preview.ethUsed, preview.tokensOut, preview.fee, c.vEth, c.vToken, memo
-        );
+        _emitTrade(token, buyer, true, preview.ethUsed, preview.tokensOut, preview.fee, c.vEth, c.vToken, memo);
+        IERC20(token).safeTransfer(buyer, preview.tokensOut);
         if (preview.refund > 0) _sendEth(buyer, preview.refund);
+    }
+
+    function _emitTrade(
+        address token,
+        address trader,
+        bool isBuy,
+        uint256 ethAmount,
+        uint256 tokenAmount,
+        uint256 fee,
+        uint256 vEthAfter,
+        uint256 vTokenAfter,
+        string memory memo
+    ) internal {
+        emit Trade(token, trader, isBuy, ethAmount, tokenAmount, fee, vEthAfter, vTokenAfter, memo);
     }
 
     function _requireMemo(string calldata memo) internal pure {
