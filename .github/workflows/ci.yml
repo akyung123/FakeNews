@@ -16,8 +16,6 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       # No lint/typecheck scripts on the current web skeleton. tsc is the check.
-      - name: Lint
-        run: bunx tsc --noEmit
       - name: Typecheck
         run: bunx tsc --noEmit
       - run: bun run build
