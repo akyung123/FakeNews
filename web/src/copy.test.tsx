@@ -49,6 +49,8 @@ const REMOVED = [
   "profit",
   "yield",
   "prediction market",
+  "Set final price",
+  "Auction ended · final price not set yet",
   "PRIVATE_KEY",
   "just saw a PRIVATE_KEY on the big screen 👀",
   ...FLAGGED_MEMOS,

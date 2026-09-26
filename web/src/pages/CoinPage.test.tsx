@@ -64,6 +64,8 @@ describe("CCA trade panel", () => {
       expect(html).toContain("Market open on Uniswap v4");
       expect(html).toContain("Swap");
       expect(html).toContain("Collect fees");
+      expect(html).not.toContain("Set final price");
+      expect(html).not.toContain("Set up fee collection");
       expect(html).not.toContain("Place bid");
       expect(html).not.toContain("Budget (ETH)");
       expect(html).not.toContain("Curve sold out");

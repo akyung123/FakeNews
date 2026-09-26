@@ -138,7 +138,8 @@ describe("CcaTrade CCA states", () => {
       }),
     );
     await waitFor(() => expect(screen.getByText(CCA_COPY.auctionEnded)).toBeInTheDocument());
-    expect(screen.queryByText(CCA_COPY.setFinalPrice)).toBeNull();
+    expect(screen.queryByText("Set final price")).toBeNull();
+    expect(screen.queryByText("Auction ended · final price not set yet")).toBeNull();
     expect(screen.getByText("Get back unused ETH (0.003 ETH)")).toBeInTheDocument();
     expect(screen.getByText(CCA_COPY.claimTokens)).toBeInTheDocument();
   });
@@ -215,11 +216,12 @@ describe("CcaTrade CCA states", () => {
     expect(screen.getByText(CCA_COPY.claimTokens)).toBeInTheDocument();
   });
 
-  it("shows swap and collect after the pool opens, or register when UnknownLock", async () => {
+  it("shows one Collect fees button after the pool opens, including when register is still needed", async () => {
     renderTrade(
       snap({
         copyStatus: "pool_open",
         poolOpen: true,
+        tokenId: 7n,
         view: view({
           phase: "ended_goal_reached",
           goalReached: true,
@@ -229,7 +231,7 @@ describe("CcaTrade CCA states", () => {
       }),
     );
     await waitFor(() => expect(screen.getByText(SWAP_SECTION_COPY.title)).toBeInTheDocument());
-    expect(screen.getByText(FEE_COLLECT_COPY.collectFees)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: FEE_COLLECT_COPY.collectFees })).toBeInTheDocument();
     expect(screen.queryByText(FEE_COLLECT_COPY.setupFeeCollection)).toBeNull();
     cleanup();
 
@@ -247,9 +249,10 @@ describe("CcaTrade CCA states", () => {
         }),
       }),
     );
-    await waitFor(() => expect(screen.getByText(FEE_COLLECT_COPY.setupFeeCollection)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: FEE_COLLECT_COPY.collectFees })).toBeInTheDocument());
     expect(screen.getByText(FEE_COLLECT_COPY.registerHelper)).toBeInTheDocument();
-    expect(screen.queryByText(FEE_COLLECT_COPY.collectFees)).toBeNull();
+    expect(screen.queryByText(FEE_COLLECT_COPY.setupFeeCollection)).toBeNull();
+    expect(screen.getAllByRole("button", { name: FEE_COLLECT_COPY.collectFees })).toHaveLength(1);
   });
 
   it("hides migrate, swap, and collect when their flags are off", async () => {
@@ -371,6 +374,80 @@ describe("CcaTrade CCA states", () => {
     await waitFor(() => expect(screen.getByText(CCA_COPY.notFunded)).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: CCA_COPY.placeBid })).toBeNull();
     expect(screen.queryByText(/Cash /)).toBeNull();
+  });
+
+  it("Collect fees registers then collects when isRegistered is false", async () => {
+    const user = userEvent.setup();
+    const simulateContract = vi.fn(async () => ({}));
+    const writeContract = vi.fn(async () => "0xabc" as const);
+    const waitForTransactionReceipt = vi.fn(async () => ({ status: "success" }));
+    render(
+      <CcaTrade
+        coin={coin}
+        balance={0.05}
+        held={0}
+        chain
+        loadAuction={async () =>
+          snap({
+            copyStatus: "pool_open",
+            poolOpen: true,
+            needsRegister: true,
+            tokenId: 7n,
+            view: view({
+              phase: "ended_goal_reached",
+              goalReached: true,
+              isGraduated: true,
+              blocksRemaining: 0,
+            }),
+          })
+        }
+        writes={{ simulateContract, writeContract, waitForTransactionReceipt }}
+      />,
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: FEE_COLLECT_COPY.collectFees })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: FEE_COLLECT_COPY.collectFees }));
+    await waitFor(() => expect(writeContract).toHaveBeenCalledTimes(2));
+    expect(writeContract.mock.calls.map(([, request]) => request.functionName)).toEqual(["register", "collect"]);
+    expect(writeContract.mock.calls[0]?.[1].args).toEqual([TOKEN, 7n]);
+    expect(writeContract.mock.calls[1]?.[1].args).toEqual([TOKEN, 7n]);
+    expect(screen.queryByText(FEE_COLLECT_COPY.setupFeeCollection)).toBeNull();
+  });
+
+  it("Collect fees calls collect(token, tokenId) when already registered", async () => {
+    const user = userEvent.setup();
+    const simulateContract = vi.fn(async () => ({}));
+    const writeContract = vi.fn(async () => "0xabc" as const);
+    const waitForTransactionReceipt = vi.fn(async () => ({ status: "success" }));
+    render(
+      <CcaTrade
+        coin={coin}
+        balance={0.05}
+        held={0}
+        chain
+        loadAuction={async () =>
+          snap({
+            copyStatus: "pool_open",
+            poolOpen: true,
+            needsRegister: false,
+            tokenId: 7n,
+            view: view({
+              phase: "ended_goal_reached",
+              goalReached: true,
+              isGraduated: true,
+              blocksRemaining: 0,
+            }),
+          })
+        }
+        writes={{ simulateContract, writeContract, waitForTransactionReceipt }}
+      />,
+    );
+    await waitFor(() => expect(screen.getByRole("button", { name: FEE_COLLECT_COPY.collectFees })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: FEE_COLLECT_COPY.collectFees }));
+    await waitFor(() => expect(writeContract).toHaveBeenCalledTimes(1));
+    expect(writeContract.mock.calls[0]?.[1]).toMatchObject({
+      functionName: "collect",
+      args: [TOKEN, 7n],
+    });
   });
 
   it("runs simulate then write then receipt on Place bid", async () => {

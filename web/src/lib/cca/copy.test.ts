@@ -44,9 +44,9 @@ describe("designer FINAL CCA copy", () => {
     expect(CCA_COPY.soldOut).toBe("Auction live · all tokens are bid for");
     expect(CCA_COPY.soldOutSub).toBe("New bids are closed. Come back when the auction ends.");
     expect(CCA_COPY.auctionEnded).toBe("Auction ended");
-    expect(CCA_COPY.endedNotFinalized).toBe("Auction ended · final price not set yet");
-    expect(CCA_COPY.setFinalPrice).toBe("Set final price");
-    expect(CCA_COPY.settingFinalPrice).toBe("Setting final price…");
+    expect(CCA_COPY.endedNotFinalized).toBe("Auction ended");
+    expect(CCA_COPY).not.toHaveProperty("setFinalPrice");
+    expect(CCA_COPY).not.toHaveProperty("settingFinalPrice");
     expect(CCA_COPY.graduated).toBe("Auction ended · ready to open the market");
     expect(CCA_COPY.goalNotReached).toBe("Auction ended · goal not reached");
     expect(CCA_COPY.poolOpen).toBe("Market open on Uniswap v4");
@@ -262,5 +262,6 @@ describe("designer FINAL CCA copy", () => {
       expect(joined).not.toContain(word);
     }
     expect(joined).not.toMatch(/[+-]\d+(?:\.\d+)?%/);
+    expect(joined).not.toContain("set final price");
   });
 });

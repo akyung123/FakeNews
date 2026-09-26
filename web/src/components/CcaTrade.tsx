@@ -420,28 +420,11 @@ export function CcaTrade({
           <h2>{FEE_COLLECT_COPY.title}</h2>
           {copyStatus !== "pool_open" ? (
             <p className="faint">{FEE_COLLECT_COPY.beforeOpen}</p>
-          ) : snap?.needsRegister ? (
-            <>
-              <p className="faint">{FEE_COLLECT_COPY.registerHelper}</p>
-              <button
-                type="button"
-                className="btn primary full"
-                disabled={writesBlocked || !snap.locker || !token || snap.tokenId == null}
-                onClick={() => {
-                  if (!snap.locker || !token || snap.tokenId == null) return;
-                  void run(
-                    FEE_COLLECT_COPY.settingUp,
-                    () => registerLocker(snap.locker!, token, snap.tokenId!, writes),
-                    FEE_COLLECT_COPY.feeCollectionReady,
-                  );
-                }}
-              >
-                {pending === FEE_COLLECT_COPY.settingUp ? FEE_COLLECT_COPY.settingUp : FEE_COLLECT_COPY.setupFeeCollection}
-              </button>
-            </>
           ) : (
             <>
-              <p className="faint">{FEE_COLLECT_COPY.helper}</p>
+              <p className="faint">
+                {snap?.needsRegister ? FEE_COLLECT_COPY.registerHelper : FEE_COLLECT_COPY.helper}
+              </p>
               <button
                 type="button"
                 className="btn primary full"
@@ -456,7 +439,12 @@ export function CcaTrade({
                   const tokenId = snap.tokenId;
                   void run(
                     FEE_COLLECT_COPY.collectingFees,
-                    () => sendCcaWrite(collectCcaWrite(locker, token, tokenId), "collect", writes),
+                    async () => {
+                      if (snap.needsRegister) {
+                        await registerLocker(locker, token, tokenId, writes);
+                      }
+                      return sendCcaWrite(collectCcaWrite(locker, token, tokenId), "collect", writes);
+                    },
                     FEE_COLLECT_COPY.feesSent,
                   );
                 }}
