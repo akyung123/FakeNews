@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ProphecyFactory} from "../src/ProphecyFactory.sol";
+import {Launchpad} from "../src/Launchpad.sol";
 import {SepoliaConfig} from "./SepoliaConfig.sol";
 import {ScriptVm} from "./ScriptVm.sol";
 
-/// Sepolia deploy skeleton. Wired to the current factory stub until PR #8 merges.
+/// Sepolia Launchpad deploy.
 ///
-/// Launchpad constructor (PR #8):
+/// Constructor (contracts/src/Launchpad.sol):
 ///   constructor(address protocolFeeRecipient_, address worldSigner_)
-/// Both immutable, no setter. Zero address reverts.
+/// Both public immutable. Zero address reverts. No setter.
 ///
 /// Dry-run:  ./script/run-sepolia.sh script/Deploy.s.sol
 /// Send:     ./script/run-sepolia.sh script/Deploy.s.sol --broadcast
@@ -31,20 +31,20 @@ contract Deploy is ScriptVm {
         if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
             require(protocolFeeRecipient != address(0), "set PROTOCOL_FEE_RECIPIENT");
             require(worldSigner != address(0), "set WORLD_SIGNER_KEY");
+        } else {
+            // Launchpad reverts on address(0). Placeholders keep dry-run working.
+            if (protocolFeeRecipient == address(0)) protocolFeeRecipient = address(uint160(0xfee));
+            if (worldSigner == address(0)) worldSigner = address(uint160(0x51e));
         }
 
         _start();
-        // TODO(#8): Launchpad launchpad = new Launchpad(protocolFeeRecipient, worldSigner);
-        // constructor(address protocolFeeRecipient_, address worldSigner_)
-        // Both public immutable. After deploy (before relying on logs), require both:
-        //   require(launchpad.worldSigner() == worldSigner);
-        //   require(launchpad.protocolFeeRecipient() == protocolFeeRecipient);
-        // A swapped constructor order compiles; the requires fail in dry-run.
-        ProphecyFactory factory = new ProphecyFactory();
+        Launchpad launchpad = new Launchpad(protocolFeeRecipient, worldSigner);
+        require(launchpad.worldSigner() == worldSigner);
+        require(launchpad.protocolFeeRecipient() == protocolFeeRecipient);
         vm.stopBroadcast();
 
-        address deployed = address(factory);
-        emit Deployed("ProphecyFactory", deployed);
+        address deployed = address(launchpad);
+        emit Deployed("Launchpad", deployed);
         emit Deployed("protocolFeeRecipient", protocolFeeRecipient);
         emit Deployed("worldSigner", worldSigner);
         emit CopyChainId("WORLD_CHAIN_ID", SepoliaConfig.CHAIN_ID);
