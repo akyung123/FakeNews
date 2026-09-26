@@ -1,19 +1,82 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { formatEther } from "viem";
+import { formatEther, type Address } from "viem";
+import { getAccount } from "wagmi/actions";
 import { Bar } from "../components/CoinCard";
+import { contracts, hasLaunchpad } from "../lib/contracts";
+import { createReadCreatorFee, createReadProphetOf } from "../lib/launchpad";
 import {
+  canClaimCreatorFee,
   getProphetPage,
+  normalizeProphetLabel,
+  prophetPageFromChain,
   prophecyDetailPath,
   prophecyTradeLabel,
   type ProphetPageData,
   type ProphetProphecy,
 } from "../lib/prophetData";
+import { wagmiConfig } from "../lib/wagmi";
+import { createClaim, writeErrorMessage, writePhaseCopy, WRITE_COPY, type WritePhase } from "../lib/writes";
 
-export function ProphetPage() {
+export type ProphetPageProps = {
+  claimFee?: () => Promise<unknown>;
+  loadProphet?: (name: string) => Promise<ProphetPageData | null>;
+  readCreatorFee?: (wallet: string) => Promise<bigint>;
+};
+
+async function loadOwnChainProphet(name: string): Promise<ProphetPageData | null> {
+  if (!hasLaunchpad() || !contracts.launchpad) return null;
+  const label = normalizeProphetLabel(name);
+  if (!label) return null;
+  let wallet: Address | undefined;
+  try {
+    wallet = getAccount(wagmiConfig).address;
+  } catch {
+    return null;
+  }
+  if (!wallet) return null;
+  try {
+    const onChain = await createReadProphetOf()(wallet);
+    if (!onChain || onChain.toLowerCase() !== label) return null;
+    const claimableFeeWei = await createReadCreatorFee()(wallet);
+    return prophetPageFromChain({ label, wallet, claimableFeeWei });
+  } catch {
+    return null;
+  }
+}
+
+export function ProphetPage({ claimFee, loadProphet, readCreatorFee }: ProphetPageProps = {}) {
   const { name = "" } = useParams();
-  const data = getProphetPage(name);
+  const chain = hasLaunchpad() || Boolean(loadProphet);
+  const mock = getProphetPage(name);
+  const [chainData, setChainData] = useState<ProphetPageData | null>(null);
+  const [chainReady, setChainReady] = useState(!chain);
+
+  useEffect(() => {
+    if (!chain) return;
+    let cancelled = false;
+    const run = loadProphet ?? loadOwnChainProphet;
+    void run(name)
+      .then((row) => {
+        if (cancelled) return;
+        setChainData(row);
+        setChainReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setChainData(null);
+        setChainReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chain, loadProphet, name]);
+
+  const data = chain ? (chainData ?? (chainReady ? mock : null)) : mock;
   if (!data) {
+    if (chain && !chainReady) {
+      return <main className="prophet-page stack" />;
+    }
     return (
       <main className="narrow">
         <section className="block">
@@ -26,14 +89,56 @@ export function ProphetPage() {
       </main>
     );
   }
-  return <ProphetView data={data} />;
+  return (
+    <ProphetView data={data} chain={chain} claimFee={claimFee} readCreatorFee={readCreatorFee} />
+  );
 }
 
-function ProphetView({ data }: { data: ProphetPageData }) {
+function ProphetView({
+  data,
+  chain,
+  claimFee,
+  readCreatorFee,
+}: {
+  data: ProphetPageData;
+  chain: boolean;
+  claimFee?: () => Promise<unknown>;
+  readCreatorFee?: (wallet: string) => Promise<bigint>;
+}) {
   const departed = data.prophecies.filter((p) => p.departed);
   const nextBuy = data.prophecies.find((p) => !p.departed);
   const [claimed, setClaimed] = useState(false);
-  const feeWei = claimed ? 0n : data.claimableFeeWei;
+  const [pending, setPending] = useState(false);
+  const [phase, setPhase] = useState<WritePhase | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [onChainFee, setOnChainFee] = useState<bigint | null>(null);
+
+  useEffect(() => {
+    if (!chain || !data.fromChain) {
+      setOnChainFee(null);
+      return;
+    }
+    const read = readCreatorFee ?? (hasLaunchpad() ? createReadCreatorFee() : undefined);
+    if (!read) {
+      setOnChainFee(null);
+      return;
+    }
+    let cancelled = false;
+    void read(data.prophet.wallet)
+      .then((fee) => {
+        if (!cancelled) setOnChainFee(fee);
+      })
+      .catch(() => {
+        if (!cancelled) setOnChainFee(0n);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chain, data.fromChain, data.prophet.wallet, readCreatorFee]);
+
+  const feeWei = claimed ? 0n : (onChainFee ?? data.claimableFeeWei);
+  const showClaim = canClaimCreatorFee(data, { chain, claimFee });
+  const claimDisabled = claimed || feeWei === 0n || pending;
 
   return (
     <main className="prophet-page stack">
@@ -55,14 +160,41 @@ function ProphetView({ data }: { data: ProphetPageData }) {
           <p className="faint small">Claimable fees</p>
           <p className="big-num">{formatFee(feeWei)}</p>
         </div>
-        <button
-          type="button"
-          className="btn primary"
-          disabled={claimed || feeWei === 0n}
-          onClick={() => setClaimed(true)}
-        >
-          {claimed ? "Claimed" : "Claim fees"}
-        </button>
+        {showClaim ? (
+          <button
+            type="button"
+            className="btn primary"
+            disabled={claimDisabled}
+            onClick={() => {
+              if (claimDisabled) return;
+              void (async () => {
+                setPending(true);
+                setPhase("wallet");
+                setError(null);
+                try {
+                  await (claimFee ?? createClaim({ onPhase: setPhase }))();
+                  setClaimed(true);
+                } catch (err) {
+                  setError(writeErrorMessage(err));
+                } finally {
+                  setPending(false);
+                  setPhase(null);
+                }
+              })();
+            }}
+          >
+            {claimed ? WRITE_COPY.claimSuccess : "Claim fees"}
+          </button>
+        ) : null}
+        {pending && writePhaseCopy(phase) ? (
+          <p className="banner-lock">{writePhaseCopy(phase)}</p>
+        ) : null}
+        {claimed ? <p className="up">{WRITE_COPY.claimSuccess}</p> : null}
+        {error ? (
+          <p className="banner-error" role="alert">
+            {error}
+          </p>
+        ) : null}
       </section>
 
       <div className="prophet-split">

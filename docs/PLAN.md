@@ -61,7 +61,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - cancelling or failing disables it
 - [ ] Screen 3: prophecy detail
   - find the token by name
-  - buy and sell
+  - [x] buy and sell @cursor-agent
   - no True / False
   - optional one-line memo on buy and sell; recent trades listed with their memos
   - [x] replace the prototype's holder talk with trade memos @cursor
