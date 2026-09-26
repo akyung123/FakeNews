@@ -20,7 +20,7 @@ import {ProphecyEns} from "../src/ens/ProphecyEns.sol";
 import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
 import {LockActor, LockFactory, LockRegistry, LockResolver} from "./LockMock.sol";
-import {LaunchpadTestBase} from "./LaunchpadHelpers.sol";
+import {LaunchpadTestBase, MockProphecyEns} from "./LaunchpadHelpers.sol";
 
 /// Launchpad → ProphecyEns: sentence written at init only, name lock holds.
 contract LaunchpadEnsTest is LaunchpadTestBase {
@@ -47,21 +47,25 @@ contract LaunchpadEnsTest is LaunchpadTestBase {
         actor = new LockActor();
         vm.deal(address(actor), 10 ether);
 
-        address predicted = vm.computeCreateAddress(address(this), vm.getNonce(address(this)) + 1);
+        // First Launchpad deploy also links CurveMath; do that before predicting.
+        new Launchpad(protocol, signer, IProphecyEns(address(new MockProphecyEns())));
+
+        uint64 nonce = vm.getNonce(address(this));
+        address predictedPad = vm.computeCreateAddress(address(this), nonce + 1);
         realEns = new ProphecyEns(
-            predicted,
+            predictedPad,
             IPermissionedRegistry(address(parent)),
             parentDns,
             IVerifiableFactory(address(factory)),
             address(registryKind),
             address(resolverKind)
         );
+        launchpad = new Launchpad(protocol, signer, IProphecyEns(address(realEns)));
+        require(address(launchpad) == predictedPad, "launchpad address");
+
         Grant[] memory grants = new Grant[](1);
         grants[0] = Grant({account: address(realEns), roleBitmap: ROLE_REGISTRAR});
         parent.initialize(grants);
-
-        launchpad = new Launchpad(protocol, signer, IProphecyEns(address(realEns)));
-        require(address(launchpad) == predicted, "launchpad address");
     }
 
     function test_launchRegistersFullNameAndLocksSentence() public {

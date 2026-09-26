@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IProphecyEns} from "../src/ens/IProphecyEns.sol";
 import {Launchpad} from "../src/Launchpad.sol";
 import {SepoliaConfig} from "./SepoliaConfig.sol";
 import {ScriptVm} from "./ScriptVm.sol";
@@ -8,8 +9,8 @@ import {ScriptVm} from "./ScriptVm.sol";
 /// Sepolia Launchpad deploy.
 ///
 /// Constructor (contracts/src/Launchpad.sol):
-///   constructor(address protocolFeeRecipient_, address worldSigner_)
-/// Both public immutable. Zero address reverts. No setter.
+///   constructor(address protocolFeeRecipient_, address worldSigner_, IProphecyEns ens_)
+/// All three public immutable. Zero address reverts. No setter.
 ///
 /// Dry-run:  ./script/run-sepolia.sh script/Deploy.s.sol
 /// Send:     ./script/run-sepolia.sh script/Deploy.s.sol --broadcast
@@ -28,19 +29,23 @@ contract Deploy is ScriptVm {
 
         address protocolFeeRecipient = vm.envOr("PROTOCOL_FEE_RECIPIENT", address(0));
         address worldSigner = _worldSigner();
+        address ens = vm.envOr("ENS_ADDRESS", address(0));
         if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
             require(protocolFeeRecipient != address(0), "set PROTOCOL_FEE_RECIPIENT");
             require(worldSigner != address(0), "set WORLD_SIGNER_KEY");
+            require(ens != address(0), "set ENS_ADDRESS");
         } else {
             // Launchpad reverts on address(0). Placeholders keep dry-run working.
             if (protocolFeeRecipient == address(0)) protocolFeeRecipient = address(uint160(0xfee));
             if (worldSigner == address(0)) worldSigner = address(uint160(0x51e));
+            if (ens == address(0)) ens = address(uint160(0xe05));
         }
 
         _start();
-        Launchpad launchpad = new Launchpad(protocolFeeRecipient, worldSigner);
+        Launchpad launchpad = new Launchpad(protocolFeeRecipient, worldSigner, IProphecyEns(ens));
         require(launchpad.worldSigner() == worldSigner);
         require(launchpad.protocolFeeRecipient() == protocolFeeRecipient);
+        require(address(launchpad.ens()) == ens);
         vm.stopBroadcast();
 
         address deployed = address(launchpad);

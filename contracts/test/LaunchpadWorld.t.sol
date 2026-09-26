@@ -99,6 +99,20 @@ contract LaunchpadWorldTest is LaunchpadTestBase {
         launchpad.registerProphet("ringo", 2, _sign(buyer, 2));
     }
 
+    function test_alreadyProphetReverts() public {
+        _registerProphet(prophet, "ringo");
+        vm.prank(prophet);
+        vm.expectRevert(Launchpad.AlreadyProphet.selector);
+        launchpad.registerProphet("mina", 2, _sign(prophet, 2));
+    }
+
+    function test_signatureForOtherWalletReverts() public {
+        bytes memory sig = _sign(prophet, 1);
+        vm.prank(buyer);
+        vm.expectRevert(Launchpad.InvalidSignature.selector);
+        launchpad.registerProphet("ringo", 1, sig);
+    }
+
     function test_invalidLabelReverts() public {
         vm.prank(prophet);
         vm.expectRevert(Launchpad.BadLabel.selector);
