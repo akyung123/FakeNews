@@ -122,7 +122,7 @@ Copy [`.env.example`](../.env.example) locally. Names only in git.
 | `contracts/.env` | Foundry (`SEPOLIA_RPC_URL`, keys, fee recipient, ENS) |
 | `world/.env` | World server (not started) |
 
-Foundry also accepts exported shell variables. `foundry.toml` maps `sepolia` to `SEPOLIA_RPC_URL`.
+`run-sepolia.sh` loads `contracts/.env` if present. Foundry also accepts exported shell variables. `foundry.toml` maps `sepolia` to `SEPOLIA_RPC_URL`. The deployer key is read inside the Solidity script, not placed on the process command line.
 
 ## CI
 
