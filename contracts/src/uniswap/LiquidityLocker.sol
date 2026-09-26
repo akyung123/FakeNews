@@ -5,8 +5,8 @@ import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {IUnlockCallback} from "v4-core/src/interfaces/callback/IUnlockCallback.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
-import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
-import {Currency, CurrencyLibrary} from "v4-core/src/types/Currency.sol";
+import {PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
+import {Currency} from "v4-core/src/types/Currency.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {IERC20Minimal} from "v4-core/src/interfaces/external/IERC20Minimal.sol";
@@ -21,8 +21,14 @@ contract LiquidityLocker is IUnlockCallback {
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
 
+    uint256 private constant _NOT_ENTERED = 1;
+    uint256 private constant _ENTERED = 2;
+
     IPoolManager public immutable poolManager;
     address public immutable launchpad;
+    IHooks public immutable hook;
+
+    uint256 private _status = _NOT_ENTERED;
 
     struct Position {
         Currency currency0;
@@ -59,11 +65,22 @@ contract LiquidityLocker is IUnlockCallback {
     error UnexpectedDebt();
     error EthTransferFailed();
     error TokenTransferFailed();
+    error Reentrant();
 
-    constructor(IPoolManager poolManager_, address launchpad_) {
-        if (address(poolManager_) == address(0) || launchpad_ == address(0)) revert ZeroAddress();
+    modifier nonReentrant() {
+        if (_status == _ENTERED) revert Reentrant();
+        _status = _ENTERED;
+        _;
+        _status = _NOT_ENTERED;
+    }
+
+    constructor(IPoolManager poolManager_, address launchpad_, IHooks hook_) {
+        if (address(poolManager_) == address(0) || launchpad_ == address(0) || address(hook_) == address(0)) {
+            revert ZeroAddress();
+        }
         poolManager = poolManager_;
         launchpad = launchpad_;
+        hook = hook_;
     }
 
     receive() external payable {}
@@ -76,7 +93,7 @@ contract LiquidityLocker is IUnlockCallback {
         address protocolFeeRecipient,
         PoolKey calldata key,
         uint256 tokenAmount
-    ) external payable {
+    ) external payable nonReentrant {
         if (msg.sender != launchpad) revert NotLaunchpad();
         if (token == address(0) || prophet == address(0) || protocolFeeRecipient == address(0)) revert ZeroAddress();
         Position storage p = positions[token];
@@ -84,6 +101,7 @@ contract LiquidityLocker is IUnlockCallback {
         if (
             Currency.unwrap(key.currency0) != address(0) || Currency.unwrap(key.currency1) != token
                 || key.fee != Graduation.POOL_FEE || key.tickSpacing != Graduation.TICK_SPACING
+                || address(key.hooks) != address(hook)
         ) revert BadPoolKey();
 
         p.currency0 = key.currency0;
@@ -104,21 +122,22 @@ contract LiquidityLocker is IUnlockCallback {
             }
         }
 
-        poolManager.unlock(abi.encode(true, token, msg.sender));
+        poolManager.unlock(abi.encode(true, token, msg.sender, msg.value, tokenAmount));
     }
 
     /// Anyone may call. Fees go only to the two recipients stored at lock time.
-    function collect(address token) external {
+    function collect(address token) external nonReentrant {
         Position storage p = positions[token];
         if (!p.locked) revert UnknownLock();
-        poolManager.unlock(abi.encode(false, token, address(0)));
+        poolManager.unlock(abi.encode(false, token, address(0), uint256(0), uint256(0)));
     }
 
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
         if (msg.sender != address(poolManager)) revert NotPoolManager();
-        (bool isLock, address token, address refundTo) = abi.decode(data, (bool, address, address));
+        (bool isLock, address token, address refundTo, uint256 amount0, uint256 amount1) =
+            abi.decode(data, (bool, address, address, uint256, uint256));
         if (isLock) {
-            _addLiquidity(token, refundTo);
+            _addLiquidity(token, refundTo, amount0, amount1);
         } else {
             _collectFees(token);
         }
@@ -135,13 +154,11 @@ contract LiquidityLocker is IUnlockCallback {
         });
     }
 
-    function _addLiquidity(address token, address refundTo) internal {
+    function _addLiquidity(address token, address refundTo, uint256 amount0, uint256 amount1) internal {
         Position storage p = positions[token];
         PoolKey memory key = _poolKey(p);
         (uint160 sqrtPriceX96,,,) = poolManager.getSlot0(key.toId());
 
-        uint256 amount0 = address(this).balance;
-        uint256 amount1 = IERC20Minimal(token).balanceOf(address(this));
         uint128 liquidity = Graduation.fullRangeLiquidity(sqrtPriceX96, amount0, amount1);
         if (liquidity == 0) revert ZeroLiquidity();
 
@@ -180,15 +197,32 @@ contract LiquidityLocker is IUnlockCallback {
         int128 d1 = delta.amount1();
         if (d0 < 0 || d1 < 0) revert UnexpectedDebt();
 
-        (uint256 prophet0, uint256 protocol0) = Graduation.splitFees(uint256(uint128(d0)));
-        (uint256 prophet1, uint256 protocol1) = Graduation.splitFees(uint256(uint128(d1)));
+        uint256 amount0 = uint256(uint128(d0));
+        uint256 amount1 = uint256(uint128(d1));
+        (uint256 prophet0, uint256 protocol0) = Graduation.splitFees(amount0);
+        (uint256 prophet1, uint256 protocol1) = Graduation.splitFees(amount1);
 
-        if (prophet0 > 0) key.currency0.take(poolManager, p.prophet, prophet0, false);
-        if (protocol0 > 0) key.currency0.take(poolManager, p.protocolFeeRecipient, protocol0, false);
-        if (prophet1 > 0) key.currency1.take(poolManager, p.prophet, prophet1, false);
-        if (protocol1 > 0) key.currency1.take(poolManager, p.protocolFeeRecipient, protocol1, false);
+        if (amount0 > 0) key.currency0.take(poolManager, address(this), amount0, false);
+        if (amount1 > 0) key.currency1.take(poolManager, address(this), amount1, false);
+
+        // Protocol first. A later follow-up can drop the revert on prophet payout
+        // without changing who is paid first.
+        _pay(key.currency0, p.protocolFeeRecipient, protocol0);
+        _pay(key.currency1, p.protocolFeeRecipient, protocol1);
+        _pay(key.currency0, p.prophet, prophet0);
+        _pay(key.currency1, p.prophet, prophet1);
 
         emit Collected(token, prophet0, protocol0, prophet1, protocol1);
+    }
+
+    function _pay(Currency currency, address to, uint256 amount) internal {
+        if (amount == 0) return;
+        if (currency.isAddressZero()) {
+            (bool ok,) = to.call{value: amount}("");
+            if (!ok) revert EthTransferFailed();
+        } else if (!IERC20Minimal(Currency.unwrap(currency)).transfer(to, amount)) {
+            revert TokenTransferFailed();
+        }
     }
 
     function _settleDelta(PoolKey memory key, BalanceDelta delta) internal {

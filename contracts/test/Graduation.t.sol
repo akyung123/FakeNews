@@ -42,7 +42,7 @@ contract GraduationTest is Test {
         (, bytes32 salt) =
             HookMiner.find(address(this), HookMiner.prophecyFlags(), type(ProphecyHook).creationCode, ctorArgs);
         hook = new ProphecyHook{salt: salt}(manager, address(this));
-        locker = new LiquidityLocker(manager, address(this));
+        locker = new LiquidityLocker(manager, address(this), IHooks(address(hook)));
     }
 
     function test_fullRangeTicksMatchSpacing200() public pure {
