@@ -52,9 +52,8 @@ contract RegisterParent is Script {
         IETHRegistrar registrar = IETHRegistrar(SepoliaConfig.ETH_REGISTRAR);
 
         require(registrar.isAvailable(label), "label not available");
-        bytes32 commitment = registrar.makeCommitment(
-            label, owner, secret, address(0), address(0), duration, bytes32(0)
-        );
+        bytes32 commitment =
+            registrar.makeCommitment(label, owner, secret, address(0), address(0), duration, bytes32(0));
 
         console.log("label", label);
         console.log("owner", owner);
@@ -71,9 +70,8 @@ contract RegisterParent is Script {
         IETHRegistrar registrar = IETHRegistrar(SepoliaConfig.ETH_REGISTRAR);
         IERC20 usdc = IERC20(SepoliaConfig.MOCK_USDC);
 
-        bytes32 commitment = registrar.makeCommitment(
-            label, owner, secret, address(0), address(0), duration, bytes32(0)
-        );
+        bytes32 commitment =
+            registrar.makeCommitment(label, owner, secret, address(0), address(0), duration, bytes32(0));
         uint64 committedAt = registrar.commitmentAt(commitment);
         require(committedAt != 0, "commit first");
         require(block.timestamp >= uint256(committedAt) + 60, "wait 60s after commit");
