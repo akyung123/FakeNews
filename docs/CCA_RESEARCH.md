@@ -387,7 +387,226 @@ Do not use official LBPStrategy as the 22:00 fallback: it cannot attach `Prophec
 
 ---
 
-## 6. Source index
+## 7. Infra (deploy order, addresses, gas)
+
+Folder contract for the same facts: [`INTERFACE.md`](INTERFACE.md) section 9.
+
+This section does **not** edit `script/`. It is the proposed later change to `Deploy.s.sol` and `deployments/sepolia.json`.
+
+### Must we deploy CCA contracts ourselves?
+
+**No, not the factory, lens, PoolManager, or PositionManager.** Those are already on Sepolia (section 1). Path A only **creates per-prophecy auction clones** through the official factory at issue time (`factory.create` inside `launch`). We still deploy our own Launchpad, Hook, Locker, ENS adapter.
+
+| Contract | Deploy ourselves? | Why |
+|---|---|---|
+| ContinuousClearingAuctionFactory v2.1.0 | No | Canonical address, bytecode present |
+| Each `ContinuousClearingAuction` | Yes, via factory `create` at `launch` | One auction per prophecy. Not a Launchpad constructor deploy |
+| CCALens | No | Optional read helper, already on Sepolia |
+| LiquidityLauncher / LBPStrategy | No | Path A does not use them |
+| Uniswap v4 PoolManager / PositionManager | No | Official Sepolia table |
+| Launchpad, ProphecyHook, LiquidityLocker, ProphecyEns | Yes | Same as today ([`Deploy.s.sol` header](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/contracts/script/Deploy.s.sol#L17-L38)) |
+
+### Proposed `Deploy.s.sol` order (Path A)
+
+Keep today’s one-broadcast order, then wire the official factory. Do not CREATE a factory.
+
+1. Predict Launchpad CREATE address.
+2. `new ProphecyEns(predictedPad, …)` then `new Launchpad(protocolFeeRecipient, worldSigner, ens)` — unchanged ([Deploy.s.sol L23-L29](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/contracts/script/Deploy.s.sol#L23-L29)).
+3. Mine CREATE2 salt; `new ProphecyHook{salt}(poolManager, launchpad)`.
+4. `new LiquidityLocker(poolManager, launchpad, hook)`.
+5. `launchpad.setUniswap(poolManager, hook, locker)` once.
+6. **New:** `launchpad.setCcaFactory(0x000000001F26a0044BaA66024e7b6599c61963F8)` (official v2.1.0). Require `launchpad.ccaFactory()` matches.
+
+PoolManager stays `SepoliaConfig.POOL_MANAGER` / [v4 deployments](https://docs.uniswap.org/contracts/v4/deployments). Optional `UNISWAP_V4_POOL_MANAGER` unchanged.
+
+v4 **pool** wiring is **not** a deploy-time CREATE. Each prophecy’s pool is created later by `graduate(token)` (`poolManager.initialize` + `locker.lock`), same moment as today’s last-buy graduate ([Launchpad.sol L399-L409](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/contracts/src/Launchpad.sol#L399-L409)).
+
+Auctions are also **not** deploy-time. `launch` calls `factory.create` per prophecy.
+
+### `deployments/sepolia.json` and `VITE_*`
+
+Current record after a send ([infra/README.md “Deployment record”](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/infra/README.md#deployment-record)):
+
+```json
+{
+  "chainId": 11155111,
+  "launchpad": "0x…",
+  "launchpadBlock": 12345678,
+  "adapter": "0x…",
+  "parentUserRegistry": "0x…",
+  "hook": "0x…",
+  "locker": "0x…",
+  "poolManager": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
+  "deployer": "0x…",
+  "commit": "<git sha>"
+}
+```
+
+**Proposed additions** (later infra PR; this research PR does not edit the writer script):
+
+| JSON field | Value | Vite / web |
+|---|---|---|
+| `ccaFactory` | `0x000000001F26a0044BaA66024e7b6599c61963F8` | optional `VITE_CCA_FACTORY`; empty = `launchpad.ccaFactory()` |
+| `ccaLens` | `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53` | optional `VITE_CCA_LENS`; empty = official lens or skip |
+| *(existing)* `launchpad` | our CREATE | `VITE_LAUNCHPAD_ADDRESS` (required for the home `Launched` list) |
+| *(existing)* `launchpadBlock` | Launchpad CREATE block | `VITE_LAUNCHPAD_DEPLOY_BLOCK` (`fromBlock` for `Launched`) |
+| *(existing)* `hook` / `locker` | our CREATE2 / CREATE | optional `VITE_HOOK_ADDRESS` / `VITE_LOCKER_ADDRESS` |
+| *(existing)* `poolManager` | official v4 | not a Vite var today |
+| *(do not add per auction)* | auction addresses | come from `Launched.auction` / `auctionOf(token)`, not the deploy record |
+
+`VITE_CHAIN_ID` stays `11155111`. Per-prophecy auction and pool addresses must not be hardcoded ([AGENTS.md](../AGENTS.md): UI reads names from ENS; list from logs).
+
+### Gas (measured vs estimate vs UNVERIFIED)
+
+No official CCA `.forge-snapshots` tree exists at tag v2.1.0 (GitHub directory listing returned not found). Do not treat the numbers below as CCA-team measurements.
+
+| Op | Kind | Number | Source |
+|---|---|---|---|
+| Our current Sepolia stack (14 txs: MockUSDC + adapter + Launchpad + Hook + Locker + `setUniswap`) | **Measured** (fork) | ~6.82M gas total | [infra/README.md L104](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/infra/README.md#L104) |
+| Extra `setCcaFactory` (one SSTORE + event) | **Estimate** | tens of thousands of gas | typical one-time setter; **not measured** |
+| Deploy our own CCA factory | **UNVERIFIED** | — | Official factory already exists; do not deploy |
+| `factory.create` (one auction) | **UNVERIFIED** | — | Large CREATE2 of `ContinuousClearingAuction` (factory itself is 24,215 bytes runtime; auction size **UNVERIFIED**). A person should `forge snapshot` after the contracts PR |
+| `submitBid` (ETH, existing tick) | **UNVERIFIED** | — | Docs warn the no-hint overload “will be gas intensive” ([TechnicalDocumentation — submitBid](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/docs/TechnicalDocumentation.md#submitbid)); first bid in a block also writes a checkpoint |
+| `checkpoint` / `forceIterateOverTicks` | **UNVERIFIED**; can OOG | — | Implementation comment: iterating many ticks “can revert with out of gas” ([ContinuousClearingAuction.sol L351-L352](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuction.sol#L351-L352)) |
+| `exitBid` / `claimTokens` | **UNVERIFIED** | — | O(1) after hints / exit; not snapshotted in the official repo |
+| Path A `graduate` (`sweep*` + `initialize` + `locker.lock`) | **UNVERIFIED** as a CCA flow | — | Same shape as today’s `_graduate` + two CCA sweeps. Today’s graduate gas is **UNVERIFIED** in-repo (no snapshot file cited) |
+| Path B `LBPStrategy.migrate` | **UNVERIFIED** | — | Not recommended |
+
+ETH cost at 1 / 5 / 20 gwei for the **current** 6.82M deploy is in infra/README (0.0068 / 0.034 / 0.136 ETH). Adding CCA factory CREATE is unnecessary. Adding one `setCcaFactory` does not change that order of magnitude.
+
+---
+
+## 8. Designer: auction states and revert names
+
+Folder contract: [`INTERFACE.md`](INTERFACE.md) section 8.
+
+CCA has **no** `getState()` enum ([IContinuousClearingAuction.sol](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuction.sol)). The UI derives a label from blocks + views. `$_tokensReceived` is **internal** ([AuctionStorage](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/AuctionStorage.sol)); there is no public `tokensReceived()` getter.
+
+`block` below is the chain’s block-numberish (`START_BLOCK` / `END_BLOCK` / `CLAIM_BLOCK` getters). Sepolia is 12s blocks.
+
+| UI state | Detect on-chain | User can |
+|---|---|---|
+| **Not funded** | No `TokensReceived` log; `token.balanceOf(auction) < totalSupply()` *or* `submitBid` would revert `TokensNotReceived`. After Path A `launch`, this should not appear (same tx calls `onTokensReceived`) | Nothing |
+| **Not started** | Funded, and `block < startBlock()` | Wait. Bid reverts `AuctionNotStarted` |
+| **Live** | Funded, `startBlock() <= block < endBlock()`, and remaining supply / MPS > 0 | `submitBid`. Clearing price from `clearingPrice()` or CCALens `state(auction)` |
+| **Sold out (still live)** | `block < endBlock()` but next `submitBid` reverts `AuctionSoldOut` | Wait for end, then exit/claim if graduated |
+| **Ended, not finalized** | `block >= endBlock()` and `lastCheckpointedBlock() != endBlock()` | Anyone `checkpoint()` to write the final checkpoint ([ICheckpointStorage.lastCheckpointedBlock](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/ICheckpointStorage.sol#L21)) |
+| **Ended, graduated** | `block >= endBlock()`, `isGraduated() == true` (needs an up-to-date checkpoint; `isGraduated` “relies on the latest checkpoint which may be out of date” — [interface L172-L176](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuction.sol#L172-L176)) | `exitBid` / `exitPartiallyFilledBid`. Launchpad `graduate` once Uniswap is set |
+| **Ended, failed** | `block >= endBlock()` and `isGraduated() == false` after a final checkpoint | Full refund via `exitBid` (tokensFilled = 0). `claimTokens` reverts `NotGraduated`. `sweepUnsoldTokens` returns the whole supply to `tokensRecipient` |
+| **Claimable** | Graduated and `block >= claimBlock()` and the bid has `exitedBlock != 0` | `claimTokens` / `claimTokensBatch` |
+| **Claim blocked** | Graduated but `block < claimBlock()` | Exit is allowed after end; claim reverts `NotClaimable` |
+| **Pool open** | Launchpad `auctionOf(token).poolOpened == true` or a `Graduated` log for that token | Trade on Uniswap v4 (section 9.4). Auction bid/sell is over |
+
+CCALens `state(auction)` (off-chain `eth_call`) runs `checkpoint()` and returns `{checkpoint, currencyRaised, totalCleared, isGraduated}` without a user tx ([AuctionStateLens.sol L9-L30](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/lens/AuctionStateLens.sol#L9-L30)). Address: `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53`.
+
+Departed (`now >= deadline` from ENS) is **independent** of these auction states ([INTERFACE §1](INTERFACE.md), DECISIONS #9).
+
+### User-facing revert names
+
+**Bid (`submitBid`)** — [IContinuousClearingAuction.sol L40-L93](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuction.sol#L40-L93), [IStepStorage.sol L13](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IStepStorage.sol#L13), [ITickStorage.sol](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/ITickStorage.sol):
+
+`AuctionNotStarted`, `TokensNotReceived`, `AuctionIsOver`, `BidAmountTooSmall`, `BidOwnerCannotBeZeroAddress`, `InvalidAmount` (ETH `msg.value != amount`), `CurrencyIsNotNative` (ERC-20 bid sent ETH), `InvalidBidPriceTooHigh`, `BidMustBeAboveClearingPrice`, `AuctionSoldOut`, `InvalidBidUnableToClear`, `TickPreviousPriceInvalid`, `TickPriceNotIncreasing`, `TickPriceNotAtBoundary`, `TickNotInitialized`, `InvalidTickPrice`, `TickHintMustBeGreaterThanNextActiveTickPrice`.
+
+**Exit / refund (`exitBid`, `exitPartiallyFilledBid`)** — same interface + [IBidStorage.sol L9](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IBidStorage.sol#L9):
+
+`AuctionIsNotOver` (`exitBid` before end), `BidAlreadyExited`, `CannotExitBid` (max price not strictly above final clearing — use partial exit), `CannotPartiallyExitBidBeforeGraduation`, `CannotPartiallyExitBidBeforeEndBlock`, `InvalidLastFullyFilledCheckpointHint`, `InvalidOutbidBlockCheckpointHint`, `BidIdDoesNotExist`.
+
+**Claim (`claimTokens`, `claimTokensBatch`)** — [IStepStorage `NotClaimable`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IStepStorage.sol#L17), [IAuctionStorage `NotGraduated`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IAuctionStorage.sol#L25):
+
+`NotClaimable` (before `claimBlock`), `AuctionIsNotFinalized` (end block not checkpointed), `NotGraduated`, `BidNotExited`, `BatchClaimDifferentOwner`, `BidIdDoesNotExist`.
+
+**Sweep / Launchpad `graduate` (CCA side):** `NotAuthorized`, `CannotSweepCurrency`, `CannotSweepTokens`, `AuctionIsNotOver`, `AuctionIsNotFinalized`, `NotGraduated` (`lbpInitializationParams`).
+
+**Create-time (factory / constructor, prophet sees these on `launch`):** factory `InvalidTokenAmount` ([IContinuousClearingAuctionFactory.sol L12](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuctionFactory.sol#L12)); constructor / storage: `InvalidEndBlock`, `ClaimBlockIsBeforeEndBlock`, `InvalidAuctionDataLength`, `StepBlockDeltaCannotBeZero`, `InvalidStepDataMps`, `InvalidEndBlockGivenStepData`, `FloorPriceIsZero`, `FloorPriceTooLow`, `TickSpacingTooSmall`, `FloorPriceAndTickSpacingGreaterThanMaxBidPrice`, `FloorPriceAndTickSpacingTooLarge`, `TotalSupplyIsZero`, `TotalSupplyIsTooLarge`, `TokenIsAddressZero`, `TokenAndCurrencyCannotBeTheSame`, `FundsRecipientIsZero`, `TokensRecipientIsZero`. Funding after CREATE: `InvalidTokenAmountReceived` (`onTokensReceived`).
+
+Path A does **not** invent new Launchpad custom-error names here (`Launchpad.sol` still has the curve surface). Existing Launchpad names that still apply, plus the official CCA names above, are the INTERFACE contract (INTERFACE §§4, 8, 9). New Launchpad-only names (`CcaFactoryNotSet` and the like) are left to the contracts PR.
+
+---
+
+## 9. Frontend
+
+Folder contract: [`INTERFACE.md`](INTERFACE.md) section 4.
+
+### 9.1 Home list event and auction address
+
+**Keep `Launched`.** Do not invent a second list event. Path A **extends** it with `auction` as the third indexed topic so the home list still uses `fromBlock = VITE_LAUNCHPAD_DEPLOY_BLOCK` ([web `fetchLaunchedLogs`](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/web/src/lib/launchpad.ts); [INTERFACE §4](INTERFACE.md)).
+
+```solidity
+event Launched(
+    address indexed token,
+    address indexed prophet,
+    address indexed auction,
+    string prophetLabel,
+    string slug
+);
+```
+
+How to get the auction from a token:
+
+1. `launchpad.auctionOf(token)` → `(auction, poolOpened)` (proposed view).
+2. Or decode `Launched` where `token` matches.
+3. Factory `getAddress(token, amount, configData, salt, sender)` only if the UI already has the exact create args ([IDistributorFactory.getAddress](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IDistributorFactory.sol#L26-L29)). Prefer (1).
+
+Sentence / deadline still come from ENS, never from `Launched` (DECISIONS #5).
+
+### 9.2 Views: state and clearing price
+
+| Need | Call | Notes |
+|---|---|---|
+| Auction address + pool flag | `launchpad.auctionOf(token)` | Proposed |
+| Start / end / claim blocks | `auction.startBlock()`, `endBlock()`, `claimBlock()` | [IContinuousClearingAuction L230-L236](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuction.sol#L230-L236) |
+| Clearing price (Q96, ETH per token) | `auction.clearingPrice()` | Stale until `checkpoint()`; docs say prefer this over the checkpoint field ([L166-L171](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuction.sol#L166-L171)) |
+| Fresh checkpoint + raised + cleared + graduated | CCALens `state(auction)` via `eth_call` | [AuctionStateLens.sol L25-L30](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/lens/AuctionStateLens.sol#L25-L30) |
+| Graduated? | `auction.isGraduated()` after a current checkpoint | May be stale |
+| Finalized? | `auction.lastCheckpointedBlock() == auction.endBlock()` | |
+| Floor / tick | `auction.floorPrice()`, `auction.tickSpacing()` | [ITickStorage](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/ITickStorage.sol#L48-L52) |
+| One bid | `auction.bids(bidId)` → `Bid{startBlock, exitedBlock, maxPrice, owner, amountQ96, tokensFilled, …}` | [BidLib.sol L6-L14](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/libraries/BidLib.sol#L6-L14); missing id → `BidIdDoesNotExist` |
+
+Display price: `clearingPrice / 2^96` ETH per token (Q96). Do not use `curve()`.
+
+### 9.3 Bid, claim, exit — signatures and errors
+
+All on the **CCA**, not Launchpad. ETH currency: `address(0)`.
+
+```solidity
+function submitBid(uint256 maxPriceQ96, uint128 amount, address owner, uint256 prevTickPriceQ96, bytes calldata hookData)
+    external payable returns (uint256 bidId);
+// 4-arg overload: same without prevTickPriceQ96 (scans from floor — avoid in the demo)
+
+function exitBid(uint256 bidId) external;
+function exitPartiallyFilledBid(uint256 bidId, uint64 lastFullyFilledCheckpointBlock, uint64 outbidBlock) external;
+
+function claimTokens(uint256 bidId) external;
+function claimTokensBatch(address owner, uint256[] calldata bidIds) external;
+```
+
+[IContinuousClearingAuction.sol L137-L201](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuction.sol#L137-L201).
+
+| Action | ETH / tokens | Reverts the user should see |
+|---|---|---|
+| Bid | `msg.value == amount`; `owner` = bidder | §8 Bid list. Empty `hookData` if no validation hook |
+| Refund / exit | leftover ETH paid in `BidExited` | §8 Exit list. Failed auction: `exitBid` refunds 100% |
+| Claim after clearing | tokens to `bid.owner` after `claimBlock` | §8 Claim list. Must exit first |
+
+Events: `BidSubmitted(id, owner, priceQ96, amount)`, `BidExited(bidId, owner, tokensFilled, currencyRefunded)`, `TokensClaimed(bidId, owner, tokensFilled)`.
+
+### 9.4 Post-pool trading: in-app swap vs Uniswap link
+
+**Recommendation: Uniswap link, not an in-app v4 swap.** Same as today.
+
+Reasons (product + what the code already does):
+
+- After graduation the web **already hides Buy/Sell** and shows “View pool on Uniswap” ([CoinPage.tsx](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/web/src/pages/CoinPage.tsx); copy `GRADUATED_BODY` / `GRADUATED_LINK` in [graduation.ts L11-L13](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/web/src/lib/graduation.ts#L11-L13)).
+- The live URL shape is verified against a Sepolia v4 pool: `https://app.uniswap.org/explore/pools/ethereum_sepolia/<poolId>` ([graduation.ts L19-L26](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/web/src/lib/graduation.ts#L19-L26)).
+- `ProphecyHook` only implements `beforeInitialize`. It does **not** implement `beforeSwap` / `afterSwap` ([ProphecyHook.sol L26-L43](https://github.com/prism-toggle-ai/FakeNews/blob/70430a5cc72acd27ebb7ec6cfb13898a591ca474/contracts/src/uniswap/ProphecyHook.sol#L26-L43)). An in-app swap would be a generic v4 swap (Universal Router `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3` on Sepolia — [v4 deployments](https://docs.uniswap.org/contracts/v4/deployments)), not “via our hook”.
+- Building a router swap UI is extra contracts/web work after Path A auction + `graduate`. The 22:00 checkpoint is CCA working, not an in-app AMM.
+- Hook still gates **who opens** the pool (Launchpad only). It does not gate who swaps once the pool exists.
+
+Use `Graduated.poolId` (or reconstruct ETH/`token`/fee 10000/tick 200/`hook()`). Do not point at LBPStrategy pools.
+
+---
+
+## 10. Source index
 
 | What | Link |
 |---|---|

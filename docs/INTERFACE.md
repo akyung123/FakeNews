@@ -4,6 +4,8 @@
 >
 > **Path A (recommended):** official CCA factory on Sepolia + our Launchpad still initializes the v4 pool and locks LP in `LiquidityLocker`. Frontend talks to the CCA for bid / exit / claim.
 > **Path B (not recommended for the hackathon):** official `LBPStrategy.migrate`. Cannot attach today's `ProphecyHook` / `LiquidityLocker` without rewriting both. See CCA_RESEARCH section 3.
+>
+> Team addenda (same no-guess rule): Frontend §4, Designer §8, Infra §9. Sources: [`CCA_RESEARCH.md`](CCA_RESEARCH.md) §§7–9.
 
 What `contracts/`, `web/` and `world/` rely on from each other. Only the contract between folders, not how to implement it.
 
@@ -238,18 +240,86 @@ Live IDKit uses `app_id`, `action`, and `environment` from this envelope so the 
 
 Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check can take a minute when the World server has been idle. The issue button stays off while the check is running. The retry sentence is shown only after a timeout or a dropped connection — not while the request is still open.
 
-## 4. How the web app reads `(PROPOSAL)`
+## 4. How the web app reads `(PROPOSAL)` — Frontend
 
-1. List: `Launched` logs (now includes `auction`).
-2. Names, resolved through the Universal Resolver (`VITE_UNIVERSAL_RESOLVER`):
-   - token: `getEnsAddress(name)`
-   - sentence: `getEnsText(name, "prophecy")`
-   - deadline: `getEnsText(name, "deadline")`
-3. Auction: `auctionOf(token)` then CCA views / CCALens. Price is `clearingPrice()` (Q96, ETH per token). Progress is checkpoints and `isGraduated()`, not virtual reserves.
-4. After the auction: watch Launchpad `Graduated`. The Uniswap link uses `Graduated.poolId` (V4 `PoolId`). If the event is not in hand yet, reconstruct the key: native ETH (`address(0)`), `token`, fee `10000`, tickSpacing `200`, `hooks` from the event or `launchpad.hook()`.
-5. Bid list: CCA `BidSubmitted` / `BidExited` / `TokensClaimed`. `(removed)` `Trade` logs and memos.
-6. Name next to a wallet: reverse lookup, falling back to `prophetOf(wallet)`.
-7. Issue: unchanged World ID → `registerProphet` → `launch` (no `msg.value` first buy).
+Sources for every CCA name and view: [`CCA_RESEARCH.md`](CCA_RESEARCH.md) sections 8–9. Do not guess extra events or getters.
+
+### 4.1 Home list — `Launched` is not replaced
+
+No new list event. Path A **extends** the existing Launchpad `Launched` with `auction` as the third indexed topic. Home still queries `fromBlock = VITE_LAUNCHPAD_DEPLOY_BLOCK`.
+
+Today (`Launchpad.sol`): `event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);`
+
+Proposed:
+
+```solidity
+event Launched(
+    address indexed token,
+    address indexed prophet,
+    address indexed auction,
+    string prophetLabel,
+    string slug
+);
+```
+
+Sentence and deadline are still **not** in this event (DECISIONS #5). Read them from ENS.
+
+### 4.2 Auction address from a token
+
+| Order | Call | Notes |
+|---|---|---|
+| 1 | `launchpad.auctionOf(token)` → `(address auction, bool poolOpened)` | Proposed view. Prefer this. |
+| 2 | Decode `Launched` where `token` matches | Same log as the home list |
+| 3 | Factory `getAddress(token, amount, configData, salt, sender)` | Only if the UI already has the exact `create` args. Do not use as the default |
+
+### 4.3 Views: auction state and clearing price
+
+CCA has no `getState()` enum. Derive the designer labels in section 8 from these views.
+
+| Need | Call |
+|---|---|
+| Auction + pool flag | `launchpad.auctionOf(token)` |
+| Schedule | `auction.startBlock()`, `endBlock()`, `claimBlock()` |
+| Clearing price (Q96, ETH per token) | `auction.clearingPrice()` — stale until `checkpoint()`; prefer this over the checkpoint field |
+| Fresh checkpoint + raised + cleared + graduated | CCALens `state(auction)` via `eth_call` (official Sepolia `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53`) |
+| Graduated? | `auction.isGraduated()` after a current checkpoint (may be stale) |
+| Finalized? | `auction.lastCheckpointedBlock() == auction.endBlock()` |
+| Floor / tick | `auction.floorPrice()`, `auction.tickSpacing()` |
+| One bid | `auction.bids(bidId)` |
+
+Display price: `clearingPrice / 2^96` ETH per token. Do not call `curve()`.
+
+### 4.4 Bid, claim after clearing, refund / exit
+
+All on the **CCA** at `auctionOf(token).auction`, not Launchpad. Currency is native ETH (`address(0)`). Empty `hookData` when `validationHook == 0`.
+
+```solidity
+function submitBid(uint256 maxPriceQ96, uint128 amount, address owner, uint256 prevTickPriceQ96, bytes calldata hookData)
+    external payable returns (uint256 bidId);
+// 4-arg overload omits prevTickPriceQ96 and scans from the floor — do not use in the demo
+
+function exitBid(uint256 bidId) external;
+function exitPartiallyFilledBid(uint256 bidId, uint64 lastFullyFilledCheckpointBlock, uint64 outbidBlock) external;
+
+function claimTokens(uint256 bidId) external;
+function claimTokensBatch(address owner, uint256[] calldata bidIds) external;
+```
+
+| Action | ETH / tokens | User-facing revert names (official CCA) |
+|---|---|---|
+| Bid | `msg.value == amount`; `owner` = bidder | `AuctionNotStarted`, `TokensNotReceived`, `AuctionIsOver`, `BidAmountTooSmall`, `BidOwnerCannotBeZeroAddress`, `InvalidAmount`, `CurrencyIsNotNative`, `InvalidBidPriceTooHigh`, `BidMustBeAboveClearingPrice`, `AuctionSoldOut`, `InvalidBidUnableToClear`, `TickPreviousPriceInvalid`, `TickPriceNotIncreasing`, `TickPriceNotAtBoundary`, `TickNotInitialized`, `InvalidTickPrice`, `TickHintMustBeGreaterThanNextActiveTickPrice` |
+| Refund / exit | leftover ETH in `BidExited` | `AuctionIsNotOver`, `BidAlreadyExited`, `CannotExitBid`, `CannotPartiallyExitBidBeforeGraduation`, `CannotPartiallyExitBidBeforeEndBlock`, `InvalidLastFullyFilledCheckpointHint`, `InvalidOutbidBlockCheckpointHint`, `BidIdDoesNotExist` |
+| Claim after clearing | tokens to `bid.owner` after `claimBlock`; must exit first | `NotClaimable`, `AuctionIsNotFinalized`, `NotGraduated`, `BidNotExited`, `BatchClaimDifferentOwner`, `BidIdDoesNotExist` |
+
+Events: `BidSubmitted(id, owner, priceQ96, amount)`, `BidExited(bidId, owner, tokensFilled, currencyRefunded)`, `TokensClaimed(bidId, owner, tokensFilled)`, `CheckpointUpdated`, `ClearingPriceUpdated`, `TokensReceived`.
+
+### 4.5 Post-pool trading
+
+**Uniswap link, not an in-app v4 swap.** Same as today: hide Buy/Sell and show “View pool on Uniswap” (`GRADUATED_LINK` in `web/src/lib/graduation.ts`). URL: `https://app.uniswap.org/explore/pools/ethereum_sepolia/<poolId>` (verified against a live Sepolia v4 pool). `ProphecyHook` only implements `beforeInitialize` — an in-app swap would be a generic Universal Router call, not “via our hook”. Building that UI is extra work after Path A; the 22:00 checkpoint is CCA working, not an in-app AMM.
+
+Use `Graduated.poolId`. If the event is not in hand: native ETH (`address(0)`), `token`, fee `10000`, tickSpacing `200`, `hooks` from the event or `launchpad.hook()`.
+
+Also: name next to a wallet = reverse lookup, falling back to `prophetOf(wallet)`. Issue = World ID → `registerProphet` → `launch` (no `msg.value` first buy). Bid list replaces `(removed)` `Trade` logs.
 
 ## 5. Environment variables
 
@@ -259,7 +329,8 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 | `VITE_LAUNCHPAD_ADDRESS` | web |
 | `VITE_LAUNCHPAD_DEPLOY_BLOCK` | web (`fromBlock` for `Launched` logs) |
 | `VITE_HOOK_ADDRESS`, `VITE_LOCKER_ADDRESS` | web (optional) |
-| `VITE_CCA_FACTORY` | web (optional; empty = `launchpad.ccaFactory()` / official Sepolia factory) |
+| `VITE_CCA_FACTORY` | web (optional; empty = `launchpad.ccaFactory()` / official Sepolia factory `0x000000001F26a0044BaA66024e7b6599c61963F8`) |
+| `VITE_CCA_LENS` | web (optional; empty = official Sepolia CCALens `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53`, or skip the lens) |
 | `VITE_PARENT_NAME` | web (e.g. `prophecy.eth`) |
 | `VITE_UNIVERSAL_RESOLVER` | web ([`ENSV2.md`](ENSV2.md) section 0) |
 | `VITE_WORLD_APP_ID`, `VITE_WORLD_ACTION` | web |
@@ -278,9 +349,9 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 
 Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0. The web app does not read `ENS_ADAPTER_ADDRESS`; if it needs the adapter it calls `launchpad.ens()`.
 
-After a successful send, infra writes a machine-readable record (no secrets) to `deployments/sepolia.json`, or `deployments/anvil.json` on a local / fork run (gitignored). Format: [`infra/README.md`](../infra/README.md) “Deployment record”. Web copies `launchpad` into `VITE_LAUNCHPAD_ADDRESS` and `launchpadBlock` into `VITE_LAUNCHPAD_DEPLOY_BLOCK` (optional; empty means the web uses a recent block range). `hook` / `locker` / `poolManager` are recorded after `setUniswap`; optional `VITE_HOOK_ADDRESS` / `VITE_LOCKER_ADDRESS` copy the first two. `VITE_CHAIN_ID` stays `11155111` on Sepolia.
+After a successful send, infra writes a machine-readable record (no secrets) to `deployments/sepolia.json`, or `deployments/anvil.json` on a local / fork run (gitignored). Format: [`infra/README.md`](../infra/README.md) “Deployment record”. Web copies `launchpad` into `VITE_LAUNCHPAD_ADDRESS` and `launchpadBlock` into `VITE_LAUNCHPAD_DEPLOY_BLOCK` (optional; empty means the web uses a recent block range). `hook` / `locker` / `poolManager` are recorded after `setUniswap`; optional `VITE_HOOK_ADDRESS` / `VITE_LOCKER_ADDRESS` copy the first two. Path A adds `ccaFactory` / `ccaLens` (section 9). `VITE_CHAIN_ID` stays `11155111` on Sepolia.
 
-`Deploy.s.sol` order matches section 2: Launchpad, CREATE2 Hook (Launchpad in the constructor; salt mined for permission flags), Locker, then deployer-only `setUniswap(poolManager, hook, locker)` once, then `setCcaFactory` (official Sepolia factory). The script requires `launchpad.hook()`, `launchpad.locker()`, and `launchpad.poolManager()` match. This proposal does not edit the script; a later contracts PR does.
+`Deploy.s.sol` order is in section 9. This proposal does not edit the script; a later contracts PR does.
 
 `ENS_ADAPTER_ADDRESS` is the `ProphecyEns` address. **Default: output.** `Deploy.s.sol` creates the adapter (predicted Launchpad CREATE address) and the Launchpad in one broadcast, then the CREATE2 Hook, Locker, and `setUniswap`, then logs `ENS_ADAPTER_ADDRESS`. **Optional input override:** if the env var is set, the script does not CREATE an adapter and passes that address as Launchpad `ens`. Off anvil, a set value cannot be `address(0)` or placeholder `0xe05` — the same `#24` guard as `PROTOCOL_FEE_RECIPIENT` / `0xfee` and `worldSigner` / `0x51e`. Anvil dry-run (`chainid == 31337`) fills `0xe05` when unset (Launchpad reverts on zero). The hook / locker / `setUniswap` steps still run.
 
@@ -300,3 +371,97 @@ Full research: [`CCA_RESEARCH.md`](CCA_RESEARCH.md) section 5.
 2. Launchpad rewrite + web auction panel. World / ENS unchanged.
 3. Effort: same order as the existing curve + graduation stack (one contracts rewrite, one web trade-panel rewrite). Exact hours **UNVERIFIED**.
 4. **Fallback if CCA is not working by 22:00 KST:** keep the bonding-curve Launchpad already on `main`. Do not merge Path A contracts. Record blockers in `FEEDBACK.md`.
+
+## 8. Designer: auction states and revert names `(PROPOSAL)`
+
+CCA has no `getState()` enum. The UI derives a label from blocks + views ([`CCA_RESEARCH.md`](CCA_RESEARCH.md) section 8). `$_tokensReceived` is internal — there is no public `tokensReceived()` getter. Departed (`now >= deadline` from ENS) is independent of these labels.
+
+`block` is the chain’s block-numberish (`startBlock` / `endBlock` / `claimBlock`). Sepolia is 12s blocks.
+
+| UI state | Detect on-chain | User can |
+|---|---|---|
+| **Not funded** | No `TokensReceived` log; `token.balanceOf(auction) < totalSupply()` or `submitBid` would revert `TokensNotReceived`. After Path A `launch` this should not appear (same tx calls `onTokensReceived`) | Nothing |
+| **Not started** | Funded, and `block < startBlock()` | Wait. Bid reverts `AuctionNotStarted` |
+| **Live** | Funded, `startBlock() <= block < endBlock()`, remaining supply / MPS > 0 | `submitBid`. Price from `clearingPrice()` or CCALens `state(auction)` |
+| **Sold out (still live)** | `block < endBlock()` but next `submitBid` reverts `AuctionSoldOut` | Wait for end, then exit/claim if graduated |
+| **Ended, not finalized** | `block >= endBlock()` and `lastCheckpointedBlock() != endBlock()` | Anyone `checkpoint()` |
+| **Ended, graduated** | `block >= endBlock()`, `isGraduated() == true` after a current checkpoint | `exitBid` / `exitPartiallyFilledBid`. Launchpad `graduate` once Uniswap is set |
+| **Ended, failed** | `block >= endBlock()` and `isGraduated() == false` after a final checkpoint | Full refund via `exitBid`. `claimTokens` reverts `NotGraduated` |
+| **Claimable** | Graduated and `block >= claimBlock()` and the bid has `exitedBlock != 0` | `claimTokens` / `claimTokensBatch` |
+| **Claim blocked** | Graduated but `block < claimBlock()` | Exit after end; claim reverts `NotClaimable` |
+| **Pool open** | `auctionOf(token).poolOpened == true` or a `Graduated` log for that token | Uniswap v4 link (section 4.5). Auction bid is over |
+
+### User-facing revert names
+
+Bid / exit / claim names are the official CCA errors in section 4.4 (do not invent aliases).
+
+Launchpad names that **already exist** and still apply (`Launchpad.sol`):
+
+| Surface | Names |
+|---|---|
+| `registerProphet` | `InvalidSignature`, `NullifierUsed`, `LabelTaken`, `AlreadyProphet`, `BadLabel`, `ZeroAddress` |
+| `launch` (ENS / prophet) | `NotProphet`, `BadSlug`, `BadProphecy`, `SlugTaken` |
+| `setUniswap` / proposed `setCcaFactory` | `NotDeployer`, `UniswapAlreadySet`, `ZeroAddress` |
+| `graduate` | `UnknownToken`, `UniswapNotSet` |
+
+`launch` / `graduate` also bubble official CCA create / sweep names ([`CCA_RESEARCH.md`](CCA_RESEARCH.md) section 8): `InvalidTokenAmount`, `InvalidTokenAmountReceived`, `InvalidEndBlock`, `ClaimBlockIsBeforeEndBlock`, `NotAuthorized`, `CannotSweepCurrency`, `CannotSweepTokens`, `AuctionIsNotOver`, `AuctionIsNotFinalized`, `NotGraduated`, plus the constructor list there.
+
+This proposal does **not** invent new Launchpad custom-error names. The contracts PR names any extra guards (`ccaFactory` unset, auction already opened a pool).
+
+`(removed)` curve names the UI must stop mapping: `CurveComplete`, `ZeroAmount`, `Slippage`, `MemoTooLong`, `ExceedsSold`.
+
+## 9. Infra: deploy, addresses, gas `(PROPOSAL)`
+
+This section does **not** edit `script/`. Full sources: [`CCA_RESEARCH.md`](CCA_RESEARCH.md) section 7.
+
+### Must we deploy CCA contracts ourselves?
+
+**No** — not the factory, lens, PoolManager, or PositionManager. Those are already on Sepolia (bytecode verified 2026-09-26). Path A only **creates per-prophecy auction clones** through the official factory inside `launch`. We still deploy Launchpad, Hook, Locker, ENS adapter.
+
+| Contract | Deploy ourselves? |
+|---|---|
+| ContinuousClearingAuctionFactory v2.1.0 `0x000000001F26a0044BaA66024e7b6599c61963F8` | No |
+| Each `ContinuousClearingAuction` | Yes, via `factory.create` at `launch` — not a deploy-script CREATE |
+| CCALens `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53` | No |
+| LiquidityLauncher / LBPStrategy | No (Path A does not use them) |
+| Uniswap v4 PoolManager / PositionManager | No |
+| Launchpad, ProphecyHook, LiquidityLocker, ProphecyEns | Yes — same as today |
+
+### Proposed `Deploy.s.sol` order (Path A)
+
+Keep today’s one-broadcast order, then wire the official factory. Do not CREATE a factory. v4 **pool** wiring is **not** deploy-time: each prophecy’s pool is created later by `graduate(token)`.
+
+1. Predict Launchpad CREATE address.
+2. `new ProphecyEns(predictedPad, …)` then `new Launchpad(protocolFeeRecipient, worldSigner, ens)`.
+3. Mine CREATE2 salt; `new ProphecyHook{salt}(poolManager, launchpad)`.
+4. `new LiquidityLocker(poolManager, launchpad, hook)`.
+5. `launchpad.setUniswap(poolManager, hook, locker)` once. Require hook / locker / poolManager match.
+6. **New:** `launchpad.setCcaFactory(0x000000001F26a0044BaA66024e7b6599c61963F8)`. Require `launchpad.ccaFactory()` matches.
+
+PoolManager stays `SepoliaConfig.POOL_MANAGER`. Optional `UNISWAP_V4_POOL_MANAGER` unchanged. `ENS_ADAPTER_ADDRESS` / `TEAM_WALLET` rules above stay.
+
+### `deployments/sepolia.json` and `VITE_*`
+
+Current record ([infra/README.md “Deployment record”](../infra/README.md#deployment-record)): `chainId`, `launchpad`, `launchpadBlock`, `adapter`, `parentUserRegistry`, `hook`, `locker`, `poolManager`, `deployer`, `commit`.
+
+**Proposed additions** (later infra PR; this file does not edit the writer):
+
+| JSON field | Value | Vite / web |
+|---|---|---|
+| `ccaFactory` | `0x000000001F26a0044BaA66024e7b6599c61963F8` | optional `VITE_CCA_FACTORY`; empty = `launchpad.ccaFactory()` |
+| `ccaLens` | `0xc3C65F5453A3674aDb693cbdA3C842545cD30f53` | optional `VITE_CCA_LENS`; empty = official lens or skip |
+| *(existing)* `launchpad` | our CREATE | `VITE_LAUNCHPAD_ADDRESS` |
+| *(existing)* `launchpadBlock` | Launchpad CREATE block | `VITE_LAUNCHPAD_DEPLOY_BLOCK` |
+| *(existing)* `hook` / `locker` | our CREATE2 / CREATE | optional `VITE_HOOK_ADDRESS` / `VITE_LOCKER_ADDRESS` |
+| *(do not add per auction)* | auction / pool addresses | `Launched.auction` / `auctionOf(token)` / `Graduated.poolId` — not the deploy record |
+
+### Gas (measured vs estimate vs UNVERIFIED)
+
+| Op | Kind | Number |
+|---|---|---|
+| Current Sepolia stack (14 txs, including Hook + Locker + `setUniswap`) | **Measured** (fork) | ~6.82M gas ([infra/README.md](../infra/README.md)) |
+| Extra `setCcaFactory` | **Estimate** | tens of thousands; **not measured** |
+| Deploy our own CCA factory | **UNVERIFIED** / unnecessary | official factory exists |
+| `factory.create` / `submitBid` / `checkpoint` / `exitBid` / `claimTokens` / Path A `graduate` / Path B `migrate` | **UNVERIFIED** | no official `.forge-snapshots` at v2.1.0. Docs warn the no-hint `submitBid` is gas-intensive; `forceIterateOverTicks` can OOG |
+
+ETH cost for the current 6.82M deploy is in infra/README (0.0068 / 0.034 / 0.136 ETH at 1 / 5 / 20 gwei). One `setCcaFactory` does not change that order of magnitude.
