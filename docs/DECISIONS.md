@@ -12,7 +12,7 @@ One row per decision, with the reason.
 | # | Date | Decision | Reason |
 |---|------|----------|--------|
 | 1 | 09-25 | A memecoin-style launchpad, **not a prediction market**. No judging, oracle or payout | Keep it simple and fun. The price says "people are here", not "this is true" |
-| 2 | 09-25 | UI: black background, desktop first, left sidebar, text only (no avatars), blue accent | A prophecy is text, so text is the hero |
+| 2 | 09-25 | ~~UI: black background, desktop first, left sidebar, text only (no avatars), blue accent~~ → #16 | A prophecy is text, so text is the hero |
 | 3 | 09-25 | One network: **Sepolia** | ENSv2 (beta) is deployed only there |
 | 4 | 09-25 | For ENSv2, **the official docs are the source of truth**. Use the deployment the docs reference (contracts-v2 `71a3b73`, deployed 09-15) | The beta changes. The older deployment listed on the contracts-v2 main branch (June) has different functions |
 | 5 | 09-25 | The sentence lives **only in a text record of that prophecy's own PermissionedResolver**. It is written at initialization and nobody ever gets the role to write that key | One fact, one place, so it can never diverge. ENS is the data layer, not a copy |
@@ -26,6 +26,7 @@ One row per decision, with the reason.
 | 13 | 09-26 | ~~(Needs team confirmation) Holder talk and trade memos~~ → #15 | |
 | 14 | 09-26 | **Prophecy names never expire in ENS** (`type(uint64).max`), like prophet names. The deadline lives only in the `deadline` text record, and Departed is computed from it | Review A: an expired name stops pointing at the token and its label could be registered again. A departed prophecy must keep its name and token |
 | 15 | 09-26 | **Trade memos: yes.** `buy` and `sell` take an optional one-line `memo` (at most 140 bytes) that is emitted in the `Trade` event and shown on the prophecy detail screen next to the trade. **Holder talk (a separate board for holders): not now**, possibly later | A memo rides on a transaction the trader sends anyway: no extra wallet prompt, no server, and every note is backed by a real trade. A holder board would need its own server |
+| 16 | 2026-09-26 10:38 KST | **UI v2** (user approved; supersedes #2): home grid with a Closest to graduation featured slot; gold Buy / navy Sell and no red on the trade screen; no Prophet tag or badge; no holder share %. Sample data badge only in mock mode. | The board has to scan like a live list people can click through, and Sell must not look like a warning. Holder share and a Prophet badge add status the product does not judge. |
 
 ## Not decided yet
 
