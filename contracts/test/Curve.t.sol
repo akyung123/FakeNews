@@ -6,11 +6,11 @@ import {Vm} from "forge-std/Vm.sol";
 import {IProphecyEns} from "../src/ens/IProphecyEns.sol";
 import {CurveMath, Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
-import {LaunchpadTestBase} from "./LaunchpadHelpers.sol";
+import {LaunchpadStack} from "./LaunchpadStack.sol";
 
-contract CurveTest is LaunchpadTestBase {
+contract CurveTest is LaunchpadStack {
     function setUp() public {
-        _deployLaunchpad();
+        _deployStack();
         vm.deal(prophet, 100 ether);
         vm.deal(buyer, 100 ether);
     }
@@ -164,7 +164,6 @@ contract CurveTest is LaunchpadTestBase {
         assertEq(vEth, launchpad.VIRTUAL_ETH() + 0.02 ether);
         assertEq(ProphecyToken(token).balanceOf(buyer), launchpad.CURVE_SUPPLY());
         assertLt(before - buyer.balance, 1 ether);
-        assertEq(address(launchpad).balance, before - buyer.balance);
         _assertSolvent(token);
     }
 
@@ -181,6 +180,10 @@ contract CurveTest is LaunchpadTestBase {
     function test_constructorStoresProtocolRecipient() public view {
         assertEq(launchpad.protocolFeeRecipient(), protocol);
         assertEq(launchpad.worldSigner(), signer);
+        assertEq(launchpad.deployer(), address(this));
+        assertEq(address(launchpad.poolManager()), address(manager));
+        assertEq(address(launchpad.hook()), address(hook));
+        assertEq(address(launchpad.locker()), address(locker));
     }
 
     function test_claimProtocolFeePaysOnlyTheRecipient() public {
@@ -232,7 +235,7 @@ contract CurveTest is LaunchpadTestBase {
         clean.registerProphet("ringo", n, signRegister(address(clean), prophet, n, block.chainid, SIGNER_PK));
         vm.prank(prophet);
         address tokenB = clean.launch("eth-10k", "a prophecy sentence", 0, 0);
-        (uint256 tokensB, uint256 feeB) = Launchpad(clean).quoteBuy(tokenB, 0.001 ether);
+        (uint256 tokensB, uint256 feeB) = Launchpad(payable(address(clean))).quoteBuy(tokenB, 0.001 ether);
         assertEq(tokensA, tokensB);
         assertEq(feeA, feeB);
     }
@@ -255,8 +258,10 @@ contract CurveTest is LaunchpadTestBase {
     }
 
     function _assertSolvent(address token) internal view {
-        (,, uint256 realEth,,) = launchpad.curve(token);
-        assertGe(address(launchpad).balance, realEth + launchpad.protocolFees() + launchpad.creatorFeeOf(prophet));
+        (,, uint256 realEth,, bool complete) = launchpad.curve(token);
+        uint256 reserved = launchpad.protocolFees() + launchpad.creatorFeeOf(prophet);
+        if (!complete) reserved += realEth;
+        assertGe(address(launchpad).balance, reserved);
     }
 
     function _containsWord(bytes memory data, bytes32 word) internal pure returns (bool) {

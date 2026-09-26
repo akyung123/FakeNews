@@ -1,8 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
+import {PoolKey} from "v4-core/src/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
+
 import {IProphecyEns} from "./ens/IProphecyEns.sol";
 import {ProphecyToken} from "./ProphecyToken.sol";
+import {Graduation} from "./uniswap/Graduation.sol";
+import {LiquidityLocker} from "./uniswap/LiquidityLocker.sol";
 
 /// Constant-product quotes and fee rounding. Multiply first, divide once.
 library CurveMath {
@@ -47,7 +54,13 @@ library CurveMath {
 
 /// Bonding-curve launchpad. Price is the ratio of two reserves; fees sit in a
 /// separate ledger so they never move that price.
+///
+/// Constructor stays (protocolFeeRecipient_, worldSigner_, plus ENS args
+/// from the ENS wiring PR). Uniswap addresses are set once by the deployer
+/// via `setUniswap`. Deploy: Launchpad, Hook (CREATE2 with this address),
+/// Locker, then `setUniswap` once.
 contract Launchpad {
+    using PoolIdLibrary for PoolKey;
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
     uint256 private _status = _NOT_ENTERED;
@@ -90,7 +103,11 @@ contract Launchpad {
     uint256 public protocolFees;
     address public immutable protocolFeeRecipient;
     address public immutable worldSigner;
+    address public immutable deployer;
     IProphecyEns public immutable ens;
+    IPoolManager public poolManager;
+    IHooks public hook;
+    LiquidityLocker public locker;
 
     event ProphetRegistered(address indexed wallet, string label, uint256 nullifier);
     event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
@@ -107,6 +124,17 @@ contract Launchpad {
     );
     event CreatorFeeClaimed(address indexed prophet, uint256 amount);
     event ProtocolFeeClaimed(address indexed recipient, uint256 amount);
+    event UniswapSet(address poolManager, address hook, address locker);
+    event Graduated(
+        address indexed token,
+        bytes32 indexed poolId,
+        uint256 ethToPool,
+        uint256 tokensToPool,
+        uint160 sqrtPriceX96,
+        uint24 fee,
+        int24 tickSpacing,
+        address hooks
+    );
 
     error UnknownToken();
     error CurveComplete();
@@ -127,6 +155,10 @@ contract Launchpad {
     error ZeroAddress();
     error Reentrant();
     error TokenTransferFailed();
+    error UnexpectedEth();
+    error NotDeployer();
+    error UniswapAlreadySet();
+    error UniswapNotSet();
 
     modifier nonReentrant() {
         if (_status == _ENTERED) revert Reentrant();
@@ -135,7 +167,7 @@ contract Launchpad {
         _status = _NOT_ENTERED;
     }
 
-    /// Constructor ends at ens. Uniswap addresses set once via setUniswap (graduation PR).
+    /// Constructor ends at ens. Uniswap addresses set once via setUniswap.
     constructor(address protocolFeeRecipient_, address worldSigner_, IProphecyEns ens_) {
         if (
             protocolFeeRecipient_ == address(0) || worldSigner_ == address(0) || address(ens_) == address(0)
@@ -143,6 +175,25 @@ contract Launchpad {
         protocolFeeRecipient = protocolFeeRecipient_;
         worldSigner = worldSigner_;
         ens = ens_;
+        deployer = msg.sender;
+    }
+
+    /// Deployer-only, once. Call after Hook (CREATE2) and Locker exist.
+    function setUniswap(IPoolManager poolManager_, address hook_, address locker_) external {
+        if (msg.sender != deployer) revert NotDeployer();
+        if (address(poolManager) != address(0) || address(hook) != address(0) || address(locker) != address(0)) {
+            revert UniswapAlreadySet();
+        }
+        if (address(poolManager_) == address(0) || hook_ == address(0) || locker_ == address(0)) revert ZeroAddress();
+        poolManager = poolManager_;
+        hook = IHooks(hook_);
+        locker = LiquidityLocker(payable(locker_));
+        emit UniswapSet(address(poolManager_), hook_, locker_);
+    }
+
+    /// Seed leftovers from the locker (and PoolManager native take/settle).
+    receive() external payable {
+        if (msg.sender != address(locker) && msg.sender != address(poolManager)) revert UnexpectedEth();
     }
 
     /// World ID server signs `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))`
@@ -343,6 +394,35 @@ contract Launchpad {
         _emitTrade(token, buyer, true, preview.ethUsed, preview.tokensOut, preview.fee, c.vEth, c.vToken, memo);
         _transferToken(token, buyer, preview.tokensOut);
         if (preview.refund > 0) _sendEth(buyer, preview.refund);
+        if (preview.completes) _graduate(token, c);
+    }
+
+    /// Last curve buy: open the V4 pool at the curve-end price and lock LP.
+    function _graduate(address token, Curve storage c) internal {
+        if (address(poolManager) == address(0) || address(hook) == address(0) || address(locker) == address(0)) {
+            revert UniswapNotSet();
+        }
+        PoolKey memory key = Graduation.poolKey(token, hook);
+        uint160 sqrtPriceX96 = Graduation.initializePool(poolManager, key, c.vEth, c.vToken);
+        uint256 ethToPool = c.realEth;
+        uint256 tokensToPool = LP_SUPPLY;
+        ProphecyToken(token).approve(address(locker), tokensToPool);
+        locker.lock{value: ethToPool}(token, c.prophet, protocolFeeRecipient, key, tokensToPool);
+        uint256 leftover = ProphecyToken(token).balanceOf(address(this));
+        if (leftover > 0) {
+            // ProphecyToken rejects address(0); dead address is the burn sink.
+            _transferToken(token, address(0x000000000000000000000000000000000000dEaD), leftover);
+        }
+        emit Graduated(
+            token,
+            PoolId.unwrap(key.toId()),
+            ethToPool,
+            tokensToPool,
+            sqrtPriceX96,
+            key.fee,
+            key.tickSpacing,
+            address(key.hooks)
+        );
     }
 
     function _emitTrade(
