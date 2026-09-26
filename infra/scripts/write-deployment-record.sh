@@ -4,6 +4,7 @@
 # `launchpadBlock` into VITE_LAUNCHPAD_DEPLOY_BLOCK (Launched fromBlock).
 #
 # Env: LAUNCHPAD_ADDRESS, ENS_ADAPTER_ADDRESS, PARENT_USER_REGISTRY,
+#      HOOK_ADDRESS, LOCKER_ADDRESS, POOL_MANAGER / UNISWAP_V4_POOL_MANAGER,
 #      DEPLOYER (optional), LAUNCHPAD_BLOCK (optional), SEPOLIA_RPC_URL,
 #      DEPLOY_RECORD_LOCAL=1 for fork / anvil.
 set -euo pipefail
@@ -43,11 +44,14 @@ adapter="${ENS_ADAPTER_ADDRESS:-}"
 parent="${PARENT_USER_REGISTRY:-}"
 deployer="${DEPLOYER:-}"
 block="${LAUNCHPAD_BLOCK:-}"
+hook="${HOOK_ADDRESS:-${VITE_HOOK_ADDRESS:-}}"
+locker="${LOCKER_ADDRESS:-${VITE_LOCKER_ADDRESS:-}}"
+pool_manager="${POOL_MANAGER:-${UNISWAP_V4_POOL_MANAGER:-}}"
 
-parsed="$(python3 - "$broadcast" "$launchpad" "$adapter" "$deployer" "$block" <<'PY'
+parsed="$(python3 - "$broadcast" "$launchpad" "$adapter" "$deployer" "$block" "$hook" "$locker" "$pool_manager" <<'PY'
 import json, sys
 
-path, launchpad, adapter, deployer, block = sys.argv[1:6]
+path, launchpad, adapter, deployer, block, hook, locker, pool_manager = sys.argv[1:9]
 
 def parse_int(v):
     if v is None or v == "":
@@ -84,11 +88,19 @@ for r in receipts:
 
 pad_tx = pick_create(txs, "Launchpad")
 ens_tx = pick_create(txs, "ProphecyEns")
+hook_tx = pick_create(txs, "ProphecyHook")
+locker_tx = pick_create(txs, "LiquidityLocker")
 
 if not launchpad and pad_tx:
     launchpad = pad_tx.get("contractAddress") or ""
 if not adapter and ens_tx:
     adapter = ens_tx.get("contractAddress") or ""
+if not hook and hook_tx:
+    hook = hook_tx.get("contractAddress") or ""
+if not locker and locker_tx:
+    locker = locker_tx.get("contractAddress") or ""
+if not pool_manager:
+    pool_manager = "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543"
 
 if pad_tx:
     h = (pad_tx.get("hash") or "").lower()
@@ -111,6 +123,9 @@ print(launchpad or "")
 print(adapter or "")
 print(deployer or "")
 print(block or "")
+print(hook or "")
+print(locker or "")
+print(pool_manager or "")
 PY
 )"
 
@@ -119,6 +134,9 @@ mapfile -t parsed_lines <<<"$parsed"
 [[ ${#parsed_lines[@]} -ge 2 && -n "${parsed_lines[1]}" ]] && adapter="${parsed_lines[1]}"
 [[ ${#parsed_lines[@]} -ge 3 && -n "${parsed_lines[2]}" ]] && deployer="${parsed_lines[2]}"
 [[ ${#parsed_lines[@]} -ge 4 && -n "${parsed_lines[3]}" ]] && block="${parsed_lines[3]}"
+[[ ${#parsed_lines[@]} -ge 5 && -n "${parsed_lines[4]}" ]] && hook="${parsed_lines[4]}"
+[[ ${#parsed_lines[@]} -ge 6 && -n "${parsed_lines[5]}" ]] && locker="${parsed_lines[5]}"
+[[ ${#parsed_lines[@]} -ge 7 && -n "${parsed_lines[6]}" ]] && pool_manager="${parsed_lines[6]}"
 
 if [[ -z "$launchpad" || "$launchpad" == "0x0000000000000000000000000000000000000000" ]]; then
   echo "write-deployment-record: no Launchpad address (send Deploy.s.sol first)." >&2
@@ -130,10 +148,10 @@ if [[ "${launchpad,,}" == "0x0000000000000000000000000000000000000e05" ]]; then
 fi
 
 mkdir -p "$(dirname "$out")"
-python3 - "$out" "$chain_id" "$launchpad" "$block" "$adapter" "$parent" "$deployer" "$commit" <<'PY'
+python3 - "$out" "$chain_id" "$launchpad" "$block" "$adapter" "$parent" "$deployer" "$commit" "$hook" "$locker" "$pool_manager" <<'PY'
 import json, sys
 
-out, chain_id, launchpad, block, adapter, parent, deployer, commit = sys.argv[1:]
+out, chain_id, launchpad, block, adapter, parent, deployer, commit, hook, locker, pool_manager = sys.argv[1:]
 
 def addr(v):
     v = (v or "").strip()
@@ -151,6 +169,9 @@ record = {
     "launchpadBlock": num(block),
     "adapter": addr(adapter),
     "parentUserRegistry": addr(parent),
+    "hook": addr(hook),
+    "locker": addr(locker),
+    "poolManager": addr(pool_manager),
     "deployer": addr(deployer),
     "commit": commit or None,
 }
@@ -166,9 +187,14 @@ echo "launchpad=$launchpad"
 echo "launchpadBlock=${block:-}"
 echo "adapter=${adapter:-}"
 echo "parentUserRegistry=${parent:-}"
+echo "hook=${hook:-}"
+echo "locker=${locker:-}"
+echo "poolManager=${pool_manager:-}"
 echo "deployer=${deployer:-}"
 echo "commit=${commit:-}"
 echo "VITE_LAUNCHPAD_ADDRESS=$launchpad"
 echo "VITE_LAUNCHPAD_DEPLOY_BLOCK=${block:-}"
+echo "VITE_HOOK_ADDRESS=${hook:-}"
+echo "VITE_LOCKER_ADDRESS=${locker:-}"
 echo "VITE_CHAIN_ID=$chain_id"
 echo "wrote $out"

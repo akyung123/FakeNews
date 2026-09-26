@@ -49,6 +49,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [x] Sepolia deploy script (skill `deploy-sepolia`) @cursor-agent
 - [x] Single-wallet Sepolia ENS + Launchpad: adapter then Launchpad in one broadcast (predicted CREATE); wrapper sleeps ~70s for commit-reveal; no parent lock @cursor
 - [x] After send, write `deployments/sepolia.json` (or gitignored `deployments/anvil.json` on a fork) and print launchpad + deploy block for web `Launched` fromBlock @cursor
+- [x] After Launchpad: CREATE2 Hook (mined flags, Launchpad ctor input), Locker, deployer `setUniswap` once; record hook / locker / poolManager @cursor
 
 ## 3. Web (`web/`)
 

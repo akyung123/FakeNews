@@ -142,6 +142,18 @@ _ingest_addresses() {
   if [[ -n "$val" ]]; then
     export LAUNCHPAD_BLOCK="$val"
   fi
+  val="$(grep -oE 'HOOK_ADDRESS=0x[0-9a-fA-F]{40}' "$log" | tail -n1 | cut -d= -f2 || true)"
+  if [[ -n "$val" ]]; then
+    export HOOK_ADDRESS="$val"
+  fi
+  val="$(grep -oE 'LOCKER_ADDRESS=0x[0-9a-fA-F]{40}' "$log" | tail -n1 | cut -d= -f2 || true)"
+  if [[ -n "$val" ]]; then
+    export LOCKER_ADDRESS="$val"
+  fi
+  val="$(grep -oE 'POOL_MANAGER=0x[0-9a-fA-F]{40}' "$log" | tail -n1 | cut -d= -f2 || true)"
+  if [[ -n "$val" ]]; then
+    export POOL_MANAGER="$val"
+  fi
 }
 
 wait_commit() {
@@ -179,7 +191,7 @@ run_step "registerName" script/RegisterParent.s.sol --sig "registerName()"
 # 2. parent UserRegistry
 run_step "deployUserRegistry" script/SetupParent.s.sol --sig "deployUserRegistry()"
 
-# 3+4. ProphecyEns then Launchpad in one broadcast (unset override so the script creates both)
+# 3+4. ProphecyEns then Launchpad, then CREATE2 Hook + Locker + setUniswap (one broadcast)
 # PARENT_USER_REGISTRY must be in the environment from the previous step.
 if [[ -z "${PARENT_USER_REGISTRY:-}" && "$send" -eq 1 ]]; then
   echo "PARENT_USER_REGISTRY missing after deployUserRegistry." >&2

@@ -87,7 +87,7 @@ Equivalent step-by-step from `contracts/`:
 ./script/run-sepolia.sh script/RegisterParent.s.sol --sig "fundPaymentToken()"
 ./script/run-sepolia.sh script/RegisterParent.s.sol --sig "registerName()"
 ./script/run-sepolia.sh script/SetupParent.s.sol --sig "deployUserRegistry()"
-# adapter first (predicted Launchpad CREATE address), then Launchpad, one broadcast
+# adapter, Launchpad, CREATE2 Hook, Locker, setUniswap — one broadcast
 ./script/run-sepolia.sh script/Deploy.s.sol
 ./script/run-sepolia.sh script/SetupParent.s.sol --sig "linkParent()"
 ./script/run-sepolia.sh script/SetupParent.s.sol --sig "grantAdapterRegistrar()"
@@ -95,7 +95,7 @@ Equivalent step-by-step from `contracts/`:
 
 Sending is opt-in and needs `DEPLOYER_PRIVATE_KEY` in the environment, never on argv. `TEAM_WALLET` defaults to that deployer; a different value reverts.
 
-`Deploy.s.sol` creates `ProphecyEns` at the current nonce, then `Launchpad` at nonce+1, after predicting that address (`LaunchpadEns.t.sol`). Constructor: `new Launchpad(protocolFeeRecipient, worldSigner, ens)` — the order in `contracts/src/Launchpad.sol`. All three args are `public immutable`; zero address reverts. `setUniswap` is coming in the graduation / lock PR; do not call it from this script. Right after deploy the script requires `address(launchpad) == predictedPad`, `adapter.launchpad() == launchpad`, `launchpad.ens() == adapter`, plus the `#24` fee/signer checks. `worldSigner` is derived from `WORLD_SIGNER_KEY` (generated at deploy, never committed). `protocolFeeRecipient` is `PROTOCOL_FEE_RECIPIENT`. `ENS_ADAPTER_ADDRESS` is logged as an output. If that env var is already set, the script skips the adapter CREATE and uses it as `ens` (reject `0` and placeholder `0xe05` off anvil).
+`Deploy.s.sol` creates `ProphecyEns` at the current nonce, then `Launchpad` at nonce+1, after predicting that address (`LaunchpadEns.t.sol`). Constructor: `new Launchpad(protocolFeeRecipient, worldSigner, ens)` — the order in `contracts/src/Launchpad.sol`. All three args are `public immutable`; zero address reverts. In the same broadcast, after Launchpad exists, the script mines a CREATE2 salt so `ProphecyHook` lands on an address whose low bits are `Hooks.BEFORE_INITIALIZE_FLAG` (`HookMiner.prophecyFlags()`), deploys the hook with `(poolManager, launchpad)`, deploys `LiquidityLocker(poolManager, launchpad, hook)`, then calls `launchpad.setUniswap(poolManager, hook, locker)` once from the deployer. It requires `launchpad.hook() == hook`, `launchpad.locker() == locker`, and `launchpad.poolManager() == poolManager`. PoolManager is the official Uniswap v4 Sepolia address (`SepoliaConfig.POOL_MANAGER` / [docs.uniswap.org/contracts/v4/deployments](https://docs.uniswap.org/contracts/v4/deployments)); override with `UNISWAP_V4_POOL_MANAGER`. Optional `HOOK_SALT` skips the miner (must still produce the flags). Right after deploy the script also requires `address(launchpad) == predictedPad`, `adapter.launchpad() == launchpad`, `launchpad.ens() == adapter`, plus the `#24` fee/signer checks. `worldSigner` is derived from `WORLD_SIGNER_KEY` (generated at deploy, never committed). `protocolFeeRecipient` is `PROTOCOL_FEE_RECIPIENT`. `ENS_ADAPTER_ADDRESS` is logged as an output. If that env var is already set, the script skips the adapter CREATE and uses it as `ens` (reject `0` and placeholder `0xe05` off anvil).
 
 `grantAdapterRegistrar()` gives `ROLE_REGISTRAR` on the parent UserRegistry to the **adapter** (`ProphecyEns`), not the Launchpad. The old `grantLaunchpadRegistrar()` name reverts.
 
@@ -103,7 +103,7 @@ The deployer must be a **plain EOA**. `ETHRegistrar.register` mints an ERC-1155 
 
 Gas on a Sepolia fork (10 txs, ~4.27M gas, mint skipped because the account already held MockUSDC): about 0.0043 ETH at 1 gwei, 0.021 ETH at 5 gwei, 0.085 ETH at 20 gwei. A 0.05 ETH deployer balance covers 1–5 gwei, not 20 gwei. If `Deploy.s.sol` is split from `deployAdapter()`, do not send any other deployer transaction in between — the Launchpad CREATE nonce is predicted.
 
-The script prints paste-ready lines for a visual check: `WORLD_CHAIN_ID=11155111`, `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`, and `worldSigner address: 0x…` (address only, never the private key). After a send it also writes the deployment record below and prints `chainId`, `launchpad`, `launchpadBlock`, `adapter`, `parentUserRegistry`, `deployer`, and `commit`.
+The script prints paste-ready lines for a visual check: `WORLD_CHAIN_ID=11155111`, `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`, and `worldSigner address: 0x…` (address only, never the private key). After a send it also writes the deployment record below and prints `chainId`, `launchpad`, `launchpadBlock`, `adapter`, `parentUserRegistry`, `hook`, `locker`, `poolManager`, `deployer`, and `commit`.
 
 ## Deployment record
 
@@ -121,6 +121,9 @@ After a successful **send** (`SEND=1` / `--broadcast`), `infra/scripts/write-dep
   "launchpadBlock": 12345678,
   "adapter": "0xProphecyEnsAddress…",
   "parentUserRegistry": "0xParentUserRegistry…",
+  "hook": "0xProphecyHookAddress…",
+  "locker": "0xLiquidityLockerAddress…",
+  "poolManager": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
   "deployer": "0xDeployerAddress…",
   "commit": "<git rev-parse HEAD>"
 }
@@ -136,6 +139,9 @@ JSON values are hex addresses or numbers — the ellipses above are documentatio
 |---|---|
 | `launchpad` | `VITE_LAUNCHPAD_ADDRESS` (Actions variable / `web/.env`) |
 | `launchpadBlock` | `VITE_LAUNCHPAD_DEPLOY_BLOCK` — `fromBlock` for `Launched`. Optional; empty = recent block range |
+| `hook` | optional `VITE_HOOK_ADDRESS` |
+| `locker` | optional `VITE_LOCKER_ADDRESS` |
+| `poolManager` | official Uniswap v4 Sepolia PoolManager (not a Vite var) |
 | `chainId` | `VITE_CHAIN_ID` is already `11155111` on Sepolia |
 
 Stdout after a send (same keys, plus the web env lines to paste):
@@ -147,10 +153,15 @@ launchpad=0x…
 launchpadBlock=11783750
 adapter=0x…
 parentUserRegistry=0x…
+hook=0x…
+locker=0x…
+poolManager=0xE03A1074c86CFeDd5C142C4F04F1a1536e203543
 deployer=0x…
 commit=7c075cd…
 VITE_LAUNCHPAD_ADDRESS=0x…
 VITE_LAUNCHPAD_DEPLOY_BLOCK=11783750
+VITE_HOOK_ADDRESS=0x…
+VITE_LOCKER_ADDRESS=0x…
 VITE_CHAIN_ID=11155111
 wrote /…/deployments/sepolia.json
 ```
@@ -174,6 +185,8 @@ Never commit `WORLD_SIGNER_KEY`. Never print it in CI logs. A person pastes it f
 | `VITE_WORLD_SERVER_URL` | Render `https://….onrender.com` origin |
 | `VITE_LAUNCHPAD_ADDRESS` | `launchpad` from `deployments/sepolia.json` |
 | `VITE_LAUNCHPAD_DEPLOY_BLOCK` | `launchpadBlock` from that file. Optional; empty is allowed |
+| `VITE_HOOK_ADDRESS` | optional `hook` from that file |
+| `VITE_LOCKER_ADDRESS` | optional `locker` from that file |
 | `VITE_CHAIN_ID` | `11155111` |
 | `VITE_RPC_URL` | Public / rate-limited Sepolia RPC (not the `SEPOLIA_RPC_URL` secret) |
 | `VITE_PARENT_NAME` | `prophecy.eth` |
@@ -243,7 +256,7 @@ This repo has one `.env.example`. Do not add `world/.env.example`.
 2. Script mints MockUSDC via public `mint(address,uint256)` on the 71a3b73 token (`docs/ENSV2.md` section 0). If that mint is gone, fund the deployer by hand (5+ chars ≈ $8 / year).
 3. `commit()` → wait **~70 seconds** → `registerName()` (`approve` the ETHRegistrar, `subregistry=0`, `resolver=0`). Same `DEPLOYER_PRIVATE_KEY` for every step.
 4. `deployUserRegistry()` — VerifiableFactory proxy of `UserRegistryImpl`.
-5. `Deploy.s.sol` — **adapter first** with a predicted Launchpad CREATE address, then Launchpad, in one broadcast. Constructor: `protocolFeeRecipient`, `worldSigner`, `ens`.
+5. `Deploy.s.sol` — **adapter first** with a predicted Launchpad CREATE address, then Launchpad, CREATE2 Hook (mined flags), Locker, and deployer `setUniswap(poolManager, hook, locker)` once, in one broadcast. Constructor: `protocolFeeRecipient`, `worldSigner`, `ens`.
 6. `linkParent()` — `setSubregistry` on ETHRegistry, `setParent` on the new registry, revoke `SET_PARENT`.
 7. `grantAdapterRegistrar()` — `ROLE_REGISTRAR` to `ENS_ADAPTER_ADDRESS` (`ProphecyEns`) only.
 8. Final lock is irreversible. **Do not run it from this script.** A person confirms before anyone prepares it.
