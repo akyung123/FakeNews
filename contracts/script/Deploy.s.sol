@@ -36,7 +36,10 @@ contract Deploy is ScriptVm {
         _start();
         // TODO(#8): Launchpad launchpad = new Launchpad(protocolFeeRecipient, worldSigner);
         // constructor(address protocolFeeRecipient_, address worldSigner_)
-        // immutable, no setter; zero address reverts.
+        // Both public immutable. After deploy (before relying on logs), require both:
+        //   require(launchpad.worldSigner() == worldSigner);
+        //   require(launchpad.protocolFeeRecipient() == protocolFeeRecipient);
+        // A swapped constructor order compiles; the requires fail in dry-run.
         ProphecyFactory factory = new ProphecyFactory();
         vm.stopBroadcast();
 

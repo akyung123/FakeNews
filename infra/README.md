@@ -86,7 +86,7 @@ From `contracts/`, with `contracts/.env` filled:
 
 Sending is opt-in and needs `DEPLOYER_PRIVATE_KEY` in the environment, never on argv.
 
-`Deploy.s.sol` deploys the current `ProphecyFactory` stub. When PR #8 merges, call `new Launchpad(protocolFeeRecipient, worldSigner)`. Both args are immutable; zero address reverts. There is no setter. `worldSigner` is derived from `WORLD_SIGNER_KEY` (generated at deploy, never committed). `protocolFeeRecipient` is `PROTOCOL_FEE_RECIPIENT`.
+`Deploy.s.sol` deploys the current `ProphecyFactory` stub. When PR #8 merges, call `new Launchpad(protocolFeeRecipient, worldSigner)` in that constructor order. Both args are `public immutable`; zero address reverts. There is no setter. Right after deploy, require `launchpad.worldSigner() == worldSigner` and `launchpad.protocolFeeRecipient() == protocolFeeRecipient` (both mandatory — a swapped order compiles silently). `worldSigner` is derived from `WORLD_SIGNER_KEY` (generated at deploy, never committed). `protocolFeeRecipient` is `PROTOCOL_FEE_RECIPIENT`.
 
 Adapter wiring (`ProphecyEns` constructor) is TODO until #17 and #8 merge.
 
