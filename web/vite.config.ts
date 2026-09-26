@@ -18,6 +18,7 @@ export default defineConfig({
       "src/lib/prophetData.test.ts",
       "src/pages/CoinPage.test.tsx",
       "src/pages/ProphetPage.test.tsx",
+      "src/copy.test.tsx",
     ],
   },
 });

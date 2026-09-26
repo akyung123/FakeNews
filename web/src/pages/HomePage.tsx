@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { CommentItem } from "../components/CommentItem";
 import { progress } from "../lib/curve";
-import { ago, mcap, pct, trend } from "../lib/format";
-import { changeSinceLaunch, holderCount, marketCap, useStore, type Coin } from "../lib/store";
+import { ago, mcap } from "../lib/format";
+import { holderCount, marketCap, useStore, type Coin } from "../lib/store";
 
 export function HomePage() {
   const s = useStore();
@@ -30,21 +30,18 @@ export function HomePage() {
         <section className="block">
           <div className="block-head">
             <h2>Top prophecies</h2>
-            <span className="faint">by market cap</span>
           </div>
           <div className="table" role="table" aria-label="Top prophecies">
             <div className="tr th" role="row">
               <span>#</span>
               <span>Prophecy</span>
-              <span className="num">Market cap</span>
-              <span className="num">Since launch</span>
+              <span className="num">Price</span>
               <span className="col-curve">Curve</span>
               <span className="num col-opt">Holders</span>
-              <span className="num col-opt">Posts</span>
+              <span className="num col-opt">Memos</span>
               <span className="num col-opt">Age</span>
             </div>
             {top.map((coin, i) => {
-              const change = changeSinceLaunch(coin);
               return (
                 <Link key={coin.id} className="tr" role="row" to={`/coin/${coin.id}`}>
                   <span className="rank">{i + 1}</span>
@@ -57,7 +54,6 @@ export function HomePage() {
                     </span>
                   </span>
                   <span className="num strong">{mcap(marketCap(coin))}</span>
-                  <span className={`num strong ${trend(change)}`}>{pct(change)}</span>
                   <span className="cell-curve col-curve">
                     <span className="bar">
                       <span className="bar-fill" style={{ width: `${(progress(coin) * 100).toFixed(1)}%` }} />
@@ -76,8 +72,8 @@ export function HomePage() {
 
       <section className="block talk">
         <div className="block-head">
-          <h2>Holder talk</h2>
-          <span className="faint">only holders can post</span>
+          <h2>Trade memos</h2>
+          <span className="faint">from recent trades</span>
         </div>
         <ul className="posts">
           {feed.map((c) => {
@@ -91,7 +87,6 @@ export function HomePage() {
 }
 
 function LaunchCard({ coin, talk }: { coin: Coin; talk: number }) {
-  const change = changeSinceLaunch(coin);
   return (
     <Link className="launch" to={`/coin/${coin.id}`}>
       <div className="launch-head">
@@ -101,8 +96,7 @@ function LaunchCard({ coin, talk }: { coin: Coin; talk: number }) {
       <p className="launch-text">{coin.prophecy}</p>
       <div className="launch-foot">
         <span className="strong">{mcap(marketCap(coin))}</span>
-        <span className={`strong ${trend(change)}`}>{pct(change)}</span>
-        <span className="faint small">{talk} {talk === 1 ? "post" : "posts"}</span>
+        <span className="faint small">{talk} {talk === 1 ? "memo" : "memos"}</span>
       </div>
       <span className="bar">
         <span className="bar-fill" style={{ width: `${(progress(coin) * 100).toFixed(1)}%` }} />
