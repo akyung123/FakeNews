@@ -219,10 +219,14 @@ input:focus, textarea:focus { outline: none; border-color: var(--blue); }
 /* prophet page */
 .prophet-hero { display: flex; flex-direction: column; gap: 8px; }
 .prophet-wallet { display: flex; flex-direction: column; gap: 2px; }
-.prophet-wallet code, .mono {
+.prophet-wallet code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
-  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
 }
 .prophet-fees {
   display: flex;
@@ -277,7 +281,9 @@ input:focus, textarea:focus { outline: none; border-color: var(--blue); }
   .home { grid-template-columns: minmax(0, 1fr) 320px; }
   .coin-page { grid-template-columns: minmax(0, 1fr) 300px; }
   .prophet-split { grid-template-columns: 1fr; }
-  .table.prophet-table .tr { grid-template-columns: minmax(140px, 1fr) minmax(140px, 1.2fr) 130px 56px; }
+  .table.prophet-table .col-token,
+  .table.prophet-table .col-curve { display: none; }
+  .table.prophet-table .tr { grid-template-columns: minmax(140px, 1fr) minmax(140px, 1.2fr) 150px 56px; }
   main { padding: 20px 20px 40px; }
   .shell { grid-template-columns: 200px minmax(0, 1fr); }
 }
@@ -298,6 +304,13 @@ input:focus, textarea:focus { outline: none; border-color: var(--blue); }
   .launch-grid, .summary { grid-template-columns: 1fr 1fr; }
   .table { overflow-x: auto; }
   .tr { min-width: 560px; }
+  .table.prophet-table .col-deadline,
+  .table.prophet-table .col-token,
+  .table.prophet-table .col-curve { display: none; }
+  .table.prophet-table .tr {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr) 56px;
+  }
   .prophecy-title { font-size: 22px; }
 }
 @media (prefers-reduced-motion: reduce) {

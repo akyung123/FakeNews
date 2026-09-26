@@ -109,8 +109,8 @@ function ProphetView({ data }: { data: ProphetPageData }) {
             <div className="tr th" role="row">
               <span>Name</span>
               <span>Sentence</span>
-              <span>Deadline</span>
-              <span>Token</span>
+              <span className="col-deadline">Deadline</span>
+              <span className="col-token">Token</span>
               <span className="col-curve">Curve</span>
               <span className="num">Trade</span>
             </div>
@@ -123,10 +123,10 @@ function ProphetView({ data }: { data: ProphetPageData }) {
                   </span>
                 </span>
                 <span className="prophet-sentence">{row.sentence}</span>
-                <span>
+                <span className="col-deadline">
                   <Status row={row} />
                 </span>
-                <span className="mono" title={row.token}>
+                <span className="mono col-token" title={row.token}>
                   {shortAddress(row.token)}
                 </span>
                 <span className="cell-curve col-curve">
