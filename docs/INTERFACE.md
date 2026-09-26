@@ -178,6 +178,7 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 |---|---|
 | `VITE_RPC_URL` | web |
 | `VITE_LAUNCHPAD_ADDRESS` | web |
+| `VITE_LAUNCHPAD_DEPLOY_BLOCK` | web (`fromBlock` for `Launched` logs) |
 | `VITE_PARENT_NAME` | web (e.g. `prophecy.eth`) |
 | `VITE_UNIVERSAL_RESOLVER` | web ([`ENSV2.md`](ENSV2.md) section 0) |
 | `VITE_WORLD_APP_ID`, `VITE_WORLD_ACTION` | web |

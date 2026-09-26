@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { App } from "./App";
 import { Web3Provider } from "./providers/Web3Provider";
 import { gwei, mcap } from "./lib/format";
+import { ISSUE_COPY } from "./lib/issue";
 import { SEED_EVENTS } from "./lib/mock";
 
 const NEW_MEMOS = [
@@ -152,6 +153,22 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(mine).toContain(gwei(1.7727753707046925e-11));
     expect(mine).not.toContain(mcap(0.017727753707046923));
     assertRemoved(mine);
+  });
+
+  test("name-claim copy uses the designer sentences", () => {
+    expect(ISSUE_COPY.registerPending).toBe("Confirm your name in your wallet.");
+    expect(ISSUE_COPY.registerSuccess).toBe("Your name is claimed on Sepolia.");
+    expect(ISSUE_COPY.registerFailed).toBe(
+      "Name claim failed. Nothing was charged except gas. Try again.",
+    );
+    expect(ISSUE_COPY.registerPending).not.toContain("Confirm the prophet name");
+    expect(ISSUE_COPY.registerSuccess).not.toContain("Prophet name is on Sepolia");
+    const create = renderApp("/create");
+    expect(create).toContain("Issue a prophecy");
+    expect(create).toContain("It becomes a token.");
+    expect(create).not.toContain("Confirm the prophet name in your wallet.");
+    expect(create).not.toContain("Prophet name is on Sepolia.");
+    assertRemoved(create);
   });
 
   test("seed memos replace price-sentiment lines and old usernames", () => {
