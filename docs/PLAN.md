@@ -50,8 +50,8 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 ## 3. Web (`web/`)
 
-- [ ] Replace the prototype curve constants with SPEC values (`src/lib/curve.ts`) @cursor
-- [ ] wagmi + viem, Sepolia only @cursor
+- [x] Replace the prototype curve constants with SPEC values (`src/lib/curve.ts`) @cursor
+- [x] wagmi + viem, Sepolia only @cursor
 - [ ] Screen 1: prophecy list (name, sentence, price, Departed count)
 - [ ] Screen 2: issue
   - the issue button turns on only after World verification

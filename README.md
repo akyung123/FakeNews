@@ -29,7 +29,7 @@ A launchpad where every token is a one-line prophecy. Buying raises the price an
 ```bash
 cd contracts && forge build && forge test
 cd web && bun install && bun run dev      # http://localhost:5174
-cd web && bun run build
+cd web && bun test && bun run build
 ```
 
 ## Layout
