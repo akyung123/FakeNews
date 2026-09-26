@@ -71,6 +71,7 @@ ENSv2 addresses are separate — see [`docs/ENSV2.md`](docs/ENSV2.md) section 0.
 | An agent | [`AGENTS.md`](AGENTS.md) |
 | Building a feature | [`docs/SPEC.md`](docs/SPEC.md), then [`docs/INTERFACE_CCA.md`](docs/INTERFACE_CCA.md) (CCA path, current) or [`docs/INTERFACE.md`](docs/INTERFACE.md) (curve fallback) |
 | Asking "why is it like this?" | [`docs/DECISIONS.md`](docs/DECISIONS.md) |
+| Judging demo vs production | [`docs/PRODUCTION.md`](docs/PRODUCTION.md): demo constants, what a real service changes, open questions |
 | Looking for a task | [`docs/PLAN.md`](docs/PLAN.md) |
 
 ## Commands
