@@ -11,9 +11,10 @@ import {
   type WorldStatus,
 } from "../lib/issue";
 import { createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
-import { MOCK_ISSUE_PLACEHOLDER, MOCK_PARENT_NAME } from "../lib/mock";
+import { MOCK_PARENT_NAME } from "../lib/mock";
+import { isMockMode } from "../lib/mode";
 import { writeErrorMessage } from "../lib/writes";
-import { resolveIssueSession } from "./CreatePage";
+import { issuePlaceholder, resolveIssueSession } from "./CreatePage";
 import {
   createWorldClient,
   type WorldClient,
@@ -82,7 +83,7 @@ export function ClaimNameScreen({
         )}
       </div>
 
-      {world.isMock ? (
+      {world.isMock && isMockMode() ? (
         <p className="faint small">
           Mock session: <Link to="/name?fresh=1">first-time</Link>
           {" · "}
@@ -125,7 +126,7 @@ export function ClaimNameScreen({
             aria-label="Name"
             value={prophetLabel}
             maxLength={16}
-            placeholder={MOCK_ISSUE_PLACEHOLDER.prophetLabel}
+            placeholder={issuePlaceholder().prophetLabel}
             readOnly={returningProphet}
             autoComplete="off"
             spellCheck={false}

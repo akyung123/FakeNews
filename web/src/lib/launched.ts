@@ -49,6 +49,8 @@ export function coinFromLaunchedLog(log: LaunchedLogLike, parentName = webEnv.pa
     history: [],
     fromChain: true,
     auction: log.args?.auction && isAddress(log.args.auction) ? log.args.auction : undefined,
+    prophet: log.args?.prophet && isAddress(log.args.prophet) ? log.args.prophet : undefined,
+    launchedBlock: log.blockNumber != null ? Number(log.blockNumber) : undefined,
   };
 }
 

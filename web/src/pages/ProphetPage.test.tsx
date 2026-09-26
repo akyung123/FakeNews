@@ -33,7 +33,13 @@ describe("ProphetPage", () => {
       expect(html).toContain(data.prophet.wallet);
       expect(html).toContain("Claimable fees");
       expect(html).toContain("0.0012 ETH");
-      expect(html).toContain("Graduated");
+      expect(html).toContain(">Follow<");
+      expect(html).toContain("skull.svg");
+      expect(html).toContain(">Prophecies<");
+      expect(html).toContain(">Activity<");
+      expect(html).not.toContain("Replies");
+      expect(html).not.toContain(">Curve<");
+      expect(html).not.toContain(">Trade<");
       expect(html).not.toContain("Departed");
       expect(html).not.toContain("Deadline");
 
@@ -44,7 +50,7 @@ describe("ProphetPage", () => {
         expect(html).toContain(prophecyDetailPath(row.ensName));
         expect(html).toContain(row.token.slice(0, 6));
       }
-      expect((html.match(/>Buy<\/span>/g) ?? []).length).toBe(data.prophecies.length);
+      expect(html).not.toContain(">Buy</span>");
 
       expect(html).not.toContain(">Copy<");
       expect(html).not.toContain("True");
