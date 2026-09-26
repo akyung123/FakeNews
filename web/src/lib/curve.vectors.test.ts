@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import vectors from "../../../docs/curve-vectors.json";
+import vectors from "./Curve.vectors.json";
 import {
   CREATOR_BPS,
   CURVE_SUPPLY_WEI,
@@ -14,8 +14,8 @@ import {
 } from "./curve";
 
 /**
- * Canonical rows are backend M1 PR #8 `contracts/test/Curve.vectors.json`.
- * This file reads the matching copy in docs/ so web CI works before #8 merges.
+ * Canonical file is backend M1 PR #8 `contracts/test/Curve.vectors.json`.
+ * This test reads the byte-matching copy next to it. Do not edit contracts/.
  * Sell field `ethOut` in the fixture is the seller payout; `rawOut` is SPEC ethOut.
  */
 const asBig = (value: string | number) => BigInt(value);
