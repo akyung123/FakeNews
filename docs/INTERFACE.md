@@ -29,7 +29,7 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 ### `Launchpad` `(draft)`
 
 ```solidity
-constructor(address protocolFeeRecipient, address worldSigner);
+constructor(address protocolFeeRecipient, address worldSigner, address ens);
 
 // Create a prophet name. Needs a World ID server signature. Once per nullifier.
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
@@ -52,18 +52,20 @@ function prophetOf(address wallet) external view returns (string label);
 function creatorFeeOf(address wallet) external view returns (uint256);
 function protocolFeeRecipient() external view returns (address);
 function worldSigner() external view returns (address);
+function ens() external view returns (address);
 ```
 
 ```solidity
 event ProphetRegistered(address indexed wallet, string label, uint256 nullifier);
-event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug, uint64 deadline);
+event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
 event Trade(address indexed token, address indexed trader, bool isBuy,
             uint256 ethAmount, uint256 tokenAmount, uint256 fee, uint256 vEthAfter, uint256 vTokenAfter, string memo);
 event Graduated(address indexed token, uint256 ethToPool, uint256 tokensToPool);
 event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 ```
 
-- The sentence is not in `Launched`. It is read from ENS (DECISIONS #5).
+- The sentence and deadline are not in `Launched`. Both are read from ENS (DECISIONS #5).
+- `registerProphet` recovers EIP-191 `personal_sign` of `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` (section 3). `chainId` must be `block.chainid` and `launchpad` must be this contract; the signed wallet must be `msg.sender`. Label is chosen by the caller and is not in the signed payload.
 - Constants are exactly the "Constants" section of SPEC.md.
 - `memo` is only emitted, never stored. `buy`/`sell` revert if it is longer than 140 bytes (DECISIONS #15).
 - Rounding:

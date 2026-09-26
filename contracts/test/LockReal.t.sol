@@ -164,7 +164,7 @@ contract LockRealTest {
     function test_real_replaceResolverReverts() public {
         _needFork();
         _launch();
-        uint256 prophetId = uint256(keccak256(bytes(PROPHET)));
+        uint256 prophetId = parent.getState(uint256(keccak256(bytes(PROPHET)))).tokenId;
         try prophet.setResolver(parent, prophetId, address(0xB0B)) {
             revert("setResolver should revert");
         } catch (bytes memory err) {
