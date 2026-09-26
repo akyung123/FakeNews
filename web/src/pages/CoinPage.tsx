@@ -11,6 +11,7 @@ import { GRADUATION_ETH } from "../lib/mock";
 import { prototypeCoinFromName } from "../lib/prophetData";
 import {
   actions,
+  holderCount,
   myPosition,
   price,
   useStore,
@@ -22,7 +23,8 @@ export function CoinPage() {
   const s = useStore();
   const lookup = id || name;
   const mock = isMockMode();
-  const coin = (mock ? s.coins.find((c) => c.id === lookup) : undefined) ?? prototypeCoinFromName(lookup);
+  const fromStore = mock ? s.coins.find((c) => c.id === lookup) : undefined;
+  const coin = fromStore ?? prototypeCoinFromName(lookup);
   if (!coin) {
     return (
       <main className="narrow">
@@ -37,6 +39,7 @@ export function CoinPage() {
   const pos = mock ? myPosition(s, coin.id) : null;
   const talk = mock ? s.comments.filter((c) => c.coinId === coin.id).sort((a, b) => b.at - a.at) : [];
   const closed = graduated(coin);
+  const holders = fromStore ? holderCount(s, coin.id) : null;
 
   return (
     <main className="coin-page">
@@ -46,10 +49,12 @@ export function CoinPage() {
             <div>
               <div className="coin-name">
                 <TokenName {...tokenDisplayName(coin)} copy />
+                <span className="faint">${coin.ticker}</span>
                 <SampleBadge />
               </div>
               <p className="faint small">
                 by {coin.creator} · {ago(coin.createdAt)}
+                {holders != null ? ` · ${holders} holders` : null}
               </p>
             </div>
           </div>

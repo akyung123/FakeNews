@@ -33,6 +33,9 @@ Final constructor. Graduation does not add constructor arguments.
 ```solidity
 constructor(address protocolFeeRecipient, address worldSigner, address ens);
 
+// Deployer-only, once. After Launchpad, Hook (CREATE2), and Locker exist.
+function setUniswap(address poolManager, address hook, address locker) external;
+
 // Create a prophet name. Needs a World ID server signature. Once per nullifier.
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
 
@@ -55,6 +58,10 @@ function creatorFeeOf(address wallet) external view returns (uint256);
 function protocolFeeRecipient() external view returns (address);
 function worldSigner() external view returns (address);
 function ens() external view returns (address);
+function deployer() external view returns (address);
+function poolManager() external view returns (address);
+function hook() external view returns (address);
+function locker() external view returns (address);
 ```
 
 ```solidity
@@ -62,13 +69,26 @@ event ProphetRegistered(address indexed wallet, string label, uint256 nullifier)
 event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
 event Trade(address indexed token, address indexed trader, bool isBuy,
             uint256 ethAmount, uint256 tokenAmount, uint256 fee, uint256 vEthAfter, uint256 vTokenAfter, string memo);
-event Graduated(address indexed token, uint256 ethToPool, uint256 tokensToPool);
+event Graduated(
+    address indexed token,
+    bytes32 indexed poolId,
+    uint256 ethToPool,
+    uint256 tokensToPool,
+    uint160 sqrtPriceX96,
+    uint24 fee,
+    int24 tickSpacing,
+    address hooks
+);
 event CreatorFeeClaimed(address indexed prophet, uint256 amount);
+event UniswapSet(address poolManager, address hook, address locker);
 ```
 
+- `Graduated` is emitted in the buy that sells the last curve tokens. `poolId` is the V4 `PoolId` (`keccak256` of the `PoolKey`). `currency0` is native ETH (`address(0)`); `currency1` is `token`. The frontend reconstructs the key from `token`, `fee`, `tickSpacing`, and `hooks`.
 - The sentence and deadline are not in `Launched`. Both are read from ENS (DECISIONS #5).
 - `registerProphet` recovers EIP-191 `personal_sign` of `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` (section 3). `chainId` must be `block.chainid` and `launchpad` must be this contract; the signed wallet must be `msg.sender`. Label is chosen by the caller and is not in the signed payload.
-- Deploy order: Launchpad, Hook (CREATE2 with the Launchpad address), Locker, then a deployer-only one-time `setUniswap(poolManager, hook, locker)` added by the graduation PR. Uniswap addresses are not constructor args.
+- Constructor is `(protocolFeeRecipient, worldSigner, ens)`. This PR does not add constructor arguments.
+- Deploy order: Launchpad, then Hook (CREATE2 using the Launchpad address), then Locker, then a deployer-only one-time `setUniswap(poolManager, hook, locker)`. A second call or a non-deployer call reverts. Graduation reverts if Uniswap is not set.
+- `receive()` accepts leftover seed ETH only from the locker and the PoolManager.
 - Constants are exactly the "Constants" section of SPEC.md.
 - `memo` is only emitted, never stored. `buy`/`sell` revert if it is longer than 140 bytes (DECISIONS #15).
 - Rounding:
@@ -83,8 +103,12 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 
 ### `LiquidityLocker`
 
+- `lock(address token, address prophet, address protocolFeeRecipient, PoolKey key, uint256 tokenAmount)` is called only by the Launchpad at graduation. Recipients are fixed then.
 - `collect(address token)` can be called by anyone. Collected fees go **only** to prophet 24 : protocol 76.
-- No withdraw function.
+- No withdraw of principal. Liquidity cannot be decreased or burned.
+- If sending ETH to the prophet fails, `collect` still pays the protocol and accrues the prophet share. The prophet later calls `withdrawAccrued()`. Seed leftovers must not sweep `accruedEth`.
+- `withdrawAccrued()` sends only accrued ETH, never pool principal.
+- Leftover seed tokens after lock are sent to `0x…dEaD` (the token rejects `address(0)`).
 
 ## 3. World server → Launchpad `(draft)`
 
@@ -163,7 +187,7 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 | `ENS_ADAPTER_ADDRESS` | deploy script (Launchpad `ens` constructor arg) |
 | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |
 
-Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0.
+Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0. The web app does not read `ENS_ADAPTER_ADDRESS`; if it needs the adapter it calls `launchpad.ens()`.
 
 `ENS_ADAPTER_ADDRESS` is the already-deployed ENS adapter. Off anvil (`chainid != 31337`) it must be set and cannot be `address(0)` or placeholder `0xe05` — the same guard as `PROTOCOL_FEE_RECIPIENT` / `0xfee` and `worldSigner` / `0x51e`. Anvil dry-run fills `0xe05` when unset. Infra adds this name to `.env.example`.
 

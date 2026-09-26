@@ -85,19 +85,45 @@ abstract contract LaunchpadTestBase is Test {
         return signRegister(address(launchpad), wallet, nullifier, block.chainid, SIGNER_PK);
     }
 
-    function _registerProphet(address wallet, string memory label) internal {
+    function _registerProphetOn(Launchpad pad, address wallet, string memory label) internal {
         uint256 n = nextNullifier++;
         vm.prank(wallet);
-        launchpad.registerProphet(label, n, _sign(wallet, n));
+        pad.registerProphet(label, n, signRegister(address(pad), wallet, n, block.chainid, SIGNER_PK));
+    }
+
+    function _registerProphet(address wallet, string memory label) internal {
+        _registerProphetOn(launchpad, wallet, label);
+    }
+
+    function _launchOn(Launchpad pad, address wallet, string memory slug) internal returns (address token) {
+        vm.prank(wallet);
+        token = pad.launch(slug, "a prophecy sentence", 1_800_000_000, 0);
     }
 
     function _launch(string memory slug) internal returns (address token) {
-        vm.prank(prophet);
-        token = launchpad.launch(slug, "a prophecy sentence", 1_800_000_000, 0);
+        return _launchOn(launchpad, prophet, slug);
     }
 
     function _registerAndLaunch() internal returns (address token) {
         _registerProphet(prophet, "ringo");
         return _launch("lingo-2028");
+    }
+
+    function _registerAndLaunchAs(address wallet, string memory label, string memory slug)
+        internal
+        returns (address token)
+    {
+        _registerProphet(wallet, label);
+        return _launchOn(launchpad, wallet, slug);
+    }
+
+    function _sellOutOn(Launchpad pad, address trader, address token) internal {
+        vm.prank(trader);
+        pad.buy{value: 1 ether}(token, 0, "");
+    }
+
+    /// Last-curve buy: fills remaining supply and graduates when Uniswap is set.
+    function _sellOut(address token) internal {
+        _sellOutOn(launchpad, buyer, token);
     }
 }

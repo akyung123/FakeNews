@@ -15,9 +15,9 @@ describe("tokenDisplayName", () => {
     });
   });
 
-  it("falls back to the id when there is no ENS name", () => {
+  it("uses slugOf when the token name is not an ENS name", () => {
     expect(tokenDisplayName({ id: "wifi", name: "Wifi Dies" })).toEqual({
-      slug: "wifi",
+      slug: "Wifi Dies",
       ensName: null,
     });
   });

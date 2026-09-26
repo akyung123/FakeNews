@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { isEnsName, slugOf } from "../lib/ensName";
+
 /** Presentational token name: slug large, full ENS small. No chain reads. */
 export function tokenDisplayName(input: {
   slug?: string;
@@ -7,10 +10,11 @@ export function tokenDisplayName(input: {
 }): { slug: string; ensName: string | null } {
   if (input.slug && input.ensName) return { slug: input.slug, ensName: input.ensName };
   const name = input.name?.trim() ?? "";
-  if (name.endsWith(".eth") && name.includes(".")) {
-    return { slug: name.slice(0, name.indexOf(".")), ensName: name };
+  if (isEnsName(name)) {
+    return { slug: slugOf(name), ensName: name };
   }
-  return { slug: input.slug ?? input.id ?? name, ensName: input.ensName ?? null };
+  const slug = input.slug ?? slugOf(name);
+  return { slug: slug || input.id || name, ensName: input.ensName ?? null };
 }
 
 export function TokenName({
@@ -28,19 +32,28 @@ export function TokenName({
       {ensName ? (
         <span className="token-ens">
           <span>{ensName}</span>
-          {copy ? (
-            <button
-              type="button"
-              className="link token-copy"
-              onClick={() => {
-                void navigator.clipboard?.writeText(ensName);
-              }}
-            >
-              Copy
-            </button>
-          ) : null}
+          {copy ? <CopyFullName value={ensName} /> : null}
         </span>
       ) : null}
     </span>
+  );
+}
+
+function CopyFullName({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="link token-copy"
+      onClick={() => {
+        if (!navigator.clipboard) return;
+        void navigator.clipboard.writeText(value).then(() => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
   );
 }
