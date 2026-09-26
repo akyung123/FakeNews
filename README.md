@@ -46,16 +46,58 @@ One full loop on the deployed Launchpad. Each cell gets a Sepolia Etherscan link
 
 Nobody is paid during the auction (the CCA protocol fee is off). After migrate, the prophet gets 24% of the pool's trading fees, the protocol 76%. Nobody is paid for being right. Numbers and rules: [`docs/INTERFACE_CCA.md`](docs/INTERFACE_CCA.md) (CCA path, current on `main`); [`docs/SPEC.md`](docs/SPEC.md) still documents the earlier bonding-curve design.
 
+## Where to look (for judges)
+
+### ENSv2: the address book
+
+| ENSv2 feature | Where we use it |
+|---|---|
+| Own subname registry per prophet | [`ProphecyEns.registerProphet`](contracts/src/ens/ProphecyEns.sol#L70-L105): a UserRegistry proxy from VerifiableFactory ([L85](contracts/src/ens/ProphecyEns.sol#L85)), `setParent` then its role revoked ([L92–L93](contracts/src/ens/ProphecyEns.sol#L92-L93)) |
+| Permissioned Resolver per name, written once | [`_deployLockedResolver`](contracts/src/ens/ProphecyEns.sol#L143-L161): the sentence and address are written in `initialize`, then the adapter revokes its own text admin role ([L160](contracts/src/ens/ProphecyEns.sol#L160)). Nobody can edit the sentence |
+| EAC: an account may edit only certain text records | The prophet gets `avatar` and `description` only ([L158–L159](contracts/src/ens/ProphecyEns.sol#L158-L159)) |
+| Non-transferable, never-expiring names | Registered with owner roles `0` and expiry `type(uint64).max` ([L100](contracts/src/ens/ProphecyEns.sol#L100), [L136](contracts/src/ens/ProphecyEns.sol#L136)) |
+| Proof in tests | [`Lock.t.sol`](contracts/test/Lock.t.sol): editing the sentence reverts (L55), transfer reverts (L100), swapping the resolver reverts (L118), `avatar` stays writable (L181) |
+| Reading names in the app | [`getEnsText`](web/src/lib/ens.ts#L107) through the Universal Resolver; the list reads each sentence from ENS ([`launched.ts`](web/src/lib/launched.ts#L164-L170)) |
+
+### Uniswap: CCA → LBPStrategy → V4
+
+| Step | Where |
+|---|---|
+| Launch opens a CCA through the official LBPStrategy | [`Launchpad.launch`](contracts/src/Launchpad.sol#L157) → [`initializeDistribution`](contracts/src/Launchpad.sol#L193); config encoding in [`CcaLib.build`](contracts/src/cca/CcaLib.sol#L80-L120) |
+| Hook that lets LBPStrategy initialize the V4 pool | [`ProphecyHook.beforeInitialize`](contracts/src/uniswap/ProphecyHook.sol#L54-L58) (`authorized` = LBPStrategy), address mined with [`HookMiner`](contracts/src/uniswap/HookMiner.sol) |
+| Locked LP position, fees 24 : 76 | [`LiquidityLocker.register`](contracts/src/uniswap/LiquidityLocker.sol#L127), [`collect`](contracts/src/uniswap/LiquidityLocker.sol#L164); no withdraw function |
+| Web: bid, migrate, register, swap | [`placeBidArgs`](web/src/lib/cca/bid.ts#L31), [`openMarketWrite`](web/src/lib/cca/migrate.ts#L17), [`registerLockerWrite`](web/src/lib/cca/register.ts#L32), Universal Router [`encodeV4ExactInSingle`](web/src/lib/cca/swap.ts#L180), Quoter [`quoteExactInRequest`](web/src/lib/cca/pool.ts#L96) |
+| Full loop on a Sepolia fork | [`test_launchpadHookLockerMigrateRegisterCollect`](contracts/test/fork/CcaLaunchpadFork.t.sol#L83), [`test_urSwapBuyAndSellAfterMigrate`](contracts/test/fork/CcaSepoliaFork.t.sol#L194) |
+| Developer feedback | [`FEEDBACK.md`](FEEDBACK.md) |
+
+### World ID: one prophet name per person
+
+| Step | Where |
+|---|---|
+| Proof of Human request, bound to the wallet | [`WorldGate.tsx`](web/src/components/WorldGate.tsx#L357) |
+| Server-side verify with the Developer Portal, then a scoped signature | [`verifyAndSign`](world/src/verify.ts#L13) |
+| On-chain check and nullifier stored | [`Launchpad.registerProphet`](contracts/src/Launchpad.sol#L137) |
+| Failure paths | Reused nullifier reverts `NullifierUsed` ([test](contracts/test/LaunchpadWorld.t.sol#L89)); wrong signer, chain or Launchpad reverts ([tests](contracts/test/LaunchpadWorld.t.sol#L66-L88)); cancelling or failing in the widget keeps the issue button off |
+
+**Why this credential.** Issuing creates a permanent public record under a name that cannot be transferred, and the nullifier is never freed. The product needs one name per human, not an identity: Proof of Human gives exactly that uniqueness and nothing else. Selfie Check gives a probabilistic sybil score, so one person could end up with two permanent names. Passport would reveal attributes we do not need. Buying and browsing need no check.
+
+**Integration debrief.**
+
+- Time to first success: TBD (team)
+- Friction: the IDKit widget closed after the prove click and had to be kept open ([#62](https://github.com/prism-toggle-ai/Prophit/pull/62)); TBD (team)
+- Missing capability or docs: TBD (team)
+- The one improvement with the most impact: TBD (team)
+
 ## Status
 
-As of 2026-09-26. Deployed to Sepolia (CCA path, commit `58514dd`) — see addresses below. No prophecy has been launched on the live contract yet, so there is no live bid, claim, or migrate on-chain.
+As of 2026-09-27. Deployed to Sepolia (CCA path, commit `58514dd`) — see addresses below. Live transactions are in [On-chain proof](#on-chain-proof).
 
 | Part | Built | Not yet |
 |------|-------|---------|
-| `contracts/` | `Launchpad`: World ID prophet names (`registerProphet`), ENS names on `launch`, CCA auction via the official LBPStrategy v3.3.0. `migrate` opens a Uniswap V4 pool through `ProphecyHook`, locked in `LiquidityLocker` (fees 24 : 76, no withdraw). `ProphecyToken`, ENS adapter. Deployed and read back on Sepolia; fork suite green (95 tests) | A live launch, bid, claim, and migrate on the deployed contract |
-| `web/` | The four screens. Wallet connect on Sepolia. Issue screen: World ID check, then a real `registerProphet` transaction. Auction bid / claim UI reading `auctionBlocks()` on-chain, `migrate`, and a pool price chart once the market opens. Helpers to read names and sentences from ENS (`src/lib/ens.ts`) | List, detail and prophet page fall back to prototype rows until a real prophecy is launched and picked up from a `Launched` log |
-| `world/` | World ID verification server: `GET /rp-context`, `POST /verify`, `GET /health`. Signs the result for the Launchpad | Hosting (planned on Render, see [`infra/README.md`](infra/README.md)) |
-| `infra/` | Sepolia deploy scripts, `deployments/sepolia.json` record, GitHub Pages preview for `web/`, Render blueprint for `world/` | Hosting the World server for a live demo |
+| `contracts/` | `Launchpad`: World ID prophet names (`registerProphet`), ENS names on `launch`, CCA auction via the official LBPStrategy v3.3.0. `migrate` opens a Uniswap V4 pool through `ProphecyHook`, locked in `LiquidityLocker` (fees 24 : 76, no withdraw). `ProphecyToken`, ENS adapter. Deployed and read back on Sepolia; fork suite green (95 tests) | Revoking the team wallet's roles on `prophecy.eth` (see [Invariants & trust assumptions](#invariants--trust-assumptions)) |
+| `web/` | The four screens. Wallet connect on Sepolia. Issue screen: World ID check, then a real `registerProphet` transaction. Auction bid / claim UI reading `auctionBlocks()` on-chain, `migrate`, and a pool price chart once the market opens. Names and sentences are read from ENS (`src/lib/ens.ts`) | — |
+| `world/` | World ID verification server: `GET /rp-context`, `POST /verify`, `GET /health`. Signs the result for the Launchpad. Hosted on Render's free plan, so the first request after idle can take tens of seconds | — |
+| `infra/` | Sepolia deploy scripts, `deployments/sepolia.json` record, GitHub Pages site for `web/`, Render blueprint for `world/` | — |
 
 Live task board: [`docs/PLAN.md`](docs/PLAN.md). Build and deploy notes: [`FEEDBACK.md`](FEEDBACK.md).
 
@@ -200,7 +242,9 @@ Environment variables: copy [`.env.example`](.env.example) and see [`infra/READM
 - **Fee recipient is fixed at launch.** The prophet and protocol addresses are set when `launch` writes the ENS record and opens the auction; they cannot be changed afterwards.
 - **One name per person (World nullifier).** `registerProphet` stores the World ID nullifier on-chain. A second registration with the same nullifier reverts.
 - **World signature is scoped.** The server signs `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))`. A signature for one chain, contract, or wallet cannot be replayed elsewhere.
-- **`worldSigner` is a single trusted key.** If this key leaks, anyone can forge a World verification and the one-name-per-person rule breaks. The deployer sets `worldSigner` once (`setWorldSigner` is deployer-only, single-use).
+- **`worldSigner` is a single trusted key.** If this key leaks, anyone can forge a World verification and the one-name-per-person rule breaks. `worldSigner` is `immutable`, set in the Launchpad constructor; rotating it means a new Launchpad.
+- **The parent name is not locked yet.** Every prophet and prophecy name is written once and locked, but one level up the team wallet still owns `prophecy.eth` on the `.eth` registry with `SET_SUBREGISTRY`, and holds `REGISTRAR` on the parent registry. With those it could point `prophecy.eth` at another registry, or register a prophet name without World ID. `prophecy.eth` also has a `.eth` expiry, and names under it stop resolving if it lapses. We plan to revoke those roles and renew the name for a long term; revoking is irreversible, so it is a separate, person-confirmed step.
+- **Demo data.** TBD (team): if a demo prophet was registered with a signature made directly with the World signer key instead of an in-app World ID check, name it here.
 
 ## Layout
 
