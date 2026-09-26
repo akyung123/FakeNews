@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import type { Address } from "viem";
+import { WalletGate } from "../components/WalletGate";
 import { WorldGate } from "../components/WorldGate";
 import {
   clearLaunchDraft,
   isIssueFormValid,
-  isIssueSubmitEnabled,
   isLaunchEnabled,
   isNamedProphet,
   isRegisterSubmitEnabled,
@@ -13,16 +14,15 @@ import {
   launchButtonLabel,
   prophecyName,
   readLaunchDraft,
-  readStoredProphetLabel,
   storeLaunchDraft,
   storeProphetLabel,
   worldUserMessage,
   type IssueSession,
   type RegisterStatus,
-  type WorldStatus,
 } from "../lib/issue";
+import { useIssueSession, useProphetLookup, useWalletBoundWorld } from "../lib/issueSession";
 import { createReadProphetOf, createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
-import { MOCK_ISSUE_PLACEHOLDER, MOCK_ISSUE_SESSION, MOCK_PARENT_NAME, MOCK_RETURNING_SESSION } from "../lib/mock";
+import { MOCK_ISSUE_PLACEHOLDER, MOCK_PARENT_NAME } from "../lib/mock";
 import { isMockMode } from "../lib/mode";
 import { actions } from "../lib/store";
 import { MAX_PROPHECY_BYTES, utf8ByteLength } from "../lib/limits";
@@ -35,15 +35,12 @@ import {
   type LaunchInput,
   type WritePhase,
 } from "../lib/writes";
-import {
-  createWorldClient,
-  type WorldClient,
-  type WorldErrorKind,
-  type WorldServerSignature,
-} from "../lib/world";
+import { createWorldClient, type WorldClient } from "../lib/world";
 
 export type IssueScreenProps = {
-  session: IssueSession;
+  /** null: chain mode with no wallet connected. */
+  session: IssueSession | null;
+  walletConnecting?: boolean;
   world?: WorldClient;
   parentName?: string;
   onIssued?: (id: string) => void;
@@ -57,26 +54,14 @@ export function issuePlaceholder(mock = isMockMode()) {
   return mock ? MOCK_ISSUE_PLACEHOLDER : ISSUE_PLACEHOLDER;
 }
 
-export function resolveIssueSession(
-  search: URLSearchParams,
-  storedLabel = readStoredProphetLabel(),
-  mock = isMockMode(),
-): IssueSession {
-  // The sample returning prophet is a demo shortcut; chain mode reads prophetOf instead.
-  if (mock && search.get("returning") === "1") return { ...MOCK_RETURNING_SESSION };
-  if (search.get("fresh") === "1") return { ...MOCK_ISSUE_SESSION };
-  if (storedLabel) return { wallet: MOCK_ISSUE_SESSION.wallet, prophetLabel: storedLabel };
-  return { ...MOCK_ISSUE_SESSION };
-}
-
 export function CreatePage() {
-  const [params] = useSearchParams();
-  const session = useMemo(() => resolveIssueSession(params), [params]);
-  return <IssueScreen session={session} />;
+  const { session, connecting } = useIssueSession();
+  return <IssueScreen session={session} walletConnecting={connecting} />;
 }
 
 export function IssueScreen({
   session,
+  walletConnecting = false,
   world: worldProp,
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
   onIssued,
@@ -88,39 +73,53 @@ export function IssueScreen({
   // One client per screen. A new one each render makes WorldGate recheck the
   // server and drop the open World ID widget.
   const [world] = useState(() => worldProp ?? createWorldClient());
+  const wallet = session?.wallet ?? null;
+  const presetLabel = session?.prophetLabel ?? null;
   const readProphet = useMemo(() => lookupProphet ?? createReadProphetOf(), [lookupProphet]);
-  const [onChainLabel, setOnChainLabel] = useState("");
-  const returningProphet = Boolean(session.prophetLabel || onChainLabel);
+  const { lookup, retry: retryLookup, refresh: refreshLookup } = useProphetLookup(wallet, presetLabel, readProphet);
+  const onChainLabel = lookup.status === "ready" ? lookup.label : "";
+  const walletReady = Boolean(wallet) && lookup.status === "ready";
+  const returningProphet = Boolean(onChainLabel);
+  const {
+    walletRef,
+    worldStatus,
+    worldError,
+    verified,
+    onStatus: onWorldStatus,
+    onErrorKind: onWorldError,
+    onVerified: onWorldVerified,
+    reset: resetWorld,
+  } = useWalletBoundWorld(wallet);
   // The inputs outlive a reload (a refresh, or the tab coming back from a wallet
   // app) so a claimed name goes straight on to launch without retyping.
   const [draft] = useState(readLaunchDraft);
-  const [prophetLabel, setProphetLabel] = useState(session.prophetLabel ?? draft?.prophetLabel ?? "");
+  const [typedLabel, setProphetLabel] = useState(presetLabel ?? draft?.prophetLabel ?? "");
+  // A wallet that already has a name keeps it; the field is read-only then.
+  const prophetLabel = onChainLabel || typedLabel;
   const [prophecy, setProphecy] = useState(draft?.prophecy ?? "");
   const [slug, setSlug] = useState(draft?.slug ?? "");
-  const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
-  const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
-  const [verified, setVerified] = useState<WorldServerSignature | null>(null);
   const [registerStatus, setRegisterStatus] = useState<RegisterStatus>("idle");
   const [writeBusy, setWriteBusy] = useState(false);
   const [writePhase, setWritePhase] = useState<WritePhase | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
   const [writeSuccess, setWriteSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    storeLaunchDraft({ prophetLabel, prophecy, slug });
-  }, [prophetLabel, prophecy, slug]);
+  // A different wallet is a different person on chain: drop its World result,
+  // name claim and banners.
+  const [stateWallet, setStateWallet] = useState(wallet);
+  if (stateWallet !== wallet) {
+    setStateWallet(wallet);
+    resetWorld();
+    // A wallet reconnecting after a reload is the same person: keep the typed name.
+    if (stateWallet) setProphetLabel(presetLabel ?? "");
+    setRegisterStatus("idle");
+    setWriteError(null);
+    setWriteSuccess(null);
+  }
 
   useEffect(() => {
-    let cancelled = false;
-    void readProphet(session.wallet).then((label) => {
-      if (cancelled || !label) return;
-      setOnChainLabel(label);
-      setProphetLabel(label);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [readProphet, session.wallet]);
+    storeLaunchDraft({ prophetLabel: typedLabel, prophecy, slug });
+  }, [typedLabel, prophecy, slug]);
 
   const formValid = isIssueFormValid({
     prophetLabel,
@@ -130,22 +129,24 @@ export function IssueScreen({
   const gate = { returningProphet, worldStatus, formValid, registerStatus };
   const named = isNamedProphet(gate);
   const registeredHere = registerStatus === "success";
-  const canLaunch = isLaunchEnabled(gate);
-  const canRegister = isRegisterSubmitEnabled(gate);
-  const canSubmit = isIssueSubmitEnabled(gate);
+  const canLaunch = walletReady && isLaunchEnabled(gate);
+  const canRegister = walletReady && isRegisterSubmitEnabled(gate);
+  const canSubmit = canLaunch || canRegister;
   const registerBusy = registerStatus === "pending";
   const busy = registerBusy || writeBusy;
   const pending = writeBusy
     ? writePhaseCopy(writePhase) ?? WRITE_COPY.pending
     : registerBusy
       ? ISSUE_COPY.registerPending
-      : !named && worldStatus === "pending"
+      : walletReady && !named && worldStatus === "pending"
         ? ISSUE_COPY.pending
         : null;
   const error =
     writeError ??
     (named || worldStatus === "pending" || busy ? null : worldUserMessage(worldError));
-  const submitLabel = launchButtonLabel(gate);
+  const submitLabel = !wallet
+    ? ISSUE_COPY.connectWallet
+    : launchButtonLabel(gate);
   const fullName = prophetLabel && slug ? prophecyName(slug, prophetLabel, parentName) : "";
   const pendingTestId = writeBusy ? "write-pending" : registerBusy ? "register-pending" : "world-pending";
 
@@ -186,17 +187,22 @@ export function IssueScreen({
           void (async () => {
             setWriteError(null);
             if (canRegister) {
-              if (!verified) return;
+              if (!verified || !wallet) return;
+              const signer = wallet;
               setRegisterStatus("pending");
               try {
                 await registerProphet({
+                  wallet: signer as Address,
                   label: prophetLabel,
                   nullifier: verified.nullifier,
                   serverSig: verified.serverSig,
                 });
-                storeProphetLabel(prophetLabel);
+                if (walletRef.current !== signer) return;
+                storeProphetLabel(signer, prophetLabel);
                 setRegisterStatus("success");
+                void refreshLookup();
               } catch (err) {
+                if (walletRef.current !== signer) return;
                 const message = writeErrorMessage(err, "registerProphet");
                 setRegisterStatus(message ? "failed" : "idle");
                 setWriteError(message);
@@ -299,20 +305,22 @@ export function IssueScreen({
 
         {fullName ? <p className="name-preview">{fullName}</p> : null}
 
-        {registeredHere ? null : (
-          <WorldGate
-            returningProphet={returningProphet}
-            prophetName={returningProphet ? `${prophetLabel}.${parentName}` : ""}
-            wallet={session.wallet}
-            world={world}
-            status={worldStatus}
-            onStatus={(status) => {
-              setWorldStatus(status);
-              if (status === "pending" || status === "success") setWorldError(null);
-            }}
-            onErrorKind={setWorldError}
-            onVerified={setVerified}
-          />
+        {wallet && walletReady ? (
+          registeredHere ? null : (
+            <WorldGate
+              key={wallet}
+              returningProphet={returningProphet}
+              prophetName={onChainLabel ? `${onChainLabel}.${parentName}` : ""}
+              wallet={wallet}
+              world={world}
+              status={worldStatus}
+              onStatus={onWorldStatus}
+              onErrorKind={onWorldError}
+              onVerified={onWorldVerified}
+            />
+          )
+        ) : (
+          <WalletGate hasWallet={Boolean(wallet)} connecting={walletConnecting} lookup={lookup} onRetry={retryLookup} />
         )}
 
         {pending ? (
@@ -344,7 +352,7 @@ export function IssueScreen({
         >
           {submitLabel}
         </button>
-        {!named && worldStatus !== "success" ? (
+        {walletReady && !named && worldStatus !== "success" ? (
           <p className="faint small">The button stays off until World verification succeeds.</p>
         ) : null}
       </form>

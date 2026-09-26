@@ -3,6 +3,12 @@ import type { WorldErrorKind } from "./world";
 
 export type WorldStatus = "idle" | "pending" | "success" | "cancelled" | "failed";
 
+/**
+ * Who is issuing. `wallet` is the address that signs `registerProphet` and
+ * `launch`: the connected wallet in chain mode, a mock address only in mock mode.
+ * `prophetLabel` is a known name (mock sessions only); in chain mode it stays
+ * null and `prophetOf(wallet)` decides.
+ */
 export type IssueSession = {
   wallet: string;
   prophetLabel: string | null;
@@ -42,6 +48,11 @@ export const ISSUE_COPY = {
   claimTitle: "Claim your name",
   claimLead: "One name per person. World ID is asked only here.",
   continueIssue: "Continue to issue",
+  connectWallet: "Connect your wallet first",
+  connectWalletHelp: "Your name and prophecies belong to the wallet you connect. Use Connect wallet to continue.",
+  connectingWallet: "Connecting your wallet…",
+  checkingWallet: "Checking your wallet for a prophet name…",
+  lookupFailed: "Couldn't check whether this wallet already has a name. Check your connection and try again.",
 } as const;
 
 /** Chain-mode input hints. Demo mode uses the sample placeholders in mock.ts. */
@@ -160,17 +171,35 @@ export function prophecyName(slug: string, prophetLabel: string, parentName: str
 
 const PROPHET_STORAGE_KEY = "prophecy:prophet-label";
 
-export function readStoredProphetLabel(): string | null {
+/** Stored value: `{ [lowercased wallet]: label }`. Anything else reads as empty. */
+function readProphetLabelMap(): Record<string, string> {
   try {
-    return sessionStorage.getItem(PROPHET_STORAGE_KEY);
+    const raw = localStorage.getItem(PROPHET_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const map: Record<string, string> = {};
+    for (const [wallet, label] of Object.entries(parsed)) {
+      if (typeof label === "string" && label) map[wallet] = label;
+    }
+    return map;
   } catch {
-    return null;
+    return {};
   }
 }
 
-export function storeProphetLabel(label: string): void {
+/** Name this browser saw claimed by `wallet`. Mock mode uses it in place of `prophetOf`. */
+export function readStoredProphetLabel(wallet: string): string | null {
+  if (!wallet) return null;
+  return readProphetLabelMap()[wallet.toLowerCase()] ?? null;
+}
+
+export function storeProphetLabel(wallet: string, label: string): void {
+  if (!wallet || !label) return;
   try {
-    sessionStorage.setItem(PROPHET_STORAGE_KEY, label);
+    const map = readProphetLabelMap();
+    map[wallet.toLowerCase()] = label;
+    localStorage.setItem(PROPHET_STORAGE_KEY, JSON.stringify(map));
   } catch {
     // storage blocked
   }

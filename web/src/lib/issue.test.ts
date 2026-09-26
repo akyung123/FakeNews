@@ -12,7 +12,9 @@ import {
   launchButtonLabel,
   prophecyName,
   readLaunchDraft,
+  readStoredProphetLabel,
   storeLaunchDraft,
+  storeProphetLabel,
   worldErrorKindFromRegisterProphet,
   worldErrorMessage,
   worldUserMessage,
@@ -202,5 +204,35 @@ describe("launch draft storage", () => {
     expect(readLaunchDraft()).toBeNull();
     sessionStorage.setItem("prophecy:launch-draft", JSON.stringify({ prophecy: 3, slug: "coffee-last" }));
     expect(readLaunchDraft()).toEqual({ prophetLabel: "", prophecy: "", slug: "coffee-last" });
+  });
+});
+
+describe("prophet name cache", () => {
+  const A = "0xC0ffee254729296a45a3885639AC7E10F9d54979";
+  const B = "0x999999cf1046e68e36E1aA2E0E07105eDDD1f08E";
+
+  it("keeps one name per wallet in localStorage", () => {
+    localStorage.clear();
+    storeProphetLabel(A, "mina");
+    expect(readStoredProphetLabel(A)).toBe("mina");
+    expect(readStoredProphetLabel(A.toLowerCase())).toBe("mina");
+    expect(readStoredProphetLabel(B)).toBeNull();
+    storeProphetLabel(B, "ringo");
+    expect(readStoredProphetLabel(A)).toBe("mina");
+    expect(readStoredProphetLabel(B)).toBe("ringo");
+    expect(JSON.parse(localStorage.getItem("prophecy:prophet-label")!)).toEqual({
+      [A.toLowerCase()]: "mina",
+      [B.toLowerCase()]: "ringo",
+    });
+    expect(sessionStorage.getItem("prophecy:prophet-label")).toBeNull();
+    localStorage.clear();
+  });
+
+  it("ignores an old single-name value that is not tied to a wallet", () => {
+    localStorage.setItem("prophecy:prophet-label", "mina");
+    expect(readStoredProphetLabel(A)).toBeNull();
+    storeProphetLabel(A, "ringo");
+    expect(readStoredProphetLabel(A)).toBe("ringo");
+    localStorage.clear();
   });
 });

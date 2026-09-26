@@ -6,11 +6,14 @@ import { ISSUE_COPY } from "../lib/issue";
 import { MOCK_ISSUE_SESSION, MOCK_RP_CONTEXT_RESPONSE, MOCK_WORLD_HEALTH, MOCK_WORLD_LAUNCHPAD } from "../lib/mock";
 import { IssueScreen } from "./CreatePage";
 
-const calls = vi.hoisted(() => ({ created: 0, health: 0 }));
+const calls = vi.hoisted(() => ({ created: 0, health: 0, signals: [] as string[] }));
 
 vi.mock("@worldcoin/idkit", () => ({
   IDKitRequestWidget: () => <div data-testid="idkit-widget" />,
-  proofOfHuman: () => ({}),
+  proofOfHuman: ({ signal }: { signal: string }) => {
+    calls.signals.push(signal);
+    return {};
+  },
 }));
 
 vi.mock("../lib/world", async (importOriginal) => {
@@ -56,5 +59,8 @@ describe("Screen 2 live World ID", () => {
     await waitFor(() => expect(calls.health).toBe(1));
     expect(screen.getByTestId("idkit-widget")).toBeInTheDocument();
     expect(calls.created).toBe(1);
+    // The proof is bound to the same wallet that later sends registerProphet.
+    expect(calls.signals.length).toBeGreaterThan(0);
+    expect(new Set(calls.signals)).toEqual(new Set([MOCK_ISSUE_SESSION.wallet]));
   });
 });

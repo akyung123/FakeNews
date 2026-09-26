@@ -1,13 +1,20 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ISSUE_COPY, readLaunchDraft } from "../lib/issue";
+import { resolveIssueSession } from "../lib/issueSession";
 import type { RegisterProphetInput } from "../lib/launchpad";
 import { MOCK_RETURNING_SESSION, MOCK_WORLD_LAUNCHPAD } from "../lib/mock";
 import type { LaunchInput } from "../lib/writes";
 import { createWorldClient, type WorldClient } from "../lib/world";
-import { CreatePage, IssueScreen, resolveIssueSession } from "./CreatePage";
+import { CreatePage, IssueScreen } from "./CreatePage";
+
+// Mock mode (no Launchpad in tests): /create issues from the mock wallet.
+vi.mock("wagmi", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("wagmi")>();
+  return { ...actual, useAccount: () => ({ address: undefined, status: "disconnected" }) };
+});
 
 const PROPHECY = "Coffee lasts until the last pitch";
 const TOKEN = "0x1111111111111111111111111111111111111111" as const;
@@ -48,7 +55,11 @@ function spies() {
 function renderScreen(props: ReturnType<typeof spies>["props"], world: WorldClient = createWorldClient({ mock: true })) {
   return render(
     <MemoryRouter>
-      <IssueScreen session={resolveIssueSession(new URLSearchParams())} world={world} {...props} />
+      <IssueScreen
+        session={resolveIssueSession({ search: new URLSearchParams(), mock: true })}
+        world={world}
+        {...props}
+      />
     </MemoryRouter>,
   );
 }
@@ -79,6 +90,7 @@ function expectCurrentStep(step: "claim" | "launch") {
 
 beforeEach(() => {
   sessionStorage.clear();
+  localStorage.clear();
 });
 
 describe("Launch screen keeps what was typed", () => {
