@@ -53,7 +53,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] Replace the prototype curve constants with SPEC values (`src/lib/curve.ts`)
 - [ ] wagmi + viem, Sepolia only
 - [ ] Screen 1: prophecy list (name, sentence, price, Departed count)
-- [ ] Screen 2: issue
+- [ ] Screen 2: issue @cursor
   - the issue button turns on only after World verification
   - cancelling or failing disables it
 - [ ] Screen 3: prophecy detail
