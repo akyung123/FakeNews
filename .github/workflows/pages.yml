@@ -1,0 +1,62 @@
+name: pages
+
+# Public preview for web/. Zero extra secrets (default GITHUB_TOKEN only).
+# A person must enable Pages once: Settings → Pages → source GitHub Actions.
+# Until that is on, the deploy job will fail. Expected URL:
+#   https://akyung123.github.io/Prophecy/
+#
+# Vite base is set here (`vite build --base /Prophecy/`). No change to
+# web/vite.config.* — other lanes own that file.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Build
+        env:
+          VITE_RPC_URL: ${{ vars.VITE_RPC_URL }}
+          VITE_LAUNCHPAD_ADDRESS: ${{ vars.VITE_LAUNCHPAD_ADDRESS }}
+          VITE_PARENT_NAME: ${{ vars.VITE_PARENT_NAME }}
+          VITE_UNIVERSAL_RESOLVER: ${{ vars.VITE_UNIVERSAL_RESOLVER }}
+          VITE_WORLD_APP_ID: ${{ vars.VITE_WORLD_APP_ID }}
+          VITE_WORLD_ACTION: ${{ vars.VITE_WORLD_ACTION }}
+          VITE_WORLD_RP_ID: ${{ vars.VITE_WORLD_RP_ID }}
+        run: bunx tsc --noEmit && bunx vite build --base /Prophecy/
+      - name: SPA fallback
+        run: cp dist/index.html dist/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
