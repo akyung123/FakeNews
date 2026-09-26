@@ -28,6 +28,10 @@ describe("Screen 3 name route", () => {
       expect(html).toContain(row.sentence);
       expect(html).toContain(row.ensName);
       expect(html).toContain("Buy");
+      expect(html).toContain("Trade memos");
+      expect(html).toContain("Curve progress");
+      expect(html).not.toContain("Holder talk");
+      expect(html).not.toContain("market cap since launch");
       expect(html).not.toContain("Prophecy not found");
       expect(html.trim()).not.toBe("");
     } finally {
