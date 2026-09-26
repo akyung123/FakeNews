@@ -71,8 +71,8 @@ contract CcaLaunchTest is LaunchpadStack {
         assertEq(stored.migrationBlock, ap.endBlock + 1);
         assertEq(ap.requiredCurrencyRaised, 0.02 ether);
         assertEq(ap.currency, address(0));
-        assertEq(ap.floorPrice, uint256(1000) << 96);
-        assertEq(ap.tickSpacing, uint256(100) << 96);
+        assertEq(ap.floorPrice, CcaLib.FLOOR_PRICE_Q96);
+        assertEq(ap.tickSpacing, CcaLib.AUCTION_TICK_SPACING_Q96);
     }
 
     function test_recipientsAreNeverProphet() public {
