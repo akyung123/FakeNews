@@ -339,7 +339,7 @@ function withdrawAccrued() external;                       // L195–L203
 function tokenIdsOf(address token) external view returns (uint256[] memory); // L205–L207; can grow with spam registrations — do not use to pick the LP id
 function isRegistered(address token, uint256 tokenId) external view returns (bool); // L209–L211
 function prophetOf(address token) external view returns (address); // L214–L217; reverts UnknownLock if not prepared
-function positions(address token) external view returns (Position);
+function positions(address token) external view returns (address prophet, address protocolFeeRecipient, bool prepared); // public mapping getter — ABI tuple, not a struct
 function accruedEth(address prophet) external view returns (uint256);
 
 event Prepared(address indexed token, address indexed prophet, address indexed protocolFeeRecipient);
@@ -590,7 +590,7 @@ event TokensReceived(uint128 totalSupply);
 
 Exit / refund revert names: `AuctionIsNotOver()`, `BidAlreadyExited()`, `CannotExitBid()`, `CannotPartiallyExitBidBeforeGraduation()`, `CannotPartiallyExitBidBeforeEndBlock()`, `InvalidLastFullyFilledCheckpointHint()`, `InvalidOutbidBlockCheckpointHint()`, `BidIdDoesNotExist(uint256 bidId)`.
 
-`exitBid` finalizes the price itself: official CCA `a56d422` [`ContinuousClearingAuction.sol` L498](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/ContinuousClearingAuction.sol#L498) calls `_getFinalCheckpoint()` → `_checkpointAtBlock(END_BLOCK)`. Public `checkpoint()` is `onlyActiveAuction` (L420) and is not a post-end CTA. There is **no** separate `Set final price` button. If `maxPrice <=` final clearing, `exitBid` reverts `CannotExitBid` (L504).
+`exitBid` finalizes the price itself: official CCA `a56d422` [`ContinuousClearingAuction.sol` L498](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/ContinuousClearingAuction.sol#L498) calls `_getFinalCheckpoint()` → `_checkpointAtBlock(END_BLOCK)`. Anyone can still call public `checkpoint()` after the auction ends: `onlyActiveAuction` ([L98–L108](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/ContinuousClearingAuction.sol#L98-L108)) only reverts `AuctionNotStarted` (before start) and `TokensNotReceived` (tokens not received); after `endBlock` it finalizes the clearing price ([L420–L423](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/ContinuousClearingAuction.sol#L420-L423)). The product has **no** `Set final price` button because `exitBid` already writes that final checkpoint — a product decision, not a contract revert. If `maxPrice <=` final clearing, `exitBid` reverts `CannotExitBid` ([L504](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/ContinuousClearingAuction.sol#L504)).
 
 Claim revert names: `NotClaimable()`, `AuctionIsNotFinalized()`, `NotGraduated()`, `BidNotExited()`, `BatchClaimDifferentOwner(address expectedOwner, address receivedOwner)`, `BidIdDoesNotExist(uint256 bidId)`.
 
@@ -695,7 +695,7 @@ struct ExactInputSingleParams {
 
 Swap revert names the UI will hit (Designer Q2): `V4TooLittleReceived(uint256,uint256)` ([`IV4Router.sol` L13](https://github.com/Uniswap/v4-periphery/blob/545a5d2a87228167edde48f3b9eda122d1e3c4d6/src/interfaces/IV4Router.sol#L13)), `TransactionDeadlinePassed()`, `ExecutionFailed(uint256,bytes)`, `LengthMismatch()`, Permit2 `InsufficientAllowance(uint256)` / `AllowanceExpired(uint256)`.
 
-**TBD:** this calldata has not been executed against the live Sepolia 2.1.2 router in this repo (PR #41 used `PoolSwapTest` `0x9b6b46e2c869aa39918db7f52f5557fe577b6eee` as a harness-only caller; that is not the product ABI).
+Buy/Sell on this encoding pass on the Sepolia fork ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) / [PR #47](https://github.com/prism-toggle-ai/FakeNews/pull/47) E2E).
 
 Optional reads: StateView `0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c`, Quoter `0x61b3f2011a92d183c7dbadbda940a7555ccf9227`.
 
@@ -914,7 +914,7 @@ Designer Q1 ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42)): aft
 
 Web calls the Universal Router directly (no Launchpad wrapper): `commands = 0x10` (`V4_SWAP`), actions `0x06, 0x0c, 0x0f` (`SWAP_EXACT_IN_SINGLE`, `SETTLE_ALL`, `TAKE_ALL`). PoolKey: ETH / token, fee `10000`, tickSpacing `200`, hooks `ProphecyHook`, `hookData = 0x`. Exact-in only.
 
-Dev note: this encoding has not been run against the live Sepolia 2.1.2 router yet (PR #41 used `PoolSwapTest`). Test it before launch. Use the six-field `ExactInputSingleParams` including `minHopPriceX36 = 0` (Designer Q2; supersedes the five-field note).
+Dev note: Buy/Sell pass on the Sepolia fork ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) / [PR #47](https://github.com/prism-toggle-ai/FakeNews/pull/47) E2E). Use the six-field `ExactInputSingleParams` including `minHopPriceX36 = 0` (Designer Q2; supersedes the five-field note).
 
 | Surface | Copy |
 |---|---|
@@ -1095,7 +1095,7 @@ Answered items stay struck through so later PRs can see the trail. Remaining row
 11. ~~New Launchpad custom-error names~~ → full list in section 7.14 / [`Launchpad.sol` L57–L80](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L57-L80). “LBP not set” is `CcaNotSet`.
 12. ~~`LiquidityLocker` constructor and tokenId bind~~ → `constructor(poolManager, launchpad, hook)` L91–L98; `prepare` then permissionless `register(token, tokenId)` ([`LiquidityLocker.sol` L127–L130](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol#L127-L130)); views `tokenIdsOf` / `isRegistered` (L205–L211). Event `Registered`; error `NotNftOwner`. `AlreadyReceived` is per tokenId.
 13. ~~PositionManager action bytes for fees-only `collect`~~ → `collect(token, tokenId)` with `0x01` + `0x11`, liquidity delta `0` ([`LiquidityLocker.sol` L25–L26, L164–L176](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/LiquidityLocker.sol#L164-L176)). Unregistered id reverts `UnknownLock`.
-14. ~~Universal Router 2.1.2 `V4_SWAP` command + inputs~~ → section 4.7. **TBD:** not executed against live Sepolia 2.1.2 in this repo (PR #41 used `PoolSwapTest`).
+14. ~~Universal Router 2.1.2 `V4_SWAP` command + inputs~~ → section 4.7. Buy/Sell pass on the Sepolia fork ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) / [PR #47](https://github.com/prism-toggle-ai/FakeNews/pull/47) E2E).
 15. ~~Whether `receive()` must accept ETH from LBPStrategy~~ → no. [`Launchpad.sol` L131–L133](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/Launchpad.sol#L131-L133) accepts only locker and PoolManager. `recipient` is protocol, not Launchpad.
 16. Hook CREATE2 flags if any permission besides `BEFORE_INITIALIZE` is added. [PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`ProphecyHook.sol` L31–L47](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/src/uniswap/ProphecyHook.sol#L31-L47) is `beforeInitialize` only.
 17. **TBD:** 1-wei leftover solvency after graduated + caught `migrate` (Designer Q1).
