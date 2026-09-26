@@ -10,6 +10,8 @@ name: pages
 #
 # Preview/demo must never ship mock World ID (PR #20: ON unless exactly 0 or false).
 # VITE_WORLD_MOCK is hard-coded OFF here. Public VITE_* come from Actions variables.
+# VITE_RPC_URL is the browser RPC (public / rate-limited), not the SEPOLIA_RPC_URL secret.
+# Optional vars (WalletConnect) may be empty; do not fail the build.
 
 on:
   push:
@@ -59,6 +61,8 @@ jobs:
           VITE_CHAIN_ID: ${{ vars.VITE_CHAIN_ID }}
           VITE_PARENT_NAME: ${{ vars.VITE_PARENT_NAME }}
           VITE_UNIVERSAL_RESOLVER: ${{ vars.VITE_UNIVERSAL_RESOLVER }}
+          # Optional (PR #4). Empty vars must not fail the build.
+          VITE_WALLETCONNECT_PROJECT_ID: ${{ vars.VITE_WALLETCONNECT_PROJECT_ID }}
           VITE_WORLD_SERVER_URL: ${{ vars.VITE_WORLD_SERVER_URL }}
           VITE_WORLD_APP_ID: ${{ vars.VITE_WORLD_APP_ID }}
           VITE_WORLD_ACTION: ${{ vars.VITE_WORLD_ACTION }}
