@@ -101,6 +101,9 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(empty).toContain("Trade memos");
     expect(empty).toContain("Curve progress");
     expect(empty).toContain("0% 0.0000 of 0.02 ETH to graduate");
+    expect(empty).toContain("curve-out");
+    expect(empty).toContain("curve-out.ringo.prophecy.eth");
+    expect(empty).toContain("Copy");
     expect(empty).not.toContain("0.93 ETH");
     assertRemoved(empty);
 
@@ -119,16 +122,20 @@ describe("DECISIONS #1 copy — new strings", () => {
 
   test("Home cards and Top table drop gain figures and Since launch", () => {
     const home = renderApp("/");
-    expect(home).toContain("Top prophecies");
+    expect(home).toContain("Closest to graduation");
     expect(home).toContain("Price");
     expect(home).toContain("Curve");
     expect(home).toContain("Trade memos");
+    expect(home).toContain("Sample data");
     expect(home).toContain("june_kim");
     expect(home).toContain("rin_park");
     expect(home).toContain("sam_lee");
     for (const memo of NEW_MEMOS) expect(home).toContain(memo);
     expect(home).not.toContain("Since launch");
     expect(home).not.toContain("Market cap");
+    expect(home).not.toContain("holders");
+    expect(home).not.toContain(">Prophet<");
+    expect(home).not.toContain(">Copy<");
     assertRemoved(home);
   });
 
@@ -137,6 +144,8 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(home).toContain(">prophecy<");
     expect(home).not.toContain(".pump");
     expect(home).toContain("Contracts not connected yet.");
+    expect(home).toContain("Sample data");
+    expect(home).toContain("Claim your name");
     expect(home).not.toContain("env");
     expect(home).not.toContain("Launchpad address loaded from env.");
     expect(home).not.toContain("Launchpad address not set yet.");
@@ -237,5 +246,34 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(home).not.toContain("PRIVATE_KEY");
     expect(says).not.toContain("just saw a PRIVATE_KEY on the big screen 👀");
     assertRemoved(home);
+  });
+
+  test("create and name pages show the claim steps", () => {
+    const create = renderApp("/create");
+    expect(create).toContain("Step 1 of 2");
+    expect(create).toContain("Step 2 of 2");
+    expect(create).not.toContain("One transaction");
+    assertRemoved(create);
+
+    const name = renderApp("/name");
+    expect(name).toContain("Claim your name");
+    expect(name).toContain("Step 1 of 2");
+    expect(name).toContain("Step 2 of 2");
+    assertRemoved(name);
+  });
+
+  test("returning name session keeps One transaction and no Prophet badge", () => {
+    const returning = renderApp("/create?returning=1");
+    expect(returning).toContain("One transaction");
+    expect(returning).not.toContain("Step 1 of 2");
+    expect(returning).not.toContain(">Prophet<");
+    assertRemoved(returning);
+
+    const profile = renderApp("/p/ringo");
+    expect(profile).toContain("ringo.prophecy.eth");
+    expect(profile).not.toContain(">Prophet<");
+    expect(profile).not.toContain("holder share");
+    expect(profile).not.toContain(">Copy<");
+    assertRemoved(profile);
   });
 });

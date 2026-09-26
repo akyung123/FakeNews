@@ -149,6 +149,10 @@ describe("getProphecyByName", () => {
     expect(coin!.name).toBe("badges-2028.ringo.prophecy.eth");
     expect(coin!.ticker).toBe("BADGES-2028");
   });
+
+  test("does not invent a prototype coin in chain mode", () => {
+    expect(prototypeCoinFromName("badges-2028.ringo.prophecy.eth", NOW, { mock: false })).toBeNull();
+  });
 });
 
 describe("ENS text records", () => {

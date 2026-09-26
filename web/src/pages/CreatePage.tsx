@@ -142,6 +142,16 @@ export function IssueScreen({
     <main className="narrow stack">
       <h1>{ISSUE_COPY.title}</h1>
       <p className="faint">{ISSUE_COPY.lead}</p>
+      <div className="steps" data-testid="issue-steps">
+        {returningProphet ? (
+          <span className="step on">{ISSUE_COPY.oneTransaction}</span>
+        ) : (
+          <>
+            <span className={`step${worldStatus !== "success" ? " on" : ""}`}>{ISSUE_COPY.step1}</span>
+            <span className={`step${worldStatus === "success" ? " on" : ""}`}>{ISSUE_COPY.step2}</span>
+          </>
+        )}
+      </div>
 
       {world.isMock ? (
         <p className="faint small" data-testid="mock-session-switch">

@@ -55,11 +55,11 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 - [x] Replace the prototype curve constants with SPEC values (`src/lib/curve.ts`) @cursor
 - [x] wagmi + viem, Sepolia only @cursor
-- [ ] Screen 1: prophecy list (name, sentence, price, Departed count)
+- [x] Screen 1: prophecy list (name, sentence, price, Departed count) @cursor
 - [x] Screen 2: issue @cursor
   - the issue button turns on only after World verification
   - cancelling or failing disables it
-- [ ] Screen 3: prophecy detail
+- [x] Screen 3: prophecy detail @cursor
   - find the token by name
   - [x] buy and sell @cursor-agent
   - no True / False

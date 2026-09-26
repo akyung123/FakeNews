@@ -3,10 +3,11 @@ import { Link, useParams } from "react-router-dom";
 import { parseUnits } from "viem";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
+import { SampleBadge } from "../components/SampleBadge";
+import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { hasLaunchpad } from "../lib/contracts";
 import { graduated, progress, quoteBuy, quoteSell, TOTAL_SUPPLY } from "../lib/curve";
-import { isEnsName, slugOf } from "../lib/ensName";
-import { ago, eth, tokens } from "../lib/format";
+import { ago, eth, gwei, tokens } from "../lib/format";
 import {
   GRADUATED_BODY,
   GRADUATED_LINK,
@@ -24,8 +25,8 @@ import { GRADUATION_ETH } from "../lib/mock";
 import { getProphecyByName, prototypeCoinFromName } from "../lib/prophetData";
 import {
   actions,
-  holderCount,
   myPosition,
+  price,
   useStore,
   type Coin,
 } from "../lib/store";
@@ -111,21 +112,18 @@ export function CoinPage({
         <section className="block">
           <div className="coin-id">
             <div>
-              <p className="coin-name">
-                {slugOf(coin.name)} <span className="faint">${coin.ticker}</span>
-              </p>
+              <div className="coin-name">
+                <TokenName {...tokenDisplayName(coin)} copy />
+                <span className="faint">${coin.ticker}</span>
+                <SampleBadge />
+              </div>
               <p className="faint small">
-                {isEnsName(coin.name) ? (
-                  <>
-                    {coin.name} <CopyFullName value={coin.name} />
-                    {" · "}
-                  </>
-                ) : null}
-                by {coin.creator} · {ago(coin.createdAt)} · {holderCount(s, coin.id)} holders
+                by {coin.creator} · {ago(coin.createdAt)}
               </p>
             </div>
           </div>
           <h1 className="prophecy-title">{coin.prophecy}</h1>
+          <p className="price-now">{gwei(price(coin))}</p>
           <p className="big-num">{curveProgressHeader(coin)}</p>
           {graduation.graduated ? null : <p className="faint">Curve progress</p>}
           <Sparkline coin={coin} />
@@ -376,26 +374,6 @@ function PostBox({ coinId, holds }: { coinId: string; holds: boolean }) {
         Post
       </button>
     </form>
-  );
-}
-
-function CopyFullName({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      className="link"
-      aria-label="Copy full name"
-      onClick={() => {
-        if (!navigator.clipboard) return;
-        void navigator.clipboard.writeText(value).then(() => {
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1500);
-        });
-      }}
-    >
-      {copied ? "Copied" : "Copy"}
-    </button>
   );
 }
 

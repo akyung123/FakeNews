@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { formatEther, type Address } from "viem";
 import { getAccount } from "wagmi/actions";
 import { Bar } from "../components/CoinCard";
+import { TokenName } from "../components/TokenName";
 import { contracts, hasLaunchpad } from "../lib/contracts";
 import { createReadCreatorFee, createReadProphetOf } from "../lib/launchpad";
 import {
@@ -143,7 +144,6 @@ function ProphetView({
   return (
     <main className="prophet-page stack">
       <section className="block prophet-hero">
-        <p className="faint small">Prophet</p>
         <h1>{data.prophet.ensName}</h1>
         <p className="prophet-wallet">
           <span className="faint small">Wallet</span>
@@ -251,8 +251,7 @@ function ProphetView({
               <Link key={row.ensName} className="tr" role="row" to={prophecyDetailPath(row.ensName)}>
                 <span className="cell-coin">
                   <span className="cell-coin-text">
-                    <span className="row-title">{row.slug}</span>
-                    <span className="row-sub">{row.ensName}</span>
+                    <TokenName slug={row.slug} ensName={row.ensName} />
                   </span>
                 </span>
                 <span className="prophet-sentence">{row.sentence}</span>
@@ -284,8 +283,7 @@ function ProphecyCard({ row }: { row: ProphetProphecy }) {
   const label = prophecyTradeLabel(row);
   return (
     <article className="prophet-card">
-      <p className="row-title">{row.slug}</p>
-      <p className="row-sub">{row.ensName}</p>
+      <TokenName slug={row.slug} ensName={row.ensName} />
       <p className="prophet-card-sentence">{row.sentence}</p>
       <Status row={row} />
       <p className="faint small mono" title={row.token}>
