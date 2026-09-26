@@ -155,10 +155,13 @@ describe("designer World copy mapping", () => {
     expect(worldUserMessage("network")).toBe(ISSUE_COPY.checkFailed);
   });
 
-  it("uses existing banner copy for the register write, without prediction-market wording", () => {
-    expect(ISSUE_COPY.registerPending).toBe("Confirm the prophet name in your wallet.");
-    expect(ISSUE_COPY.registerSuccess).toBe("Prophet name is on Sepolia.");
-    const text = `${ISSUE_COPY.registerPending} ${ISSUE_COPY.registerSuccess}`.toLowerCase();
+  it("uses the designer name-claim sentences, without prediction-market wording", () => {
+    expect(ISSUE_COPY.registerPending).toBe("Confirm your name in your wallet.");
+    expect(ISSUE_COPY.registerSuccess).toBe("Your name is claimed on Sepolia.");
+    expect(ISSUE_COPY.registerFailed).toBe(
+      "Name claim failed. Nothing was charged except gas. Try again.",
+    );
+    const text = `${ISSUE_COPY.registerPending} ${ISSUE_COPY.registerSuccess} ${ISSUE_COPY.registerFailed}`.toLowerCase();
     expect(text).not.toMatch(/coin|profit|yield|prediction|true|false/);
   });
 });

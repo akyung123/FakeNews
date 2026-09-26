@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readLaunchpadDeployBlock, webEnv } from "./env";
 import { MOCK_WORLD_LAUNCHPAD, MOCK_WORLD_VERIFY } from "./mock";
 import {
+  assertSuccessfulReceipt,
   createRegisterProphet,
   fetchLaunchedLogs,
   LAUNCHED_LOOKBACK_BLOCKS,
@@ -51,23 +52,28 @@ describe("registerProphet write shape", () => {
     expect(() => registerProphetWrite(input)).toThrow(/not set/i);
   });
 
-  it("calls wagmi writeContract with registerProphet args when a launchpad address is set", async () => {
+  it("simulates, then calls writeContract with registerProphet args, then requires a successful receipt", async () => {
     const hash = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
+    const simulate = vi.fn(async () => ({ result: undefined }));
     const write = vi.fn(async () => hash);
     const wait = vi.fn(async () => ({ status: "success" }));
     const run = createRegisterProphet(undefined, {
       address: MOCK_WORLD_LAUNCHPAD,
+      simulateContract: simulate,
       writeContract: write,
       waitForTransactionReceipt: wait,
     });
     await run(input);
+    const request = registerProphetWrite(input, MOCK_WORLD_LAUNCHPAD);
+    expect(simulate).toHaveBeenCalledTimes(1);
+    expect(simulate).toHaveBeenCalledWith(wagmiConfig, request);
     expect(write).toHaveBeenCalledTimes(1);
-    const [config, request] = write.mock.calls[0];
+    const [config, written] = write.mock.calls[0];
     expect(config).toBe(wagmiConfig);
-    expect(request.address).toBe(MOCK_WORLD_LAUNCHPAD);
-    expect(request.abi).toBe(launchpadAbi);
-    expect(request.functionName).toBe("registerProphet");
-    expect(request.args).toEqual([
+    expect(written.address).toBe(MOCK_WORLD_LAUNCHPAD);
+    expect(written.abi).toBe(launchpadAbi);
+    expect(written.functionName).toBe("registerProphet");
+    expect(written.args).toEqual([
       "ringo",
       BigInt(MOCK_WORLD_VERIFY.nullifier),
       MOCK_WORLD_VERIFY.serverSig,
@@ -76,7 +82,49 @@ describe("registerProphet write shape", () => {
     expect(wait).toHaveBeenCalledWith(wagmiConfig, { hash });
   });
 
+  it("does not call writeContract when simulateContract throws", async () => {
+    const simulate = vi.fn(async () => {
+      throw new Error("NullifierUsed");
+    });
+    const write = vi.fn(async () => {
+      throw new Error("write must not run after a failed simulation");
+    });
+    const wait = vi.fn(async () => {
+      throw new Error("wait must not run after a failed simulation");
+    });
+    const run = createRegisterProphet(undefined, {
+      address: MOCK_WORLD_LAUNCHPAD,
+      simulateContract: simulate,
+      writeContract: write,
+      waitForTransactionReceipt: wait,
+    });
+    await expect(run(input)).rejects.toThrow(/NullifierUsed/);
+    expect(simulate).toHaveBeenCalledTimes(1);
+    expect(write).not.toHaveBeenCalled();
+    expect(wait).not.toHaveBeenCalled();
+  });
+
+  it("throws when the receipt status is not success", async () => {
+    const hash = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" as const;
+    const simulate = vi.fn(async () => ({ result: undefined }));
+    const write = vi.fn(async () => hash);
+    const wait = vi.fn(async () => ({ status: "reverted" }));
+    const run = createRegisterProphet(undefined, {
+      address: MOCK_WORLD_LAUNCHPAD,
+      simulateContract: simulate,
+      writeContract: write,
+      waitForTransactionReceipt: wait,
+    });
+    await expect(run(input)).rejects.toThrow(/did not succeed/);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(() => assertSuccessfulReceipt({ status: "reverted" })).toThrow(/did not succeed/);
+    expect(() => assertSuccessfulReceipt({ status: "success" })).not.toThrow();
+  });
+
   it("does not call wagmi writeContract in mock mode", async () => {
+    const simulate = vi.fn(async () => {
+      throw new Error("simulate must not run in mock mode");
+    });
     const write = vi.fn(async () => {
       throw new Error("write must not run in mock mode");
     });
@@ -85,10 +133,12 @@ describe("registerProphet write shape", () => {
     });
     const run = createRegisterProphet(undefined, {
       address: undefined,
+      simulateContract: simulate,
       writeContract: write,
       waitForTransactionReceipt: wait,
     });
     await run(input);
+    expect(simulate).not.toHaveBeenCalled();
     expect(write).not.toHaveBeenCalled();
     expect(wait).not.toHaveBeenCalled();
   });

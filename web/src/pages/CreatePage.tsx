@@ -11,7 +11,6 @@ import {
   readStoredProphetLabel,
   storeProphetLabel,
   toDatetimeLocalValue,
-  worldErrorKindFromRegisterProphet,
   worldUserMessage,
   type IssueSession,
   type WorldStatus,
@@ -89,7 +88,11 @@ export function IssueScreen({
         ? ISSUE_COPY.pending
         : null;
   const error =
-    returningProphet || worldStatus === "pending" || registerBusy ? null : worldUserMessage(worldError);
+    registerStatus === "failed"
+      ? ISSUE_COPY.registerFailed
+      : returningProphet || worldStatus === "pending" || registerBusy
+        ? null
+        : worldUserMessage(worldError);
   const submitLabel = launchButtonLabel({ returningProphet, worldStatus, canLaunch });
   const fullName = prophetLabel && slug ? prophecyName(slug, prophetLabel, parentName) : "";
 
@@ -122,10 +125,7 @@ export function IssueScreen({
                   serverSig: verified.serverSig,
                 });
                 setRegisterStatus("success");
-              } catch (err) {
-                const kind = worldErrorKindFromRegisterProphet(err);
-                setWorldError(kind);
-                setWorldStatus("failed");
+              } catch {
                 setRegisterStatus("failed");
                 return;
               }

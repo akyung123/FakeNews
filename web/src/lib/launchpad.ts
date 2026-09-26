@@ -1,4 +1,4 @@
-import { waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { simulateContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { launchpadAbi } from "./launchpadAbi";
 import { contracts } from "./contracts";
 import { webEnv } from "./env";
@@ -19,16 +19,28 @@ export type WagmiRegisterWrite = (
   request: RegisterProphetWriteRequest,
 ) => Promise<Hex>;
 
+export type WagmiSimulate = (
+  config: typeof wagmiConfig,
+  request: RegisterProphetWriteRequest,
+) => Promise<unknown>;
+
 export type WagmiWaitForReceipt = (
   config: typeof wagmiConfig,
   args: { hash: Hex },
-) => Promise<unknown>;
+) => Promise<{ status?: string } | null | undefined>;
 
 export type RegisterProphetOptions = {
   address?: `0x${string}` | undefined;
+  simulateContract?: WagmiSimulate;
   writeContract?: WagmiRegisterWrite;
   waitForTransactionReceipt?: WagmiWaitForReceipt;
 };
+
+export function assertSuccessfulReceipt(receipt: { status?: string } | null | undefined): void {
+  if (receipt?.status !== "success") {
+    throw new Error("registerProphet did not succeed");
+  }
+}
 
 export function registerProphetArgs(input: RegisterProphetInput) {
   return [input.label, BigInt(input.nullifier), input.serverSig] as const;
@@ -84,10 +96,13 @@ export function createRegisterProphet(
       await write(request);
       return;
     }
+    const simulate = options.simulateContract ?? simulateContract;
     const send = options.writeContract ?? writeContract;
     const wait = options.waitForTransactionReceipt ?? waitForTransactionReceipt;
+    await simulate(wagmiConfig, request);
     const hash = await send(wagmiConfig, request);
-    await wait(wagmiConfig, { hash });
+    const receipt = await wait(wagmiConfig, { hash });
+    assertSuccessfulReceipt(receipt);
   };
 }
 
