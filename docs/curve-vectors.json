@@ -1,0 +1,138 @@
+{
+  "description": "SPEC-derived bonding-curve quote vectors. Web asserts these in curve.ts. When Launchpad lands, forge tests should assert the same outputs from quoteBuy / quoteSell.",
+  "rounding": {
+    "buy": "fee rounds up on incoming ETH, then tokensOut = floor(vToken * ethNet / (vETH + ethNet)). Last-buy cost for remaining supply rounds up; excess ETH is not consumed.",
+    "sell": "ethOut = floor(vETH * tokensIn / (vToken + tokensIn)), capped at real ETH. Fee rounds up on ethOut. Seller receives ethOut - fee."
+  },
+  "constants": {
+    "TOTAL_SUPPLY": "1000000000000000000000000000",
+    "CURVE_SUPPLY": "793100000000000000000000000",
+    "LP_SUPPLY": "206900000000000000000000000",
+    "VIRTUAL_TOKEN": "1073000000000000000000000000",
+    "VIRTUAL_ETH": "7058378514689194",
+    "FEE_BPS": "125",
+    "CREATOR_BPS": "30",
+    "PROTOCOL_BPS": "95"
+  },
+  "vectors": [
+    {
+      "name": "spec-toy-first-buy",
+      "note": "SPEC Price section: ETH reserve 10, token reserve 100, deposit 10 → 50. Formula only, no fee.",
+      "kind": "buyOn",
+      "input": {
+        "vEth": "10",
+        "vToken": "100",
+        "remaining": "100",
+        "ethIn": "10",
+        "feeBps": "0"
+      },
+      "expected": {
+        "tokensOut": "50",
+        "ethNet": "10",
+        "fee": "0",
+        "ethInUsed": "10"
+      }
+    },
+    {
+      "name": "spec-toy-second-buy",
+      "note": "SPEC Price section: after the first buy, another 10 → floor(50 * 10 / 30) = 16.",
+      "kind": "buyOn",
+      "input": {
+        "vEth": "20",
+        "vToken": "50",
+        "remaining": "50",
+        "ethIn": "10",
+        "feeBps": "0"
+      },
+      "expected": {
+        "tokensOut": "16",
+        "ethNet": "10",
+        "fee": "0",
+        "ethInUsed": "10"
+      }
+    },
+    {
+      "name": "start-buy-0.001-eth",
+      "note": "SPEC Fees: 0.001 ETH takes a 0.0000125 fee and puts 0.0009875 into the curve. ~16.6% of curve supply.",
+      "kind": "buy",
+      "state": { "sold": "0", "realEth": "0" },
+      "input": { "ethIn": "1000000000000000" },
+      "expected": {
+        "tokensOut": "131693201440406167649784217",
+        "ethNet": "987500000000000",
+        "fee": "12500000000000",
+        "ethInUsed": "1000000000000000"
+      }
+    },
+    {
+      "name": "sell-back-after-0.001",
+      "note": "SPEC Fees: selling the 0.001 ETH fill back yields about 0.000975 after the second 1.25%.",
+      "kind": "sell",
+      "state": {
+        "sold": "131693201440406167649784217",
+        "realEth": "987500000000000"
+      },
+      "input": { "tokensIn": "131693201440406167649784217" },
+      "expected": {
+        "ethOut": "987499999999999",
+        "fee": "12343750000000",
+        "ethPayout": "975156249999999"
+      }
+    },
+    {
+      "name": "second-buy-0.001",
+      "note": "Another 0.001 ETH after the first fill. Price has moved; same money buys fewer tokens.",
+      "kind": "buy",
+      "state": {
+        "sold": "131693201440406167649784217",
+        "realEth": "987500000000000"
+      },
+      "input": { "ethIn": "1000000000000000" },
+      "expected": {
+        "tokensOut": "102900643659077430665921930",
+        "ethNet": "987500000000000",
+        "fee": "12500000000000",
+        "ethInUsed": "1000000000000000"
+      }
+    },
+    {
+      "name": "graduate-from-start",
+      "note": "A buy larger than remaining supply fills only CURVE_SUPPLY. Real ETH at graduation is 0.02. Excess is not consumed.",
+      "kind": "buy",
+      "state": { "sold": "0", "realEth": "0" },
+      "input": { "ethIn": "30000000000000000" },
+      "expected": {
+        "tokensOut": "793100000000000000000000000",
+        "ethNet": "20000000000000000",
+        "fee": "253164556962026",
+        "ethInUsed": "20253164556962026"
+      }
+    },
+    {
+      "name": "buy-1-wei-rounds-fee-up",
+      "note": "Fee on 1 wei rounds up to 1, so ethNet is 0 and no tokens come out.",
+      "kind": "buy",
+      "state": { "sold": "0", "realEth": "0" },
+      "input": { "ethIn": "1" },
+      "expected": {
+        "tokensOut": "0",
+        "ethNet": "0",
+        "fee": "0",
+        "ethInUsed": "0"
+      }
+    },
+    {
+      "name": "buy-10000-wei",
+      "note": "ceil(10000 * 125 / 10000) = 125. Tokens use the remaining 9875 wei as ethNet.",
+      "kind": "buy",
+      "state": { "sold": "0", "realEth": "0" },
+      "input": { "ethIn": "10000" },
+      "expected": {
+        "tokensOut": "1501176931491290",
+        "ethNet": "9875",
+        "fee": "125",
+        "ethInUsed": "10000"
+      }
+    }
+  ]
+}

@@ -103,5 +103,17 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 | `VITE_PARENT_NAME` | web (e.g. `prophecy.eth`) |
 | `VITE_UNIVERSAL_RESOLVER` | web ([`ENSV2.md`](ENSV2.md) section 0) |
 | `VITE_WORLD_APP_ID`, `VITE_WORLD_ACTION` | web |
+| `VITE_WALLETCONNECT_PROJECT_ID` | web (optional; injected wallets work without it) |
 | `RPC_URL`, `PRIVATE_KEY` | contract deployment (people only) |
 | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |
+
+Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0.
+
+## 6. Curve quote vectors `(draft)`
+
+[`curve-vectors.json`](curve-vectors.json) is the shared buy/sell quote table. Amounts are decimal strings of wei.
+
+- Web: `web/src/lib/curve.vectors.test.ts` asserts `curve.ts` against every row.
+- Contracts: when `Launchpad.quoteBuy` / `quoteSell` land, replay the same rows in a forge test. Do not re-derive the expected numbers.
+
+Rounding matches section 2: buy fee up then tokens out down; sell eth out down then fee up.
