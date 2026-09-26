@@ -62,7 +62,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - no True / False
   - optional one-line memo on buy and sell; recent trades listed with their memos
   - replace the prototype's holder talk with trade memos
-- [ ] Screen 4: prophet page. Departed prophecies next to the next buy, claimable fees, sell button
+- [ ] Screen 4: prophet page. Departed prophecies next to the next buy, claimable fees, sell button @cursor
 - [ ] Every sentence is read from ENS. Nothing hardcoded
 - [ ] Republish the demo page (skill `demo-publish`)
 
