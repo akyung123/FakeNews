@@ -41,6 +41,18 @@ describe("world client", () => {
     expect(worldErrorKindFromServerCode("nope")).toBe("network");
   });
 
+  it("reuses world/fixture/register-prophet-signature.json and does not export the signer key", async () => {
+    const fixture = await import("../../../world/fixture/register-prophet-signature.json");
+    expect(MOCK_WORLD_CHAIN_ID).toBe(fixture.chainId);
+    expect(MOCK_WORLD_LAUNCHPAD).toBe(fixture.launchpad);
+    expect(MOCK_WORLD_VERIFY).toEqual({
+      nullifier: fixture.nullifier,
+      serverSig: fixture.serverSig,
+    });
+    expect(MOCK_WORLD_HEALTH.signer).toBe(fixture.signer);
+    expect(JSON.stringify({ ...MOCK_WORLD_VERIFY, ...MOCK_WORLD_HEALTH })).not.toContain(fixture.signerKey);
+  });
+
   it("returns the world/ GET /rp-context envelope, fixture signature, and health", async () => {
     const client = createWorldClient({ mock: true });
     expect(client.isMock).toBe(true);

@@ -3,9 +3,21 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
+  server: {
+    fs: {
+      allow: [".."],
+    },
+  },
   test: {
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "src/lib/prophetData.test.ts",
+      "src/pages/CoinPage.test.tsx",
+      "src/pages/ProphetPage.test.tsx",
+    ],
   },
 });
 

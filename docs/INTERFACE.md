@@ -85,7 +85,7 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 
 ### Web → World server `(draft)`
 
-The web app never holds the RP signing key. HTTP matches `world/` (PR #10, PR #15): `GET /rp-context`, then `POST /verify`.
+The web app never holds the RP signing key. HTTP matches `world/` (PR #10, now on main): `GET /rp-context`, then `POST /verify`.
 
 `GET {VITE_WORLD_SERVER_URL}/rp-context`
 

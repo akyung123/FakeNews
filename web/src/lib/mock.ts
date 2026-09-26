@@ -1,17 +1,22 @@
 /**
- * Shared mock data for the web prototype.
- * Each screen owns a clearly marked exported section so parallel PRs can merge cleanly.
- * Mock data lives only in this file.
+ * Demo records for the web app.
+ *
+ * Sample sentences live only in this file. Screen components read them
+ * through a *Data.ts interface so a later ENS + contract reader can replace
+ * the mock without touching the screens.
  */
 
+import registerProphetSignature from "../../../world/fixture/register-prophet-signature.json";
+
+type Hex = `0x${string}`;
+
 // ---------------------------------------------------------------------------
-// Screen 2 — Issue (World ID + launch form)
+// Screen 2 — issue
 // Owned by the Screen 2 / issue-screen change. Do not fold Screen 4 data into this block.
 //
-// Signature + verify fixtures are copied from world/ (PR #10 merged, PR #15 open):
-//   world/fixture/register-prophet-signature.json
-//   world/test/helpers.ts uniquenessProof / verifyBody
-// The Anvil signer key is not copied here.
+// Signature fields are imported from world/fixture/register-prophet-signature.json
+// (PR #10, now on main). uniquenessProof shape is from world/test/helpers.ts.
+// The Anvil signer key in that fixture is not re-exported.
 // ---------------------------------------------------------------------------
 
 /** First-time session: no prophet name yet, so World ID is required. */
@@ -32,12 +37,11 @@ export const MOCK_WORLD_ACTION = "register-prophet";
 export const MOCK_WORLD_RP_ID = "rp_test_prophecy";
 export const MOCK_WORLD_ENVIRONMENT = "staging" as const;
 
-/** Sepolia. Matches world/fixture/register-prophet-signature.json. */
-export const MOCK_WORLD_CHAIN_ID = 11_155_111;
-export const MOCK_WORLD_LAUNCHPAD = "0x1111111111111111111111111111111111111111" as const;
-export const MOCK_WORLD_WALLET = "0x2222222222222222222222222222222222222222" as const;
-export const MOCK_WORLD_NULLIFIER =
-  "0x2bf8406809dcefb1486dadc96c0a897db9bab002053054cf64272db512c6fbd8" as const;
+/** Sepolia. Values come from world/fixture/register-prophet-signature.json. */
+export const MOCK_WORLD_CHAIN_ID = registerProphetSignature.chainId;
+export const MOCK_WORLD_LAUNCHPAD = registerProphetSignature.launchpad as Hex;
+export const MOCK_WORLD_WALLET = registerProphetSignature.wallet as Hex;
+export const MOCK_WORLD_NULLIFIER = registerProphetSignature.nullifier as Hex;
 
 /** IDKit 4 rp_context object (inner field of GET /rp-context). */
 export const MOCK_RP_CONTEXT = {
@@ -76,25 +80,22 @@ export const MOCK_IDKIT_RESULT = {
 };
 
 /**
- * POST /verify success. nullifier + serverSig from
+ * POST /verify success. nullifier + serverSig imported from
  * world/fixture/register-prophet-signature.json
  * (EIP-191 personal_sign of keccak256(abi.encode(uint256 chainId, address launchpad, address wallet, uint256 nullifier))).
  */
 export const MOCK_WORLD_VERIFY = {
   nullifier: MOCK_WORLD_NULLIFIER,
-  serverSig:
-    "0x30b81b87f692058fe903c62e6658079e5ed5d399b0498408232b8d1fcc6fde907fb7fad72e0b1e482806e53d0b29ec8a2c766251dceef6e448a9772a2c5c0a801c" as const,
+  serverSig: registerProphetSignature.serverSig as Hex,
 };
 
-/** GET /health. Signer address from the world/ fixture (Anvil account 0). */
+/** GET /health. Signer address imported from the world/ fixture. */
 export const MOCK_WORLD_HEALTH = {
   ok: true as const,
-  signer: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  signer: registerProphetSignature.signer,
 };
 
 export const DEFAULT_WORLD_SERVER_URL = "http://localhost:8787";
-
-export const MOCK_PARENT_NAME = "prophecy.eth";
 
 export const MOCK_ISSUE_PLACEHOLDER = {
   prophecy: "The venue projector survives the whole demo",
@@ -103,6 +104,90 @@ export const MOCK_ISSUE_PLACEHOLDER = {
 };
 
 // ---------------------------------------------------------------------------
-// Screen 4 — Prophet page
-// Another FE change owns this section. Add Screen 4 mocks below this marker.
+// Screen 4 — prophet page
 // ---------------------------------------------------------------------------
+
+export const MOCK_PARENT_NAME = "prophecy.eth";
+
+export type MockProphet = {
+  /** Prophet label, e.g. `ringo`. */
+  label: string;
+  wallet: `0x${string}`;
+  /** Accumulated creator-fee share, wei. Matches Launchpad.creatorFeeOf. */
+  claimableFeeWei: bigint;
+};
+
+export type MockProphecy = {
+  slug: string;
+  prophetLabel: string;
+  /** One-line sentence. The only place this string is stored in the mock. */
+  sentence: string;
+  /** Unix seconds. Departed is `now >= deadline` (INTERFACE). */
+  deadline: number;
+  token: `0x${string}`;
+  /** Tokens already sold, 18 decimals. Matches Launchpad.curve().sold. */
+  sold: bigint;
+  /** Graduation flag. Matches Launchpad.curve().complete. */
+  complete: boolean;
+};
+
+export const MOCK_PROPHETS: readonly MockProphet[] = [
+  {
+    label: "ringo",
+    wallet: "0x1111111111111111111111111111111111111111",
+    claimableFeeWei: 1_200_000_000_000_000n,
+  },
+  {
+    label: "mina",
+    wallet: "0x2222222222222222222222222222222222222222",
+    claimableFeeWei: 0n,
+  },
+];
+
+export const MOCK_PROPHECIES: readonly MockProphecy[] = [
+  {
+    slug: "badges-2028",
+    prophetLabel: "ringo",
+    sentence: "Every hackathon badge is an ENS name by 2028",
+    deadline: 1_830_297_600, // 2028-01-01
+    token: "0xa111111111111111111111111111111111111111",
+    sold: 317_240_000n * 10n ** 18n, // 40% of curve supply
+    complete: false,
+  },
+  {
+    slug: "last-talk",
+    prophetLabel: "ringo",
+    sentence: "The last hallway talk is standing room only",
+    deadline: 1_700_000_000, // 2023-11-14 — Departed
+    token: "0xa222222222222222222222222222222222222222",
+    sold: 131_693_201_440_406_167_649_784_217n,
+    complete: false,
+  },
+  {
+    slug: "two-min",
+    prophetLabel: "ringo",
+    sentence: "A two-minute demo has already left the stage",
+    deadline: 1_720_000_000, // 2024-07-03 — Departed
+    token: "0xa333333333333333333333333333333333333333",
+    sold: 793_100_000n * 10n ** 18n,
+    complete: true,
+  },
+  {
+    slug: "curve-out",
+    prophetLabel: "ringo",
+    sentence: "The curve sells out before the pitch",
+    deadline: 1_893_456_000, // 2030-01-01
+    token: "0xa444444444444444444444444444444444444444",
+    sold: 0n,
+    complete: false,
+  },
+  {
+    slug: "name-points",
+    prophetLabel: "mina",
+    sentence: "Someone asks why this name points at a token",
+    deadline: 1_893_456_000,
+    token: "0xb111111111111111111111111111111111111111",
+    sold: 79_310_000n * 10n ** 18n, // 10% of curve supply
+    complete: false,
+  },
+];
