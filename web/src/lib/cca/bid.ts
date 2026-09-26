@@ -4,13 +4,15 @@
  * 4-arg overload in the demo (it scans from the floor).
  *
  * `maxPrice = floor + n * tick` (snapped DOWN).
- * `prevTick = floor + (n - 1) * tick` (floor itself when n = 0).
+ * `prevTick` is always the floor: the floor tick exists from the start, and the
+ * auction walks forward from it to where the bid belongs. A guessed tick below
+ * `maxPrice` that no earlier bid has opened reverts `TickPreviousPriceInvalid`.
  * A max price below the floor throws `MaxPriceBelowFloorError`.
  */
 import { zeroAddress, type Address } from "viem";
 import { ccaAbi } from "./abi/cca";
 import { CCA_CONFIG } from "./config";
-import { budgetEthToAmount, ethPerTokenToQ96, prevTickHintQ96, snapMaxPriceToTick } from "./price";
+import { budgetEthToAmount, ethPerTokenToQ96, snapMaxPriceToTick } from "./price";
 import { sendCcaWrite, type CcaWriteOptions, type CcaWriteRequest } from "./writes";
 import type { Hex } from "../world";
 
@@ -39,7 +41,7 @@ export function placeBidArgs(input: PlaceBidInput) {
     maxPriceQ96,
     amount,
     owner,
-    prevTickPriceQ96: prevTickHintQ96(maxPriceQ96, floor, tick),
+    prevTickPriceQ96: floor,
     hookData: input.hookData ?? "0x",
   };
 }

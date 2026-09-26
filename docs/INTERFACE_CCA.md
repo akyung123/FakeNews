@@ -548,7 +548,7 @@ function submitBid(uint256 maxPriceQ96, uint128 amount, address owner, bytes cal
 | `amount` | budget in wei; `msg.value` **must** equal `amount` |
 | `maxPriceQ96` | max price the bidder accepts (Q96 ETH per token), strictly above current clearing and `<= MAX_BID_PRICE` |
 | `owner` | bidder (receives tokens and leftover ETH) |
-| `prevTickPriceQ96` | hint; demo uses `floor` as the tick below `maxPrice = 2 × floor` |
+| `prevTickPriceQ96` | hint; the web always sends the auction's `floor`. The floor tick exists from the start and the auction walks forward from it. A tick below `maxPrice` that no earlier bid opened reverts `TickPreviousPriceInvalid` (`0xa16c4535`) |
 
 Demo bid ([PR #42](https://github.com/prism-toggle-ai/FakeNews/pull/42) `9c6b163` [`CcaSepoliaFork.t.sol` L96](https://github.com/prism-toggle-ai/FakeNews/blob/9c6b163da093ea67d1788b43897bb3572e3fbc6d/contracts/test/fork/CcaSepoliaFork.t.sol#L96)): budget **0.021 ETH**, max price **2× floor** = `6338253001141147200`. That stays strictly above a floor clearing so `exitBid` does not revert `CannotExitBid`.
 
