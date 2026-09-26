@@ -172,11 +172,30 @@ contract LockerTest is Test {
         uint256 accrued = locker.accruedEth(address(rejector));
         assertGt(accrued, 0);
 
+        ProphecyToken tok2 = new ProphecyToken("later.prophecy.eth", "LATER", address(this));
+        PoolKey memory laterKey = Graduation.poolKey(address(tok2), IHooks(address(hook)));
+        Graduation.initializePool(manager, laterKey, 3 * 7_058_378_514_689_194, 279_900_000e18);
+        tok2.approve(address(locker), SEED_TOKEN);
+        vm.deal(address(this), SEED_ETH);
+        locker.lock{value: SEED_ETH}(address(tok2), prophet, protocol, laterKey, SEED_TOKEN);
+        assertEq(locker.accruedEth(address(rejector)), accrued);
+        assertEq(locker.totalAccruedEth(), accrued);
+
+        (uint128 liquidityBefore,,) = manager.getPositionInfo(
+            rejectKey.toId(), address(locker), Graduation.tickLower(), Graduation.tickUpper(), bytes32(0)
+        );
+
         rejector.setAccept(true);
         uint256 before = address(rejector).balance;
         rejector.withdraw(locker);
         assertEq(address(rejector).balance, before + accrued);
         assertEq(locker.accruedEth(address(rejector)), 0);
+        assertEq(locker.totalAccruedEth(), 0);
+
+        (uint128 liquidityAfter,,) = manager.getPositionInfo(
+            rejectKey.toId(), address(locker), Graduation.tickLower(), Graduation.tickUpper(), bytes32(0)
+        );
+        assertEq(liquidityAfter, liquidityBefore);
     }
 
     function test_withdrawAccruedRevertsWhenEmpty() public {

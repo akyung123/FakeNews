@@ -363,6 +363,11 @@ contract Launchpad {
         uint256 tokensToPool = LP_SUPPLY;
         ProphecyToken(token).approve(address(locker), tokensToPool);
         locker.lock{value: ethToPool}(token, c.prophet, protocolFeeRecipient, key, tokensToPool);
+        uint256 leftover = ProphecyToken(token).balanceOf(address(this));
+        if (leftover > 0) {
+            // ProphecyToken rejects address(0); dead address is the burn sink.
+            _transferToken(token, address(0x000000000000000000000000000000000000dEaD), leftover);
+        }
         emit Graduated(
             token,
             PoolId.unwrap(key.toId()),

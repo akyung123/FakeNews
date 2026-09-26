@@ -53,7 +53,7 @@ Add a row when something slows V4 work. Leave unused rows blank. Times in KST.
 
 ```text
 cd contracts && forge build && forge test
-# result: 50 passed; 0 failed; 0 skipped
+# result: 63 tests passed, 0 failed, 4 skipped (67 total)
 ```
 
 SPEC asks for three fuzz tests once the curve and pool exist: solvency; a fee-inclusive round trip never gains; graduation price vs pool start price gap under 0.0068%. Record pass/fail here only after those tests run.

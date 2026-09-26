@@ -159,7 +159,7 @@ contract LaunchpadGraduationTest is LaunchpadStack {
         PoolDonateTest donor = new PoolDonateTest(manager);
         uint256 ethFee = 100;
         uint256 tokFee = 100;
-        vm.prank(address(launchpad));
+        vm.prank(buyer);
         ProphecyToken(token).transfer(address(this), tokFee);
         vm.deal(address(this), ethFee);
         ProphecyToken(token).approve(address(donor), tokFee);
@@ -202,11 +202,30 @@ contract LaunchpadGraduationTest is LaunchpadStack {
         uint256 accrued = locker.accruedEth(address(prophetC));
         assertGt(accrued, 0);
 
+        // A later graduation must not sweep the accrued ETH to the next seed refund.
+        vm.prank(prophet);
+        address other = launchpad.launch("second-grad", "", 0, 0);
+        vm.prank(buyer);
+        launchpad.buy{value: 1 ether}(other, 0, "");
+        assertEq(locker.accruedEth(address(prophetC)), accrued);
+        assertEq(locker.totalAccruedEth(), accrued);
+
+        PoolKey memory otherKey = Graduation.poolKey(other, IHooks(address(hook)));
+        (uint128 liquidityBefore,,) = manager.getPositionInfo(
+            otherKey.toId(), address(locker), Graduation.tickLower(), Graduation.tickUpper(), bytes32(0)
+        );
+
         prophetC.setAccept(true);
         uint256 before = address(prophetC).balance;
         prophetC.withdraw(locker);
         assertEq(address(prophetC).balance, before + accrued);
         assertEq(locker.accruedEth(address(prophetC)), 0);
+        assertEq(locker.totalAccruedEth(), 0);
+
+        (uint128 liquidityAfter,,) = manager.getPositionInfo(
+            otherKey.toId(), address(locker), Graduation.tickLower(), Graduation.tickUpper(), bytes32(0)
+        );
+        assertEq(liquidityAfter, liquidityBefore);
     }
 
     function test_onlyLaunchpadCanInitializeViaHook() public {

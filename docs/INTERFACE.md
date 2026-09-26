@@ -103,8 +103,9 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 - `lock(address token, address prophet, address protocolFeeRecipient, PoolKey key, uint256 tokenAmount)` is called only by the Launchpad at graduation. Recipients are fixed then.
 - `collect(address token)` can be called by anyone. Collected fees go **only** to prophet 24 : protocol 76.
 - No withdraw of principal. Liquidity cannot be decreased or burned.
-- If sending ETH to the prophet fails, `collect` still pays the protocol and accrues the prophet share. The prophet later calls `withdrawAccrued()`.
+- If sending ETH to the prophet fails, `collect` still pays the protocol and accrues the prophet share. The prophet later calls `withdrawAccrued()`. Seed leftovers must not sweep `accruedEth`.
 - `withdrawAccrued()` sends only accrued ETH, never pool principal.
+- Leftover seed tokens after lock are sent to `0x…dEaD` (the token rejects `address(0)`).
 
 ## 3. World server → Launchpad `(draft)`
 

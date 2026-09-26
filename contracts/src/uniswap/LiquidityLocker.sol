@@ -46,6 +46,7 @@ contract LiquidityLocker is IUnlockCallback {
 
     mapping(address token => Position) public positions;
     mapping(address prophet => uint256) public accruedEth;
+    uint256 public totalAccruedEth;
 
     event Locked(address indexed token, address indexed prophet, address indexed protocolFeeRecipient, uint128 liquidity);
     event Collected(
@@ -70,6 +71,7 @@ contract LiquidityLocker is IUnlockCallback {
     error TokenTransferFailed();
     error Reentrant();
     error NothingAccrued();
+    error UnexpectedEth();
 
     modifier nonReentrant() {
         if (_status == _ENTERED) revert Reentrant();
@@ -87,7 +89,9 @@ contract LiquidityLocker is IUnlockCallback {
         hook = hook_;
     }
 
-    receive() external payable {}
+    receive() external payable {
+        if (msg.sender != address(poolManager)) revert UnexpectedEth();
+    }
 
     /// Seed full-range liquidity. Recipients are fixed here and cannot change.
     /// The pool must already be initialized by the Launchpad.
@@ -142,6 +146,7 @@ contract LiquidityLocker is IUnlockCallback {
         uint256 amount = accruedEth[msg.sender];
         if (amount == 0) revert NothingAccrued();
         accruedEth[msg.sender] = 0;
+        totalAccruedEth -= amount;
         emit ProphetWithdrawn(msg.sender, amount);
         (bool ok,) = msg.sender.call{value: amount}("");
         if (!ok) revert EthTransferFailed();
@@ -244,6 +249,7 @@ contract LiquidityLocker is IUnlockCallback {
         (bool ok,) = prophet.call{value: amount}("");
         if (!ok) {
             accruedEth[prophet] += amount;
+            totalAccruedEth += amount;
             emit ProphetAccrued(prophet, amount);
         }
     }
@@ -258,9 +264,10 @@ contract LiquidityLocker is IUnlockCallback {
     }
 
     function _refund(address token, address to) internal {
+        uint256 reserved = totalAccruedEth;
         uint256 ethBal = address(this).balance;
-        if (ethBal > 0) {
-            (bool ok,) = to.call{value: ethBal}("");
+        if (ethBal > reserved) {
+            (bool ok,) = to.call{value: ethBal - reserved}("");
             if (!ok) revert EthTransferFailed();
         }
         uint256 tokBal = IERC20Minimal(token).balanceOf(address(this));
