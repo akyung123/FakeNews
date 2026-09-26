@@ -17,7 +17,7 @@ description: Checklist for any change that touches ENSv2 — registries, resolve
    - Only display keys (`avatar`, `description`) are granted to the prophet via `grantSetterRoles`.
    - No `ROLE_UNREGISTER`, `ROLE_SET_SUBREGISTRY`, root `ROLE_SET_RESOLVER`, `ROLE_LINK`, `ROLE_UPGRADE` or `ROLE_CAN_TRANSFER_ADMIN` for anyone.
    - Temporary roles are revoked in the same transaction, admin included.
-4. **Expiry:** `type(uint64).max` (DECISIONS #12). Never 0; it reverts with `CannotSetPastExpiry`.
+4. **Expiry:** `type(uint64).max` (DECISIONS #14). Never 0; it reverts with `CannotSetPastExpiry`.
 5. **Names**
    - Setters take DNS-encoded names (`bytes`).
    - Reads go through the Universal Resolver (`getEnsText`, `getEnsAddress`).
