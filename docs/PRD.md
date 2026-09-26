@@ -142,7 +142,7 @@ All of these are demo-sized so people can see things happen during a live event.
 
 - Buy a prophecy by name. Choose an amount, see the estimated tokens before confirming.
 - Sell some or all of it back.
-- Attach an optional one-line memo (up to 140 bytes, about 140 English letters) to a buy or sell, e.g. "0.1 ETH in · here we go" or "sold at −42% · why is it dropping again". The memo is part of the trade itself, so every memo is backed by a real trade. (#15)
+- Attach an optional one-line memo (up to 140 bytes, about 140 English letters) to a buy or sell, e.g. "0.1 ETH in · here we go" or "sold half · see you at graduation". The memo is part of the trade itself, so every memo is backed by a real trade. (#15)
 
 ### A prophet (wallet and World ID)
 
@@ -155,7 +155,7 @@ What nobody can do, including the team: edit a sentence, move a name to another 
 
 ## 9. Screens
 
-Four screens. Look: black background, desktop first, left sidebar, text only, blue accent (DECISIONS #2).
+Four screens. Look: black, navy, gold and paper, Fraunces serif (v2 design, supersedes DECISIONS #2).
 
 | # | Screen | Must show | Must never show |
 |---|---|---|---|
