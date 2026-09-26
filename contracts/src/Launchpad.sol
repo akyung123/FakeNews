@@ -55,6 +55,9 @@ library CurveMath {
 /// separate ledger so they never move that price.
 ///
 /// Constructor order (infra must match this in `script/Deploy.s.sol`):
+/// Agreed final: protocolFeeRecipient_, worldSigner_, ens_ (ENS PR),
+/// then poolManager_, hook_, locker_ (this PR). Until the ENS PR is on
+/// main, ens_ is absent and the three graduation args follow worldSigner_.
 ///   1. protocolFeeRecipient_
 ///   2. worldSigner_
 ///   3. poolManager_
