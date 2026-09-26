@@ -10,9 +10,14 @@ import {
 import { quoteBuyWei, quoteSellWei, toCurveWei, type CurveState } from "./curve";
 import { contracts } from "./contracts";
 import { erc20Abi } from "./erc20Abi";
+import { ISSUE_COPY } from "./issue";
 import { launchpadAbi } from "./launchpadAbi";
 import { actions } from "./store";
 import { wagmiConfig } from "./wagmi";
+import { classifyWriteError } from "./writeErrors";
+
+export { WRITE_REVERT_COPY, classifyWriteError } from "./writeErrors";
+export type { ClassifiedWriteError, MappedRevertName } from "./writeErrors";
 
 /** 1% band under the contract quote (INTERFACE quoteBuy / quoteSell). */
 export const SLIPPAGE_BPS = 100n;
@@ -52,9 +57,15 @@ export function isLaunchedParseError(error: unknown): boolean {
   return error instanceof LaunchedParseError || (error instanceof Error && error.name === "LaunchedParseError");
 }
 
-export function writeErrorMessage(error: unknown): string {
+export type WriteErrorSource = "registerProphet" | "write";
+
+/** `null` = wallet rejection: no banner, return the button to idle. */
+export function writeErrorMessage(error: unknown, source: WriteErrorSource = "write"): string | null {
   if (isLaunchedParseError(error)) return WRITE_COPY.launchedMissing;
-  return WRITE_COPY.failed;
+  const classified = classifyWriteError(error);
+  if (classified.kind === "rejected") return null;
+  if (classified.kind === "revert") return classified.message;
+  return source === "registerProphet" ? ISSUE_COPY.registerFailed : WRITE_COPY.failed;
 }
 
 export function writePhaseCopy(phase: WritePhase | null): string | null {

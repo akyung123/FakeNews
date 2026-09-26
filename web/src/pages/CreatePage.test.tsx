@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { UserRejectedRequestError } from "viem";
 import { describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "../lib/issue";
 import type { RegisterProphetInput } from "../lib/launchpad";
@@ -196,6 +197,31 @@ describe("Screen 2 button gating", () => {
     assertNoRawCodes();
   });
 
+  it("maps a registerProphet NullifierUsed revert to the World ID banner", async () => {
+    const user = userEvent.setup();
+    const issued: string[] = [];
+    renderIssue(MOCK_ISSUE_SESSION, {
+      registerProphet: async () => {
+        throw { data: { errorName: "NullifierUsed" } };
+      },
+      onIssued: (id) => {
+        issued.push(id);
+      },
+    });
+    await fillFirstTimeForm(user);
+    await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
+    await waitFor(() => expect(launchButton()).toBeEnabled());
+    await user.click(launchButton());
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("This World ID already has a name."),
+    );
+    expect(screen.getByRole("alert")).not.toHaveTextContent(ISSUE_COPY.registerFailed);
+    expect(screen.queryByTestId("register-success")).toBeNull();
+    expect(issued).toEqual([]);
+    expect(launchButton()).toBeEnabled();
+    assertNoRawCodes();
+  });
+
   it("shows the name-claim failure copy after a reverted receipt and does not advance", async () => {
     const user = userEvent.setup();
     const issued: string[] = [];
@@ -218,6 +244,33 @@ describe("Screen 2 button gating", () => {
     expect(screen.queryByTestId("register-success")).toBeNull();
     expect(issued).toEqual([]);
     expect(launchButton()).toBeEnabled();
+    assertNoRawCodes();
+  });
+
+  it("resets the issue button to idle with no banner when the wallet rejects registerProphet", async () => {
+    const user = userEvent.setup();
+    const issued: string[] = [];
+    renderIssue(MOCK_ISSUE_SESSION, {
+      registerProphet: async () => {
+        throw new UserRejectedRequestError(new Error("User rejected the request."));
+      },
+      onIssued: (id) => {
+        issued.push(id);
+      },
+    });
+    await fillFirstTimeForm(user);
+    await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
+    await waitFor(() => expect(launchButton()).toBeEnabled());
+    await user.click(launchButton());
+    await waitFor(() => {
+      expect(screen.queryByTestId("register-pending")).toBeNull();
+      expect(launchButton()).toBeEnabled();
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByTestId("register-success")).toBeNull();
+    expect(issued).toEqual([]);
+    expect(document.body.textContent).not.toContain(ISSUE_COPY.registerFailed);
+    expect(launchButton()).toHaveTextContent(ISSUE_COPY.launch);
     assertNoRawCodes();
   });
 

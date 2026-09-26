@@ -107,11 +107,7 @@ export function IssueScreen({
         : null;
   const error =
     writeError ??
-    (registerStatus === "failed"
-      ? ISSUE_COPY.registerFailed
-      : returningProphet || worldStatus === "pending" || busy
-        ? null
-        : worldUserMessage(worldError));
+    (returningProphet || worldStatus === "pending" || busy ? null : worldUserMessage(worldError));
   const submitLabel = launchButtonLabel({ returningProphet, worldStatus, canLaunch });
   const fullName = prophetLabel && slug ? prophecyName(slug, prophetLabel, parentName) : "";
   const pendingTestId = writeBusy ? "write-pending" : registerBusy ? "register-pending" : "world-pending";
@@ -146,8 +142,10 @@ export function IssueScreen({
                   serverSig: verified.serverSig,
                 });
                 setRegisterStatus("success");
-              } catch {
-                setRegisterStatus("failed");
+              } catch (err) {
+                const message = writeErrorMessage(err, "registerProphet");
+                setRegisterStatus(message ? "failed" : "idle");
+                setWriteError(message);
                 return;
               }
             }

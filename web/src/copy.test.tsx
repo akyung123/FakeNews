@@ -7,6 +7,7 @@ import { gwei, mcap } from "./lib/format";
 import { ISSUE_COPY } from "./lib/issue";
 import { SEED_EVENTS } from "./lib/mock";
 import { WRITE_COPY } from "./lib/writes";
+import { WRITE_REVERT_COPY } from "./lib/writeErrors";
 
 const NEW_MEMOS = [
   "I've met this router before.",
@@ -186,6 +187,26 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(create).toContain("It becomes a token.");
     expect(create).not.toContain(WRITE_COPY.failed);
     assertRemoved(create);
+  });
+
+  test("write revert banners use the designer sentences for the six Launchpad errors", () => {
+    expect(WRITE_REVERT_COPY.NullifierUsed).toBe("This World ID already has a name.");
+    expect(WRITE_REVERT_COPY.LabelTaken).toBe("That name is taken. Try another.");
+    expect(WRITE_REVERT_COPY.AlreadyProphet).toBe("This wallet already has a name.");
+    expect(WRITE_REVERT_COPY.SlugTaken).toBe("That token name is taken. Try another.");
+    expect(WRITE_REVERT_COPY.Slippage).toBe("Price moved. Try again.");
+    expect(WRITE_REVERT_COPY.CurveComplete).toBe("This token has graduated. Trade on Uniswap.");
+    const text = Object.values(WRITE_REVERT_COPY).join(" ");
+    expect(text.toLowerCase()).not.toMatch(/coin|profit|yield|prediction|outlook/);
+    expect(text).not.toContain("%");
+    expect(Object.keys(WRITE_REVERT_COPY)).toEqual([
+      "NullifierUsed",
+      "LabelTaken",
+      "AlreadyProphet",
+      "SlugTaken",
+      "Slippage",
+      "CurveComplete",
+    ]);
   });
 
   test("seed memos replace price-sentiment lines and old usernames", () => {

@@ -94,6 +94,9 @@ event UniswapSet(address poolManager, address hook, address locker);
 - Rounding:
   - Buy: fee rounds up, tokens out round down.
   - Sell: fee rounds up, ETH out rounds down.
+- Write-facing custom errors (names match `Launchpad.sol`). The web maps these six so a revert can show a human sentence instead of a raw name:
+  `NullifierUsed`, `LabelTaken`, `AlreadyProphet`, `SlugTaken`, `Slippage`, `CurveComplete`.
+  Other custom errors on the contract stay a generic write failure. Wallet rejection is not a revert.
 
 ### `ProphecyToken`
 
