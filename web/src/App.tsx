@@ -52,6 +52,7 @@ export function App() {
           <Route path="/me" element={<MyPage />} />
           <Route path="/create" element={<CreatePage />} />
           <Route path="/coin/:id" element={<CoinPage />} />
+          <Route path="/n/:name" element={<CoinPage />} />
           <Route path="/p/:name" element={<ProphetPage />} />
         </Routes>
       </div>

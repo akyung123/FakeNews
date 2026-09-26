@@ -10,6 +10,7 @@
  * Sentences must come through this module. Screen components never hardcode them.
  */
 import { MOCK_PARENT_NAME, MOCK_PROPHETS, MOCK_PROPHECIES } from "./mock";
+import { marketCap, type Coin } from "./store";
 
 /** Curve supply from SPEC.md. Used only to turn `sold` into a 0–1 bar. */
 const CURVE_SUPPLY = 793_100_000n * 10n ** 18n;
@@ -58,6 +59,55 @@ export function prophetPagePath(label: string): string {
 /** Screen 3 (prophecy detail). Name-based so the token is found without pasting an address. */
 export function prophecyDetailPath(ensName: string): string {
   return `/n/${ensName}`;
+}
+
+function decodeName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "";
+  try {
+    return decodeURIComponent(trimmed).toLowerCase();
+  } catch {
+    return trimmed.toLowerCase();
+  }
+}
+
+/** Look up one prophecy by full ENS name or slug. */
+export function getProphecyByName(name: string, nowSec = Math.floor(Date.now() / 1000)): ProphetProphecy | null {
+  const key = decodeName(name);
+  if (!key) return null;
+  const row = MOCK_PROPHECIES.find((item) => {
+    const ens = prophecyEnsName(item.slug, item.prophetLabel);
+    return ens === key || item.slug === key;
+  });
+  if (!row) return null;
+  return toProphetProphecy(row, nowSec);
+}
+
+/**
+ * Prototype Screen 3 (`CoinPage`) still reads a localStorage coin.
+ * Map a name from this read interface onto that shape so `/n/:name` is not blank.
+ */
+export function prototypeCoinFromName(name: string, nowSec?: number): Coin | null {
+  const p = getProphecyByName(name, nowSec);
+  if (!p) return null;
+  const sold = Number(p.sold / 10n ** 18n);
+  const createdAt = (nowSec ?? Math.floor(Date.now() / 1000)) * 1000;
+  const coin: Coin = {
+    id: p.slug,
+    name: p.ensName,
+    ticker: p.slug.replace(/-/g, "").slice(0, 10).toUpperCase(),
+    prophecy: p.sentence,
+    creator: p.ensName.split(".").slice(1).join("."),
+    createdAt,
+    sold,
+    ethRaised: p.complete ? 0.02 : sold > 0 ? 0.001 : 0,
+    history: [],
+  };
+  coin.history = [
+    { at: createdAt - 60_000, mcap: marketCap({ sold: 0, ethRaised: 0 }) },
+    { at: createdAt, mcap: marketCap(coin) },
+  ];
+  return coin;
 }
 
 export function isDeparted(deadline: number, nowSec: number): boolean {

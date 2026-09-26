@@ -2,12 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { MOCK_PARENT_NAME, MOCK_PROPHECIES, MOCK_PROPHETS } from "./mock";
 import {
   curveProgress,
+  getProphecyByName,
   getProphetPage,
   isDeparted,
   normalizeProphetLabel,
   prophecyDetailPath,
   prophecyEnsName,
   prophetEnsName,
+  prototypeCoinFromName,
 } from "./prophetData";
 
 /** After the two departed mock deadlines, before the 2028 open one. */
@@ -94,5 +96,23 @@ describe("prophecyDetailPath", () => {
     expect(prophecyDetailPath("badges-2028.ringo.prophecy.eth")).toBe(
       "/n/badges-2028.ringo.prophecy.eth",
     );
+  });
+});
+
+describe("getProphecyByName", () => {
+  test("resolves a full ENS name or a slug", () => {
+    const byEns = getProphecyByName("badges-2028.ringo.prophecy.eth", NOW);
+    const bySlug = getProphecyByName("badges-2028", NOW);
+    expect(byEns?.sentence).toBe("Every hackathon badge is an ENS name by 2028");
+    expect(byEns?.ensName).toBe("badges-2028.ringo.prophecy.eth");
+    expect(bySlug?.ensName).toBe(byEns?.ensName);
+    expect(getProphecyByName("missing.ringo.prophecy.eth", NOW)).toBeNull();
+  });
+
+  test("maps that name onto the prototype Screen 3 coin shape", () => {
+    const coin = prototypeCoinFromName("badges-2028.ringo.prophecy.eth", NOW);
+    expect(coin).not.toBeNull();
+    expect(coin!.prophecy).toBe("Every hackathon badge is an ENS name by 2028");
+    expect(coin!.name).toBe("badges-2028.ringo.prophecy.eth");
   });
 });
