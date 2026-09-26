@@ -28,6 +28,8 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 
 ### `Launchpad` `(draft)`
 
+Constructor takes `protocolFeeRecipient` (address). The address is chosen at deploy and is still **TBD**; do not hardcode it.
+
 ```solidity
 // Create a prophet name. Needs a World ID server signature. Once per nullifier.
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
