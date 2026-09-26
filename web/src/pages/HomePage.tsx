@@ -124,9 +124,13 @@ function LaunchCard({ coin, talk }: { coin: Coin; talk: number }) {
   return (
     <Link className="launch" to={`/coin/${coin.id}`}>
       <div className="launch-head">
-        <TokenName {...tokenDisplayName(coin)} />
-        <span className="faint">${coin.ticker}</span>
-        {ago(coin.createdAt) ? <span className="faint small">{ago(coin.createdAt)}</span> : null}
+        <div className="launch-name">
+          <TokenName {...tokenDisplayName(coin)} />
+        </div>
+        <div className="launch-meta">
+          <span className="faint">${coin.ticker}</span>
+          {ago(coin.createdAt) ? <span className="faint small">{ago(coin.createdAt)}</span> : null}
+        </div>
       </div>
       <p className="launch-text">{coin.prophecy}</p>
       <div className="launch-foot">
