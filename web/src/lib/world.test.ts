@@ -17,6 +17,7 @@ import {
   isWorldMockEnabled,
   WorldClientError,
   WORLD_REQUEST_TIMEOUT_MS,
+  worldClientWithServerFallback,
   worldErrorKindFromIdKit,
   worldErrorKindFromServerCode,
   worldStatusFromIdKitError,
@@ -294,6 +295,42 @@ describe("world client", () => {
     expect(signals).toHaveLength(2);
     expect(signals[0]).toBeInstanceOf(AbortSignal);
     expect(signals[1]).toBeInstanceOf(AbortSignal);
+  });
+
+  it("keeps a live World client when GET /health succeeds", async () => {
+    const live = createWorldClient({
+      mock: false,
+      serverUrl: "http://world.test",
+      launchpad: MOCK_WORLD_LAUNCHPAD,
+      fetch: async (input) => {
+        expect(String(input)).toBe("http://world.test/health");
+        return new Response(JSON.stringify(MOCK_WORLD_HEALTH), { status: 200 });
+      },
+    });
+    const resolved = await worldClientWithServerFallback(live);
+    expect(resolved).toBe(live);
+    expect(resolved.isMock).toBe(false);
+  });
+
+  it("falls back to the existing mock World step only when the signature server is down", async () => {
+    const live = createWorldClient({
+      mock: false,
+      serverUrl: "http://world.test",
+      launchpad: MOCK_WORLD_LAUNCHPAD,
+      fetch: async () => {
+        throw new TypeError("Failed to fetch");
+      },
+    });
+    const mock = createWorldClient({ mock: true });
+    const resolved = await worldClientWithServerFallback(live, () => mock);
+    expect(resolved).toBe(mock);
+    expect(resolved.isMock).toBe(true);
+    expect(live.isMock).toBe(false);
+  });
+
+  it("does not remock an already-mock World client", async () => {
+    const mock = createWorldClient({ mock: true });
+    await expect(worldClientWithServerFallback(mock)).resolves.toBe(mock);
   });
 
   it("treats a dropped connection as network and keeps codes off the Error message", async () => {

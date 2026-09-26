@@ -6,7 +6,7 @@ A launchpad where every token is a one-line prophecy. Buying raises the price an
 
 - **An address book first.** `ringo.prophecy.eth` points to the prophet's wallet, `badges-2028.ringo.prophecy.eth` to that prophecy's token (ENSv2 on Sepolia).
 - **Written once, never edited.** The sentence lives in the prophecy's own ENS resolver, and nobody holds the role to change it.
-- **No judging.** No oracle, no True or False. The only status on screen is *Departed*, when `now >= deadline`. There is no on-chain status.
+- **No judging.** No oracle, no True or False. There is no status about the sentence; the only stage on screen is the market stage (auction, graduated or ended), read from the chain.
 - **One prophet name per person**, checked with World ID when you first issue.
 
 New to the project, or not a developer? Start with the **[product requirements (PRD)](docs/PRD.md)**. It explains the idea, who it is for and what success looks like, in plain words.
@@ -15,18 +15,14 @@ New to the project, or not a developer? Start with the **[product requirements (
 
 ```text
 1. Verify    World ID, once per person      → ringo.prophecy.eth points to your wallet
-2. Issue     one sentence + a deadline      → badges-2028.ringo.prophecy.eth points to a new token
-                                              launch writes sentence and deadline only to ENS
+2. Issue     one sentence                   → badges-2028.ringo.prophecy.eth points to a new token
+                                              launch writes the sentence only to ENS
 3. Trade     anyone buys or sells by name   → buying raises the price, selling lowers it
                                               each trade can carry a one-line memo
-4. Deadline  now >= deadline                → the UI shows "Departed". Nothing is deleted
-                                              buy and sell do not read the deadline
-5. Sold out  all curve tokens bought        → a locked Uniswap V4 pool. Trading continues there
+4. Sold out  all curve tokens bought        → a locked Uniswap V4 pool. Trading continues there
 ```
 
 The prophet takes a share of every trade (0.30% of each curve trade, then 24% of the pool fees after graduation). Nobody is paid for being right. Numbers and rules: [`docs/SPEC.md`](docs/SPEC.md).
-
-On main, `Launchpad.launch` takes `deadline` and the prophet page shows Departed from prototype data. The list and detail screens do not. The issue form collects a deadline but does not send `launch`.
 
 ## Status
 
@@ -35,7 +31,7 @@ As of 2026-09-26. Nothing is deployed to Sepolia yet.
 | Part | Built | Not yet |
 |------|-------|---------|
 | `contracts/` | `Launchpad`: World ID prophet names (`registerProphet`), ENS names on `launch`, bonding curve buy and sell, fees, memos, fee claims. Graduation into a Uniswap V4 pool with `ProphecyHook` and `LiquidityLocker` (fees 24 : 76, no withdraw). `ProphecyToken`, ENS adapter. Curve, fuzz, vector, lock, World, graduation, hook and locker tests | Deploying to Sepolia (a person runs it) |
-| `web/` | The four screens as a clickable prototype. Wallet connect on Sepolia. Issue screen: World ID check, then a real `registerProphet` transaction. Helpers to read names, sentences and deadlines from ENS (`src/lib/ens.ts`). Prophet page shows Departed when `now >= deadline` (prototype data) | List and detail do not show Departed or the deadline. List, detail and prophet page still use prototype data, not live ENS or the chain. Real buy, sell and `launch` transactions |
+| `web/` | The four screens as a clickable prototype. Wallet connect on Sepolia. Issue screen: World ID check, then a real `registerProphet` transaction. Helpers to read names and sentences from ENS (`src/lib/ens.ts`) | List, detail and prophet page still use prototype data, not live ENS or the chain. Real buy, sell and `launch` transactions |
 | `world/` | World ID verification server: `GET /rp-context`, `POST /verify`, `GET /health`. Signs the result for the Launchpad | Hosting (planned on Render, see [`infra/README.md`](infra/README.md)) |
 | `infra/` | Sepolia deploy scripts (dry run), GitHub Pages preview for `web/`, Render blueprint for `world/` | A person runs the real deployment |
 

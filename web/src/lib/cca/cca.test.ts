@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { encodePacked, parseEther, zeroAddress } from "viem";
+import { encodeAbiParameters, encodeEventTopics, encodePacked, parseEther, zeroAddress } from "viem";
 import { wagmiConfig } from "../wagmi";
 import { ccaAbi } from "./abi/cca";
 import { ccaLensAbi } from "./abi/ccaLens";
@@ -48,6 +48,7 @@ import {
   INTERFACE_CCA_PENDING,
   INTERFACE_CCA_TBD,
   InterfaceCcaPendingError,
+  auctionBlocksRead,
   auctionOfRead,
   backendLaunchErrorNames,
   collectCcaWrite,
@@ -59,7 +60,8 @@ import {
   lockerTokenIdBinding,
   withdrawAccruedWrite,
 } from "./launchpadCca";
-import { openMarket, openMarketWrite } from "./migrate";
+import { positionManagerTransferAbi, tokenIdsMintedToLocker } from "./register";
+import { migrateOutcomeFromReceipt, openMarket, openMarketResult, openMarketWrite } from "./migrate";
 import {
   MaxPriceBelowFloorError,
   ethPerTokenToQ96,
@@ -78,7 +80,7 @@ import {
   fetchCcaEventLogs,
   tokensClaimedLogsQuery,
 } from "./logs";
-import { assertSuccessfulReceipt } from "./writes";
+import { assertSuccessfulReceipt, sendCcaWrite } from "./writes";
 
 const AUCTION = "0x1111111111111111111111111111111111111111" as const;
 const OWNER = "0x2222222222222222222222222222222222222222" as const;
@@ -184,7 +186,27 @@ describe("verified external ABIs", () => {
     );
   });
 
-  it("Universal Router ABI is execute; 2.1.2 command bytes stay TBD", () => {
+  it("Locker ABI matches #42 9c6b163 collect(token, tokenId) and indexed Collected.tokenId", () => {
+    expect(names(lockerCcaAbi, "function")).toEqual(
+      expect.arrayContaining(["collect", "register", "tokenIdsOf", "isRegistered", "prophetOf", "withdrawAccrued"]),
+    );
+    expect(names(lockerCcaAbi, "function")).not.toContain("tokenIdOf");
+    const collect = lockerCcaAbi.find((item) => item.type === "function" && item.name === "collect");
+    if (!collect || collect.type !== "function") throw new Error("missing collect");
+    expect(collect.inputs.map((input) => `${input.name}:${input.type}`)).toEqual(["token:address", "tokenId:uint256"]);
+    const collected = lockerCcaAbi.find((item) => item.type === "event" && item.name === "Collected");
+    if (!collected || collected.type !== "event") throw new Error("missing Collected");
+    expect(collected.inputs.map((input) => `${input.name}:${input.type}:${input.indexed}`)).toEqual([
+      "token:address:true",
+      "tokenId:uint256:true",
+      "prophetAmount0:uint256:false",
+      "protocolAmount0:uint256:false",
+      "prophetAmount1:uint256:false",
+      "protocolAmount1:uint256:false",
+    ]);
+  });
+
+  it("Universal Router ABI is execute with V4_SWAP 0x10", () => {
     expect(names(universalRouterAbi, "function")).toEqual(["execute"]);
     expect(V4_SWAP_COMMAND).toBe(0x10);
   });
@@ -231,10 +253,10 @@ describe("confirmed CCA config (PR #41 head d84aed4)", () => {
   it("keeps the fork-test values in one overrideable object", () => {
     expect(CCA_CONFIG.currency).toBe(zeroAddress);
     expect(NATIVE_ETH).toBe(zeroAddress);
-    expect(CCA_CONFIG.floorPriceQ96).toBe(1000n << 96n);
-    expect(CCA_CONFIG.tickSpacingQ96).toBe(100n << 96n);
-    expect(FLOOR_PRICE_Q96).toBe(1000n * Q96);
-    expect(TICK_SPACING_Q96).toBe(100n * Q96);
+    expect(CCA_CONFIG.floorPriceQ96).toBe(3_169_126_500_570_573_600n);
+    expect(CCA_CONFIG.tickSpacingQ96).toBe(31_691_265_005_705_736n);
+    expect(FLOOR_PRICE_Q96).toBe(3_169_126_500_570_573_600n);
+    expect(TICK_SPACING_Q96).toBe(31_691_265_005_705_736n);
     expect(CCA_CONFIG.graduationWei).toBe(parseEther("0.02"));
     expect(GRADUATION_ETH_WEI).toBe(parseEther("0.02"));
     expect(CCA_CONFIG.poolFee).toBe(10_000);
@@ -284,15 +306,11 @@ describe("Q96 price encoding", () => {
 
   it("snaps max price DOWN onto floor + k*tick and rejects below the floor", () => {
     expect(snapMaxPriceToTick(FLOOR_PRICE_Q96)).toBe(FLOOR_PRICE_Q96);
-    expect(snapMaxPriceToTick(ethPerTokenToQ96("1100"))).toBe(1100n * Q96);
-    expect(snapMaxPriceToTick(ethPerTokenToQ96("1150"))).toBe(1100n * Q96);
-    expect(snapMaxPriceToTick(ethPerTokenToQ96("1199"))).toBe(1100n * Q96);
-    expect(snapMaxPriceToTick(ethPerTokenToQ96("1200"))).toBe(1200n * Q96);
-    expect(prevTickHintQ96(ethPerTokenToQ96("1100"))).toBe(FLOOR_PRICE_Q96);
-    expect(prevTickHintQ96(ethPerTokenToQ96("1200"))).toBe(1100n * Q96);
+    const mid = FLOOR_PRICE_Q96 + TICK_SPACING_Q96 * 5n + TICK_SPACING_Q96 / 2n;
+    expect(snapMaxPriceToTick(mid)).toBe(FLOOR_PRICE_Q96 + TICK_SPACING_Q96 * 5n);
+    expect(prevTickHintQ96(FLOOR_PRICE_Q96 + TICK_SPACING_Q96)).toBe(FLOOR_PRICE_Q96);
     expect(prevTickHintQ96(FLOOR_PRICE_Q96)).toBe(FLOOR_PRICE_Q96);
-    expect(() => snapMaxPriceToTick(ethPerTokenToQ96("999"))).toThrow(MaxPriceBelowFloorError);
-    expect(() => snapMaxPriceToTick(ethPerTokenToQ96("0.001"))).toThrow(/below the auction floor/);
+    expect(() => snapMaxPriceToTick(FLOOR_PRICE_Q96 - 1n)).toThrow(MaxPriceBelowFloorError);
   });
 });
 
@@ -455,12 +473,12 @@ describe("bid encoding", () => {
     };
     const args = placeBidArgs(input);
     expect(args.amount).toBe(parseEther("0.01"));
-    expect(args.maxPriceQ96).toBe(1100n * Q96);
+    expect(args.maxPriceQ96).toBe(snapMaxPriceToTick(ethPerTokenToQ96("1150")));
     const request = placeBidWrite(input);
     expect(request.address).toBe(AUCTION);
     expect(request.abi).toBe(ccaAbi);
     expect(request.functionName).toBe("submitBid");
-    expect(args.prevTickPriceQ96).toBe(FLOOR_PRICE_Q96);
+    expect(args.prevTickPriceQ96).toBe(prevTickHintQ96(args.maxPriceQ96));
     expect(request.args).toEqual([
       args.maxPriceQ96,
       args.amount,
@@ -478,7 +496,7 @@ describe("bid encoding", () => {
       owner: OWNER,
       budgetEth: "0.01",
       maxPricePerTokenEth: "1000",
-    }).maxPriceQ96).toBe(FLOOR_PRICE_Q96);
+    }).maxPriceQ96).toBe(snapMaxPriceToTick(ethPerTokenToQ96("1000")));
   });
 
   it("rejects a max price below the floor", () => {
@@ -487,7 +505,7 @@ describe("bid encoding", () => {
         auction: AUCTION,
         owner: OWNER,
         budgetEth: "0.01",
-        maxPricePerTokenEth: "0.001",
+        maxPricePerTokenEth: "0.000000000000000001",
       }),
     ).toThrow(MaxPriceBelowFloorError);
   });
@@ -527,6 +545,33 @@ describe("chain writes: simulate then write then require success", () => {
     expect(() => assertSuccessfulReceipt({ status: "reverted" }, "submitBid")).toThrow(/did not succeed/);
   });
 
+  it("skips the Sepolia gate when simulate/write are injected", async () => {
+    const fns = okWrite();
+    const ensureSepolia = vi.fn(async () => false);
+    await sendCcaWrite(
+      { address: AUCTION, abi: ccaAbi, functionName: "checkpoint" },
+      "checkpoint",
+      { ...optionsOf(fns), ensureSepolia },
+    );
+    expect(ensureSepolia).not.toHaveBeenCalled();
+    expect(fns.simulate).toHaveBeenCalled();
+    expect(fns.write).toHaveBeenCalled();
+  });
+
+  it("blocks a live write until the wallet is on Sepolia", async () => {
+    const ensureSepolia = vi.fn(async () => false);
+    const simulate = vi.fn(async () => ({}));
+    await expect(
+      sendCcaWrite(
+        { address: AUCTION, abi: ccaAbi, functionName: "checkpoint" },
+        "checkpoint",
+        { ensureSepolia },
+      ),
+    ).rejects.toThrow(/Switch to Sepolia/);
+    expect(ensureSepolia).toHaveBeenCalledTimes(1);
+    expect(simulate).not.toHaveBeenCalled();
+  });
+
   it("claimTokens throws when the receipt is not success", async () => {
     const fns = revertedWrite();
     await expect(claimTokens(AUCTION, 1n, optionsOf(fns))).rejects.toThrow(/claimTokens did not succeed/);
@@ -561,6 +606,39 @@ describe("chain writes: simulate then write then require success", () => {
     expect(openMarketWrite(AUCTION).args).toEqual([AUCTION]);
   });
 
+  it("reads MigrationFailed + FundsRecovered from a successful migrate receipt", async () => {
+    const topics = encodeEventTopics({
+      abi: lbpStrategyAbi,
+      eventName: "MigrationFailed",
+      args: { initializer: AUCTION },
+    });
+    const data = encodeAbiParameters([{ type: "bytes" }], ["0x"]);
+    const receipt = {
+      status: "success" as const,
+      logs: [{ address: CCA_SEPOLIA.lbpStrategy, topics, data }],
+    };
+    expect(migrateOutcomeFromReceipt(receipt)).toBe("failed");
+    const fns = okWrite();
+    fns.wait.mockResolvedValue(receipt);
+    await expect(openMarketResult(AUCTION, optionsOf(fns))).resolves.toEqual({
+      hash: HASH,
+      outcome: "failed",
+      receipt,
+    });
+  });
+
+  it("reads tokenId from PositionManager mint Transfer logs", () => {
+    const locker = "0x3333333333333333333333333333333333333333" as const;
+    const topics = encodeEventTopics({
+      abi: positionManagerTransferAbi,
+      eventName: "Transfer",
+      args: { from: zeroAddress, to: locker, tokenId: 7n },
+    });
+    expect(tokenIdsMintedToLocker([{ address: CCA_SEPOLIA.positionManager, topics, data: "0x" }], locker)).toEqual([
+      7n,
+    ]);
+  });
+
   it("checkpoint throws when the receipt is not success", async () => {
     const fns = revertedWrite();
     await expect(checkpoint(AUCTION, optionsOf(fns))).rejects.toThrow(/checkpoint did not succeed/);
@@ -577,7 +655,7 @@ describe("chain writes: simulate then write then require success", () => {
 });
 
 describe("v4 swap encoding", () => {
-  it("keeps the ETH/token pool key and leaves 2.1.2 command bytes TBD", () => {
+  it("keeps the ETH/token pool key and encodes UR 2.1.2 V4_SWAP", () => {
     expect(ethTokenPoolKey(TOKEN, HOOKS)).toEqual({
       currency0: zeroAddress,
       currency1: TOKEN,
@@ -593,8 +671,9 @@ describe("v4 swap encoding", () => {
       amountOutMinimum: 2n,
       deadline: 1n,
     };
-    expect(() => encodeV4ExactInSingle(input)).toThrow(InterfaceCcaPendingError);
-    expect(() => encodeV4ExactInSingle(input)).toThrow(/V4_SWAP command/);
+    const encoded = encodeV4ExactInSingle(input);
+    expect(encoded.commands).toBe("0x10");
+    expect(encoded.actions).toBe("0x060c0f");
     expect(V4_SWAP_COMMAND).toBe(0x10);
   });
 });
@@ -648,31 +727,32 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
     });
     expect(initializerFromAuction(AUCTION)).toBe(AUCTION);
     expect(hookRead(launchpad).functionName).toBe("hook");
-    const launched = launchCcaWrite(launchpad, "lingo-2028", "hello", 1_800_000_000n);
+    expect(auctionBlocksRead(launchpad)).toMatchObject({
+      address: launchpad,
+      functionName: "auctionBlocks",
+      args: [],
+    });
+    expect(names(launchpadCcaAbi, "function")).toEqual(expect.arrayContaining(["auctionBlocks"]));
+    const launched = launchCcaWrite(launchpad, "lingo-2028", "hello");
     expect(launched.functionName).toBe("launch");
-    expect(launched.args).toEqual(["lingo-2028", "hello", 1_800_000_000n]);
-    expect(collectCcaWrite(locker, TOKEN)).toMatchObject({
+    expect(launched.args).toEqual(["lingo-2028", "hello", 0n]);
+    expect(collectCcaWrite(locker, TOKEN, 7n)).toMatchObject({
       abi: lockerCcaAbi,
       functionName: "collect",
-      args: [TOKEN],
+      args: [TOKEN, 7n],
     });
     expect(withdrawAccruedWrite(locker).functionName).toBe("withdrawAccrued");
   });
 
-  it("keeps salt, locker tokenId binding, collect action bytes, and backend errors TBD", () => {
+  it("records answered Launchpad / locker names from #42 / #44", () => {
     expect(() => initializeDistributionSalt()).toThrow(InterfaceCcaPendingError);
-    expect(() => lockerTokenIdBinding()).toThrow(/tokenId/);
-    expect(() => lockerCollectActionBytes()).toThrow(/collect action bytes/);
-    expect(() => backendLaunchErrorNames()).toThrow(/LbpNotSet/);
+    expect(lockerTokenIdBinding()).toEqual({ functionName: "register", args: ["token", "tokenId"] });
+    expect(lockerCollectActionBytes()).toBe("0x0111");
+    expect(backendLaunchErrorNames()).toEqual(
+      expect.arrayContaining(["CcaNotSet", "AuctionExists", "AuctionNotCreated"]),
+    );
     expect(INTERFACE_CCA_PENDING).toEqual(
-      expect.arrayContaining([
-        "initializeDistribution salt",
-        "Universal Router 2.1.2 V4_SWAP command + inputs encoding",
-        "LiquidityLocker tokenId → token / prophet binding",
-        "Launchpad custom-error names (LbpNotSet and the like)",
-        "swap section copy",
-        "fee collect copy",
-      ]),
+      expect.arrayContaining(["Universal Router 2.1.2 calldata not live-verified on Sepolia"]),
     );
     expect(INTERFACE_CCA_TBD).toBe("TBD(INTERFACE_CCA)");
   });
@@ -686,14 +766,14 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
       firstBidId: 0n,
     });
     expect(CCA_FORK_STEPS[2].calls).toEqual(["checkpoint", "exitBid", "claimTokens", "migrate"]);
-    expect(CCA_FORK_STEPS[3].encoding).toBe(INTERFACE_CCA_TBD);
+    expect(CCA_FORK_STEPS[3].encoding).toEqual({ command: 0x10, actions: [0x06, 0x0c, 0x0f] });
     const schedule = forkHappyPathSchedule(11_784_960n);
     expect(schedule.endBlock).toBe(11_784_985n);
     expect(schedule.claimBlock).toBe(11_784_985n);
     expect(schedule.migrationBlock).toBe(11_784_986n);
     expect(schedule.submitBidArity).toBe(5);
     expect(schedule.firstBidId).toBe(0n);
-    expect(schedule.swapEncoding).toBe(INTERFACE_CCA_TBD);
+    expect(schedule.swapEncoding).toEqual({ command: 0x10, actions: [0x06, 0x0c, 0x0f] });
   });
 });
 
@@ -750,10 +830,9 @@ describe("CCA log fromBlock", () => {
     expect(chunks[chunks.length - 1].toBlock).toBe(119_999n);
   });
 
-  it("fetchCcaEventLogs forwards fromBlock in 50k chunks", async () => {
+  it("fetchCcaEventLogs applies lookback even when fromBlock is passed", async () => {
     const seen: unknown[] = [];
     const logsA = [{ eventName: "BidSubmitted", id: 1 }];
-    const logsB = [{ eventName: "BidSubmitted", id: 2 }];
     const got = await fetchCcaEventLogs(
       {
         async getBlockNumber() {
@@ -761,21 +840,21 @@ describe("CCA log fromBlock", () => {
         },
         async getContractEvents(query) {
           seen.push(query);
-          return seen.length === 1 ? logsA : logsB;
+          return logsA;
         },
       },
       AUCTION,
       "BidSubmitted",
       12_000n,
     );
-    expect(got).toEqual([...logsA, ...logsB]);
+    expect(got).toEqual([...logsA, ...logsA]);
     expect(seen).toEqual([
-      bidSubmittedLogsQuery(AUCTION, 61_999n, 12_000n),
-      bidSubmittedLogsQuery(AUCTION, 90_000n, 62_000n),
+      bidSubmittedLogsQuery(AUCTION, 89_999n, 40_000n),
+      bidSubmittedLogsQuery(AUCTION, 90_000n, 90_000n),
     ]);
   });
 
-  it("fetchCcaEventLogs queries 120k blocks in 3 calls with no overlap or gap", async () => {
+  it("fetchCcaEventLogs keeps a later explicit fromBlock above the lookback", async () => {
     const seen: { fromBlock: bigint; toBlock: bigint }[] = [];
     const got = await fetchCcaEventLogs(
       {
@@ -789,17 +868,10 @@ describe("CCA log fromBlock", () => {
       },
       AUCTION,
       "BidSubmitted",
-      0n,
+      80_000n,
     );
-    expect(got).toEqual([{ n: 1 }, { n: 2 }, { n: 3 }]);
-    expect(seen).toEqual([
-      { fromBlock: 0n, toBlock: 49_999n },
-      { fromBlock: 50_000n, toBlock: 99_999n },
-      { fromBlock: 100_000n, toBlock: 119_999n },
-    ]);
-    for (let i = 1; i < seen.length; i++) {
-      expect(seen[i].fromBlock).toBe(seen[i - 1].toBlock + 1n);
-    }
+    expect(got).toEqual([{ n: 1 }]);
+    expect(seen).toEqual([{ fromBlock: 80_000n, toBlock: 119_999n }]);
   });
 
   it("fetchCcaEventLogs uses lookback when fromBlock is omitted, then the later startBlock", async () => {

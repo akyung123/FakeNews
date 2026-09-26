@@ -3,8 +3,7 @@
  * `execute(commands, inputs, deadline)` plus the listed errors are specified.
  * Universal Router **2.1.2** Sepolia: `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`.
  *
- * V4_SWAP command + inputs encoding is TBD(INTERFACE_CCA). Do not use the
- * 2.0 research constants below on the product path.
+ * V4_SWAP = 0x10; actions 0x06 / 0x0c / 0x0f. Encoding lives in swap.ts.
  *
  * https://github.com/Uniswap/universal-router/blob/main/contracts/interfaces/IUniversalRouter.sol
  */

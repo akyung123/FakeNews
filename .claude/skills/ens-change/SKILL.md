@@ -11,6 +11,7 @@ description: Checklist for any change that touches ENSv2 — registries, resolve
    - If the docs and anything else disagree, follow the docs and note it in the PR.
 2. **Data placement**
    - The sentence (`prophecy`) and `deadline` are written once, in the prophecy resolver's `initialize(grants, calls)`.
+   - `deadline` is a legacy record: the web app always sends 0 and never reads or shows it (DECISIONS #18).
    - They are never stored anywhere else (DECISIONS #5).
 3. **Roles**
    - Nobody gets `ROLE_SET_TEXT` for `prophecy` / `deadline`.
@@ -28,5 +29,5 @@ description: Checklist for any change that touches ENSv2 — registries, resolve
    - `setResolver` / `setSubregistry` revert
    - `hasAssignees(ROOT_RESOURCE, ROLE_UNREGISTER) == false`
    - `isEmancipated() == true` for prophet registries
-7. **Web:** nothing hardcoded. Every sentence and deadline on screen comes from ENS.
+7. **Web:** nothing hardcoded. Every sentence on screen comes from ENS. The web never reads `deadline`.
 8. **Docs:** if a name, key or role changes, update `docs/INTERFACE.md` in the same PR. If a decision changes, add a row to `docs/DECISIONS.md`.

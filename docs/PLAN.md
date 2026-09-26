@@ -13,7 +13,6 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] Parent name: check that `prophecy.eth` is free on Sepolia
 - [x] DECISIONS #14: prophecy names never expire
 - [x] DECISIONS #15: trade memos yes, holder talk not now
-- [x] DECISIONS #18–#22: apply on `cca`; supersede #7/#11/#15 when `cca` merges to main @cursor
 - [ ] Protocol fee recipient
 - [ ] Who owns which lane (write names here)
 
@@ -38,7 +37,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - a separate fee ledger
   - rounding rules
 - [x] `Launchpad.registerProphet`: server signature and nullifier checks, then prophet name + prophet registry + prophet resolver @cursor
-- [x] `Launchpad.launch`: initialize the prophecy resolver (sentence, deadline, address), register the name, mint the token @cursor
+- [x] `Launchpad.launch`: initialize the prophecy resolver (sentence, address), register the name, mint the token @cursor
 - [x] Graduation: fill only the remaining supply and refund, `complete`, V4 pool, `LiquidityLocker` @cursor-agent
 - [x] `ProphecyHook`: `beforeInitialize` allows only the Launchpad. Mine the CREATE2 salt @cursor-agent
 - [x] `LiquidityLocker.collect`: 24 : 76 @cursor-agent
@@ -56,7 +55,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 - [x] Replace the prototype curve constants with SPEC values (`src/lib/curve.ts`) @cursor
 - [x] wagmi + viem, Sepolia only @cursor
-- [x] Screen 1: prophecy list (name, sentence, price, Departed count) @cursor
+- [x] Screen 1: prophecy list (name, sentence, price) @cursor
 - [x] Screen 2: issue @cursor
   - the issue button turns on only after World verification
   - cancelling or failing disables it
@@ -67,7 +66,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - optional one-line memo on buy and sell; recent trades listed with their memos
   - [x] replace the prototype's holder talk with trade memos @cursor
   - [x] hide Buy/Sell after graduation; Uniswap V4 panel @cursor-agent
-- [x] Screen 4: prophet page. Departed prophecies next to the next buy, claimable fees, sell button @cursor
+- [x] Screen 4: prophet page. Every prophecy under the name, claimable fees @cursor
 - [ ] Every sentence is read from ENS. Nothing hardcoded
 - [ ] Republish the demo page (skill `demo-publish`)
 
@@ -82,22 +81,23 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] Record scene 1 on Sepolia (register `ringo.prophecy.eth`).
   - If it fails: record it again with another person's World ID and a different name.
   - Redeploying the contracts is the last resort only.
-- [ ] Right after scene 1, off camera: issue a prophecy under `ringo` with a 2-minute deadline so it is already Departed for the later scenes.
 - [ ] Record the remaining scenes in SPEC "Demo" (total 2–4 minutes, success and failure paths).
 - [ ] If the ENS app cannot read Sepolia ENSv2 names: use the viem lookup script in `infra/` (`getEnsAddress` and text record) output as the external lookup evidence for scenes 1 and 2.
 - [ ] `FEEDBACK.md` (Uniswap): keep notes of blockers during development; it is the fallback deliverable if Uniswap graduation is cut.
 
-## 6. CCA (`cca` branch family — not `main`)
+## 6. CCA Path B2 (`cca` branch only — do not merge to `main`)
 
-Gates (KST): 22:00 INTERFACE + contract skeleton; 02:00 Sepolia-fork 4 steps; 03:30 web + deploy script. Miss any gate → curve on `main`.
+Team decision B2: replace the bonding curve with official Uniswap LBPStrategy. The curve on `main` stays the fallback.
 
-- [x] `INTERFACE_CCA.md` + DECISIONS #18–#22 for B2 (LBPStrategy `initializeDistribution`, hook inherits `InitializerHook`, locker holds the NFT). `INTERFACE.md` on `main` stays the curve contract @cursor
-- [x] `INTERFACE_CCA.md` TBD answers + designer copy v2 (PR #42 head `b71c64e`: `submitBid` 5-arg, UR 2.1.2 swap, locker `register`, salt, errors). `INTERFACE.md` on `main` stays the curve contract @cursor
-- [x] `INTERFACE_CCA.md` matches #42 final head `9c6b163` (50:50 supply, locker `tokenIdsOf` / `collect(token, tokenId)` / `isRegistered`, floor/tick, `Auction ended`, no `Set final price`). `INTERFACE.md` on `main` stays the curve contract @cursor
-- [x] `FEEDBACK.md` Uniswap prize write-up (CCA + LBPStrategy + v4 hook) @cursor
-- [ ] Contracts skeleton on a `cca/*` branch (Launchpad calls `initializeDistribution`; no curve) — 22:00 gate
-- [ ] Sepolia-fork 4 steps green: launch+create auction, bid, migrate opens v4 pool, swap — 02:00 gate
-- [ ] Web bid / CCALens / claim / migrate / v4 swap + deploy script keys in `deployments/sepolia.json` — 03:30 gate
+- [x] `Launchpad`: drop curve `buy`/`sell`/`graduate`; `launch` mints and calls `LBPStrategy.initializeDistribution`; `auctionOf(token)` @cursor
+- [x] `ProphecyHook`: official `InitializerHook` pattern so LBP can initialize the v4 pool (`authorized` = LBPStrategy); 24:76 stays on the locker @cursor
+- [x] `LiquidityLocker`: hold the v4 PositionManager LP NFT; no withdraw; `collect` splits prophet 24 : protocol 76 @cursor
+- [x] Unit tests with mocks; `forge build && forge test` green @cursor
+- [x] Follow-up Sepolia fork tests: no-checkpoint 0.021@2× floor, `CannotExitBid` at clearing, Launchpad+ProphecyHook+Locker migrate/register, leftover ETH `assertEq(171)` @cursor
+- [x] CCA `Deploy.s.sol`: hook `authorized` = LBPStrategy, `setUniswap` then `setCca`, sepolia.json schema @cursor
+- [x] Web bid / CCALens / claim / migrate / v4 swap + collect on existing screens @cursor
+- [x] Remove deadline and Departed from the screens (DECISIONS #18): no deadline field on Issue, no Departed on the prophet page, `launch` always sends `deadline = 0`, no redeploy @akyung123
+- [ ] Market stage badge (Auction / Graduated / Ended) on the prophecy detail screen, then the list
 
 ## If there is time
 

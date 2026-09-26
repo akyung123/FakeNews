@@ -135,6 +135,13 @@ export const ccaAbi = [
   },
   {
     type: "function",
+    name: "totalSupply",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint128" }],
+  },
+  {
+    type: "function",
     name: "currency",
     stateMutability: "view",
     inputs: [],

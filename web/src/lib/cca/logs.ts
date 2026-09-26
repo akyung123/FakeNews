@@ -37,7 +37,7 @@ export function parseCcaDeployBlock(
  */
 export function ccaLogsFromBlock(
   value: string | undefined = import.meta.env.VITE_LAUNCHPAD_DEPLOY_BLOCK,
-  latestBlock = 0n,
+  latestBlock: bigint,
   auctionStartBlock?: bigint,
 ): bigint {
   const fromDeployOrLookback = launchedFromBlock(parseCcaDeployBlock(value), latestBlock);
@@ -113,12 +113,8 @@ export async function fetchCcaEventLogs(
   auctionStartBlock?: bigint,
 ): Promise<unknown[]> {
   const toBlock = await client.getBlockNumber();
-  const rangeStart =
-    fromBlock === undefined
-      ? ccaLogsFromBlock(undefined, toBlock, auctionStartBlock)
-      : auctionStartBlock !== undefined && auctionStartBlock > fromBlock
-        ? auctionStartBlock
-        : fromBlock;
+  const lookback = ccaLogsFromBlock(undefined, toBlock, auctionStartBlock);
+  const rangeStart = fromBlock === undefined ? lookback : fromBlock > lookback ? fromBlock : lookback;
   const out: unknown[] = [];
   for (const chunk of ccaLogChunks(rangeStart, toBlock)) {
     const part = await client.getContractEvents(

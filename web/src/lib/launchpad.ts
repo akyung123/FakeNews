@@ -1,5 +1,6 @@
 import { isAddress, type Address } from "viem";
 import { readContract, simulateContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { launchpadCcaAbi } from "./cca/abi/launchpadCca";
 import { launchpadAbi } from "./launchpadAbi";
 import { contracts } from "./contracts";
 import { webEnv } from "./env";
@@ -211,7 +212,7 @@ export function launchedLogsQuery(
   }
   return {
     address,
-    abi: launchpadAbi,
+    abi: launchpadCcaAbi,
     eventName: "Launched" as const,
     fromBlock: launchedFromBlock(deployBlock, latestBlock),
     toBlock: latestBlock,

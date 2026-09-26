@@ -9,6 +9,7 @@ import { CCA_SEPOLIA } from "./addresses";
 import { ccaAbi } from "./abi/cca";
 import { ccaLensAbi } from "./abi/ccaLens";
 import { GRADUATION_ETH_WEI } from "./config";
+import type { AuctionCopyStatus } from "./copy";
 import type { Address } from "viem";
 
 export type CcaCheckpoint = {
@@ -181,6 +182,30 @@ export function blocksRemaining(endBlock: bigint, currentBlock: bigint): number 
   if (currentBlock >= endBlock) return 0;
   const left = endBlock - currentBlock;
   return left > BigInt(Number.MAX_SAFE_INTEGER) ? Number.MAX_SAFE_INTEGER : Number(left);
+}
+
+export function isAuctionFinalized(lastCheckpointedBlock: bigint, endBlock: bigint): boolean {
+  return lastCheckpointedBlock >= endBlock;
+}
+
+export function isAuctionSoldOut(totalCleared: bigint, totalSupply: bigint): boolean {
+  return totalSupply > 0n && totalCleared >= totalSupply;
+}
+
+export function deriveAuctionCopyStatus(input: {
+  view: AuctionView;
+  soldOut?: boolean;
+  finalized?: boolean;
+  poolOpen?: boolean;
+  marketFailed?: boolean;
+}): AuctionCopyStatus {
+  if (input.poolOpen) return "pool_open";
+  if (input.marketFailed && input.view.goalReached) return "market_failed";
+  if (input.view.phase === "not_started") return "not_started";
+  if (input.view.phase === "live") return input.soldOut ? "sold_out" : "live";
+  if (input.view.phase === "ended_goal_not_reached") return "failed";
+  if (input.finalized === false) return "ended_not_finalized";
+  return "graduated";
 }
 
 export function deriveAuctionView(input: {

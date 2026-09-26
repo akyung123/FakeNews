@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { launchpadAbi } from "./launchpadAbi";
+import { LAUNCH_DEADLINE, launchpadAbi } from "./launchpadAbi";
+import { launchWrite } from "./writes";
+
+const LAUNCHPAD = "0x0000000000000000000000000000000000000001" as const;
 
 function entry(type: string, name?: string) {
   return launchpadAbi.find((item) => item.type === type && (!name || ("name" in item && item.name === name)));
@@ -48,10 +51,24 @@ describe("Launchpad ABI from #26", () => {
     ]);
   });
 
-  it("Launched carries prophetLabel and slug, not deadline", () => {
+  it("launch is 3 args like the deployed Launchpad, and the web sends deadline = 0", () => {
+    const fn = entry("function", "launch");
+    if (!fn || fn.type !== "function") throw new Error("missing launch");
+    expect(fn.stateMutability).toBe("nonpayable");
+    expect(fn.inputs.map((input) => [input.name, input.type])).toEqual([
+      ["slug", "string"],
+      ["prophecy", "string"],
+      ["deadline", "uint64"],
+    ]);
+    expect(LAUNCH_DEADLINE).toBe(0n);
+    const write = launchWrite({ slug: "lingo-2028", prophecy: "a sentence" }, LAUNCHPAD);
+    expect(write.args).toEqual(["lingo-2028", "a sentence", 0n]);
+  });
+
+  it("Launched matches the deployed event and carries no deadline", () => {
     const ev = entry("event", "Launched");
     if (!ev || ev.type !== "event") throw new Error("missing Launched");
-    expect(ev.inputs.map((input) => input.name)).toEqual(["token", "prophet", "prophetLabel", "slug"]);
+    expect(ev.inputs.map((input) => input.name)).toEqual(["token", "prophet", "auction", "prophetLabel", "slug"]);
     expect(ev.inputs.some((input) => input.name === "deadline")).toBe(false);
   });
 
