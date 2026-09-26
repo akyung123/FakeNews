@@ -90,3 +90,12 @@ export {
   type CcaWriteOptions,
   type CcaWriteRequest,
 } from "./writes";
+export {
+  bidExitedLogsQuery,
+  bidSubmittedLogsQuery,
+  ccaEventLogsQuery,
+  ccaLogsFromBlock,
+  fetchCcaEventLogs,
+  tokensClaimedLogsQuery,
+  type CcaAuctionEvent,
+} from "./logs";

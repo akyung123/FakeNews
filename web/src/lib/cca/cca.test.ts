@@ -38,6 +38,13 @@ import {
 import { openMarket, openMarketWrite } from "./migrate";
 import { alignPriceToTick, ethPerTokenToQ96, q96ToWeiPerToken, weiPerTokenToQ96 } from "./price";
 import { encodeV4ExactInSingle, swapExactInSingle, swapExactInSingleWrite } from "./swap";
+import {
+  bidExitedLogsQuery,
+  bidSubmittedLogsQuery,
+  ccaLogsFromBlock,
+  fetchCcaEventLogs,
+  tokensClaimedLogsQuery,
+} from "./logs";
 import { assertSuccessfulReceipt } from "./writes";
 
 const AUCTION = "0x1111111111111111111111111111111111111111" as const;
@@ -133,6 +140,32 @@ describe("verified external ABIs", () => {
     expect(SWAP_EXACT_IN_SINGLE).toBe(0x06);
     expect(SETTLE_ALL).toBe(0x0c);
     expect(TAKE_ALL).toBe(0x0f);
+  });
+
+  it("records BidSubmitted / BidExited / TokensClaimed with indexed owner", () => {
+    const bid = ccaAbi.find((item) => item.type === "event" && item.name === "BidSubmitted");
+    const exited = ccaAbi.find((item) => item.type === "event" && item.name === "BidExited");
+    const claimed = ccaAbi.find((item) => item.type === "event" && item.name === "TokensClaimed");
+    if (!bid || bid.type !== "event") throw new Error("missing BidSubmitted");
+    if (!exited || exited.type !== "event") throw new Error("missing BidExited");
+    if (!claimed || claimed.type !== "event") throw new Error("missing TokensClaimed");
+    expect(bid.inputs.map((input) => [input.name, input.type, input.indexed])).toEqual([
+      ["id", "uint256", true],
+      ["owner", "address", true],
+      ["priceQ96", "uint256", false],
+      ["amount", "uint128", false],
+    ]);
+    expect(exited.inputs.map((input) => [input.name, input.type, input.indexed])).toEqual([
+      ["bidId", "uint256", true],
+      ["owner", "address", true],
+      ["tokensFilled", "uint256", false],
+      ["currencyRefunded", "uint256", false],
+    ]);
+    expect(claimed.inputs.map((input) => [input.name, input.type, input.indexed])).toEqual([
+      ["bidId", "uint256", true],
+      ["owner", "address", true],
+      ["tokensFilled", "uint256", false],
+    ]);
   });
 
   it("uses the official Sepolia addresses", () => {
@@ -406,5 +439,55 @@ describe("TBD(INTERFACE_CCA) isolation", () => {
     expect(() => poolHooksForToken(TOKEN)).toThrow(INTERFACE_CCA_TBD);
     expect(() => launchCcaWrite()).toThrow(/launch on the CCA line/);
     expect(() => claimProphetFeeCcaWrite()).toThrow(/prophet fee claim/);
+  });
+});
+
+describe("CCA log fromBlock", () => {
+  it("reads VITE_LAUNCHPAD_DEPLOY_BLOCK as bigint and falls back to 0n if unset", () => {
+    expect(ccaLogsFromBlock("12345678")).toBe(12_345_678n);
+    expect(ccaLogsFromBlock("0")).toBe(0n);
+    expect(ccaLogsFromBlock(undefined)).toBe(0n);
+    expect(ccaLogsFromBlock("")).toBe(0n);
+    expect(ccaLogsFromBlock("  ")).toBe(0n);
+    expect(ccaLogsFromBlock("nope")).toBe(0n);
+    expect(ccaLogsFromBlock()).toBe(0n);
+  });
+
+  it("always sends fromBlock on bid / exit / claim log queries", () => {
+    const latest = 80_000n;
+    const fromDeploy = bidSubmittedLogsQuery(AUCTION, latest, 12_000n);
+    expect(fromDeploy.eventName).toBe("BidSubmitted");
+    expect(fromDeploy.fromBlock).toBe(12_000n);
+    expect(fromDeploy.toBlock).toBe(latest);
+    expect(fromDeploy.address).toBe(AUCTION);
+    expect(fromDeploy.abi).toBe(ccaAbi);
+    expect(Object.keys(fromDeploy)).toContain("fromBlock");
+
+    const unset = bidSubmittedLogsQuery(AUCTION, latest, ccaLogsFromBlock(undefined));
+    expect(unset.fromBlock).toBe(0n);
+    expect(bidExitedLogsQuery(AUCTION, latest, 9n).eventName).toBe("BidExited");
+    expect(tokensClaimedLogsQuery(AUCTION, latest, 9n).eventName).toBe("TokensClaimed");
+  });
+
+  it("fetchCcaEventLogs forwards the deploy-block fromBlock", async () => {
+    const seen: unknown[] = [];
+    const logs = [{ eventName: "BidSubmitted" }];
+    const got = await fetchCcaEventLogs(
+      {
+        async getBlockNumber() {
+          return 90_000n;
+        },
+        async getContractEvents(query) {
+          seen.push(query);
+          return logs;
+        },
+      },
+      AUCTION,
+      "BidSubmitted",
+      12_000n,
+    );
+    expect(got).toBe(logs);
+    expect(seen).toEqual([bidSubmittedLogsQuery(AUCTION, 90_000n, 12_000n)]);
+    expect((seen[0] as { fromBlock: bigint }).fromBlock).toBe(12_000n);
   });
 });

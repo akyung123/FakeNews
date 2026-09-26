@@ -13,6 +13,16 @@
  *
  * Only functions / events / errors verified in that source. No invented names.
  * Price arguments are Q96 (`maxPriceQ96`). Currency ETH is address(0).
+ *
+ * Events (IContinuousClearingAuction.sol, tag v2.1.0, commit
+ * a56d42231e7bf048136d9d88fa61e8518c10c5ff):
+ *   BidSubmitted(uint256 indexed id, address indexed owner, uint256 priceQ96, uint128 amount)
+ *     — bidder/owner IS indexed
+ *   BidExited(uint256 indexed bidId, address indexed owner, uint256 tokensFilled, uint256 currencyRefunded)
+ *     — owner IS indexed
+ *   TokensClaimed(uint256 indexed bidId, address indexed owner, uint256 tokensFilled)
+ *     — owner IS indexed
+ *   https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/interfaces/IContinuousClearingAuction.sol
  */
 export const ccaAbi = [
   {
