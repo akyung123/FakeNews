@@ -4,16 +4,19 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { MEMO_COPY, memoRemainingLabel } from "../lib/limits";
 import { actions } from "../lib/store";
+import { Web3Provider } from "../providers/Web3Provider";
 import { CoinPage } from "./CoinPage";
 
 function renderWifi() {
   actions.reset();
   return render(
-    <MemoryRouter initialEntries={["/coin/wifi"]}>
-      <Routes>
-        <Route path="/coin/:id" element={<CoinPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <Web3Provider>
+      <MemoryRouter initialEntries={["/coin/wifi"]}>
+        <Routes>
+          <Route path="/coin/:id" element={<CoinPage />} />
+        </Routes>
+      </MemoryRouter>
+    </Web3Provider>,
   );
 }
 

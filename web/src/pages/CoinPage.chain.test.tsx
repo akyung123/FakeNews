@@ -3,7 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { CURVE_SUPPLY } from "../lib/curve";
+import { GRADUATED_BODY, GRADUATED_LINK, GRADUATED_TITLE } from "../lib/graduation";
 import { actions, type Coin } from "../lib/store";
+import { Web3Provider } from "../providers/Web3Provider";
 import { CoinPage } from "./CoinPage";
 
 const TOKEN = "0x1111111111111111111111111111111111111111" as const;
@@ -33,14 +35,20 @@ const liveOpen: Coin = {
 describe("chain-mode token detail", () => {
   it("reads sold-out from the live curve, not prototypeCoinFromName", async () => {
     render(
-      <MemoryRouter initialEntries={[`/coin/${TOKEN}`]}>
-        <Routes>
-          <Route path="/coin/:id" element={<CoinPage loadLaunched={async () => [live]} />} />
-        </Routes>
-      </MemoryRouter>,
+      <Web3Provider>
+        <MemoryRouter initialEntries={[`/coin/${TOKEN}`]}>
+          <Routes>
+            <Route path="/coin/:id" element={<CoinPage loadLaunched={async () => [live]} />} />
+          </Routes>
+        </MemoryRouter>
+      </Web3Provider>,
     );
     await waitFor(() => expect(screen.getByText("Every badge is a name")).toBeInTheDocument());
-    expect(screen.getByText("Graduated to Uniswap V4")).toBeInTheDocument();
+    expect(screen.getByText(GRADUATED_TITLE)).toBeInTheDocument();
+    expect(screen.getByText(GRADUATED_BODY)).toBeInTheDocument();
+    expect(screen.getByText(GRADUATED_LINK)).toBeInTheDocument();
+    expect(screen.queryByText("Amount (ETH)")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Buy \$LINGO-2028/i })).toBeNull();
     expect(screen.queryByText("Prophecy not found")).toBeNull();
   });
 
@@ -49,14 +57,16 @@ describe("chain-mode token detail", () => {
     const sendBuy = vi.fn(async () => true);
     const sendSell = vi.fn(async () => true);
     render(
-      <MemoryRouter initialEntries={["/coin/wifi"]}>
-        <Routes>
-          <Route
-            path="/coin/:id"
-            element={<CoinPage loadLaunched={async () => []} sendBuy={sendBuy} sendSell={sendSell} />}
-          />
-        </Routes>
-      </MemoryRouter>,
+      <Web3Provider>
+        <MemoryRouter initialEntries={["/coin/wifi"]}>
+          <Routes>
+            <Route
+              path="/coin/:id"
+              element={<CoinPage loadLaunched={async () => []} sendBuy={sendBuy} sendSell={sendSell} />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </Web3Provider>,
     );
     await waitFor(() => expect(screen.getByText(/venue Wi-Fi dies/i)).toBeInTheDocument());
     expect(document.querySelector(".trade")).toBeNull();
@@ -75,14 +85,16 @@ describe("chain-mode token detail", () => {
     const sendBuy = vi.fn(async () => true);
     const sendSell = vi.fn(async () => true);
     render(
-      <MemoryRouter initialEntries={[`/coin/${TOKEN}`]}>
-        <Routes>
-          <Route
-            path="/coin/:id"
-            element={<CoinPage loadLaunched={async () => [liveOpen]} sendBuy={sendBuy} sendSell={sendSell} />}
-          />
-        </Routes>
-      </MemoryRouter>,
+      <Web3Provider>
+        <MemoryRouter initialEntries={[`/coin/${TOKEN}`]}>
+          <Routes>
+            <Route
+              path="/coin/:id"
+              element={<CoinPage loadLaunched={async () => [liveOpen]} sendBuy={sendBuy} sendSell={sendSell} />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </Web3Provider>,
     );
     await waitFor(() => expect(screen.getByRole("button", { name: /Buy \$LINGO-2028/i })).toBeEnabled());
     await userEvent.click(screen.getByRole("button", { name: /Buy \$LINGO-2028/i }));
