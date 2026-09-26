@@ -94,6 +94,7 @@ Team decision B2: replace the bonding curve with official Uniswap LBPStrategy. T
 - [x] `ProphecyHook`: official `InitializerHook` pattern so LBP can initialize the v4 pool (`authorized` = LBPStrategy); 24:76 stays on the locker @cursor
 - [x] `LiquidityLocker`: hold the v4 PositionManager LP NFT; no withdraw; `collect` splits prophet 24 : protocol 76 @cursor
 - [x] Unit tests with mocks; `forge build && forge test` green @cursor
+- [x] CCA `Deploy.s.sol`: hook `authorized` = LBPStrategy, `setUniswap` then `setCca`, sepolia.json schema @cursor
 
 ## If there is time
 
