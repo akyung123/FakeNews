@@ -68,8 +68,25 @@ jobs:
           VITE_WORLD_ACTION: ${{ vars.VITE_WORLD_ACTION }}
           VITE_WORLD_RP_ID: ${{ vars.VITE_WORLD_RP_ID }}
         run: bunx tsc --noEmit && bunx vite build --base /Prophecy/
+      - name: Guard Pages asset prefix
+        run: |
+          html=dist/index.html
+          test -f "$html"
+          bad="$(grep -oE '(src|href)="[^"]+"' "$html" | grep -E '(src|href)="/' | grep -vE '(src|href)="/Prophecy/' || true)"
+          if [[ -n "$bad" ]]; then
+            echo "Asset/favicon URLs must start with /Prophecy/:" >&2
+            echo "$bad" >&2
+            exit 1
+          fi
+          if ! grep -qE '(src|href)="/Prophecy/' "$html"; then
+            echo "dist/index.html has no /Prophecy/ asset URLs. Was vite build --base /Prophecy/ used?" >&2
+            exit 1
+          fi
       - name: SPA fallback
-        run: cp dist/index.html dist/404.html
+        # GitHub Pages serves 404.html for unknown paths (/p/:name, /n/:name, /create).
+        run: |
+          cp dist/index.html dist/404.html
+          test -f dist/404.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web/dist
