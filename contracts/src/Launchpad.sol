@@ -55,10 +55,9 @@ library CurveMath {
 /// Bonding-curve launchpad. Price is the ratio of two reserves; fees sit in a
 /// separate ledger so they never move that price.
 ///
-/// Constructor stays (protocolFeeRecipient_, worldSigner_, plus ENS args
-/// from the ENS wiring PR). Uniswap addresses are set once by the deployer
-/// via `setUniswap`. Deploy: Launchpad, Hook (CREATE2 with this address),
-/// Locker, then `setUniswap` once.
+/// Constructor is (protocolFeeRecipient, worldSigner, ens). Uniswap addresses
+/// are set once by the deployer via `setUniswap`. Deploy: Launchpad, Hook
+/// (CREATE2 with this address), Locker, then `setUniswap` once.
 contract Launchpad {
     using PoolIdLibrary for PoolKey;
     uint256 private constant _NOT_ENTERED = 1;
