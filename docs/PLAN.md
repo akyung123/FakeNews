@@ -61,7 +61,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - cancelling or failing disables it
 - [ ] Screen 3: prophecy detail
   - find the token by name
-  - buy and sell
+  - [x] buy and sell @cursor-agent
   - no True / False
   - optional one-line memo on buy and sell; recent trades listed with their memos
   - [x] replace the prototype's holder talk with trade memos @cursor
@@ -90,6 +90,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 - [x] Official Uniswap CCA / Liquidity Launchpad research + INTERFACE Path A proposal ([CCA_RESEARCH.md](CCA_RESEARCH.md)) @cursor
 - [x] PM: bonding curve on `main` is the 22:00 KST fallback; CCA on a later branch; fork-test gate for create / bid / settle+claim / v4+hook ([CCA_RESEARCH.md](CCA_RESEARCH.md) section 6, [INTERFACE.md](INTERFACE.md) section 10) @cursor
+- [x] Path B hours (official LBPStrategy as-is): B1 keep-curve + B2 replace-curve ([CCA_RESEARCH.md](CCA_RESEARCH.md) section 11) @cursor
 
 ## If there is time
 

@@ -212,7 +212,8 @@ export function progress(c: CurveState): number {
   return Math.min(1, c.sold / CURVE_SUPPLY);
 }
 
-export function graduated(c: CurveState): boolean {
+export function graduated(c: CurveState & { complete?: boolean }): boolean {
+  if (c.complete) return true;
   return c.sold >= CURVE_SUPPLY - 1e-6;
 }
 

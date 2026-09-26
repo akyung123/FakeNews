@@ -17,6 +17,14 @@ describe("Launchpad ABI from #26", () => {
     ]);
   });
 
+  it("exposes creatorFeeOf(wallet) → uint256", () => {
+    const fn = entry("function", "creatorFeeOf");
+    if (!fn || fn.type !== "function") throw new Error("missing creatorFeeOf");
+    expect(fn.stateMutability).toBe("view");
+    expect(fn.inputs.map((input) => [input.name, input.type])).toEqual([["wallet", "address"]]);
+    expect(fn.outputs.map((output) => output.type)).toEqual(["uint256"]);
+  });
+
   it("exposes ens() and prophetOf(wallet) → label", () => {
     const ens = entry("function", "ens");
     expect(ens).toBeDefined();
@@ -45,6 +53,46 @@ describe("Launchpad ABI from #26", () => {
     if (!ev || ev.type !== "event") throw new Error("missing Launched");
     expect(ev.inputs.map((input) => input.name)).toEqual(["token", "prophet", "prophetLabel", "slug"]);
     expect(ev.inputs.some((input) => input.name === "deadline")).toBe(false);
+  });
+
+  it("includes the seven write-facing custom errors for revert decoding", () => {
+    const names = launchpadAbi.filter((item) => item.type === "error").map((item) => item.name);
+    const writeFacing = [
+      "NullifierUsed",
+      "LabelTaken",
+      "AlreadyProphet",
+      "SlugTaken",
+      "Slippage",
+      "CurveComplete",
+      "ZeroAmount",
+    ] as const;
+    expect(writeFacing).toHaveLength(7);
+    expect(writeFacing).toEqual([
+      "NullifierUsed",
+      "LabelTaken",
+      "AlreadyProphet",
+      "SlugTaken",
+      "Slippage",
+      "CurveComplete",
+      "ZeroAmount",
+    ]);
+    for (const name of writeFacing) {
+      expect(names).toContain(name);
+    }
+    for (const extra of [
+      "InvalidSignature",
+      "NotProphet",
+      "MemoTooLong",
+      "BadProphecy",
+      "BadSlug",
+      "BadLabel",
+      "UnexpectedEth",
+      "NotDeployer",
+      "UniswapAlreadySet",
+      "UniswapNotSet",
+    ]) {
+      expect(names).toContain(extra);
+    }
   });
 
   it("constructor ends at ens; setUniswap is a deployer-only add-on", () => {

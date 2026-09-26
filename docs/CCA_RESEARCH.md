@@ -658,6 +658,89 @@ Use `Graduated.poolId` (or reconstruct ETH/`token`/fee 10000/tick 200/`hook()`).
 
 ---
 
+## 11. Path B (official LBPStrategy as-is)
+
+Lead request 2026-09-26: use the official CCA factory and official LBPStrategy **with its own `InitializerHook`**. On the CCA path, **do not** attach `ProphecyHook` / `LiquidityLocker`. Launchpad only mints the token, writes ENS, gates World ID (`registerProphet`), and calls the factory / LBPStrategy. Hours are **ESTIMATE / UNVERIFIED**. Clock at write: ~16:52 KST; 22:00 KST is about **5 hours** later (that window also has to cover frontend / infra follow-up).
+
+### Sepolia addresses (verified bytecode 2026-09-26; section 1)
+
+| Contract | Address | Source |
+|---|---|---|
+| CCA factory v2.1.0 | `0x000000001F26a0044BaA66024e7b6599c61963F8` | [CCA README](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/README.md#continuousclearingauctionfactory); [Launchpad deployments](https://developers.uniswap.org/docs/liquidity/liquidity-launchpad/deployments); RPC `eth_getCode` present |
+| **LBPStrategy v3.3.0** | **`0x95434E898Af471945Cab33D5064d2aC1A6Ba2000`** | same deployments page “Current”; RPC bytecode present; `initializerFactory()` = factory above; `poolManager()` / `positionManager()` = official v4 Sepolia |
+| InitializerHook v3.3.0 | `0x1600059B95A80d500fC42400ea9a88A9C29D2000` | same page; RPC `authorized()` = LBPStrategy |
+| LiquidityLauncher v3.2.0 | `0x0000FffFBE8efE702c8703aE3477FF5dE3d319C0` | same page |
+| PoolManager / PositionManager | `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543` / `0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4` | [v4 deployments](https://docs.uniswap.org/contracts/v4/deployments) |
+
+Etherscan name check remains **UNVERIFIED** (Cloudflare). Use the official InitializerHook, not `ProphecyHook` (section 3).
+
+### Required call and params
+
+Typical flow ([TechnicalReference — Typical Launch Flow](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/docs/TechnicalReference.md#typical-launch-flow); [LBPStrategy.sol L68-L148](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol#L68-L148)):
+
+```solidity
+// IStrategy — strategy pulls `totalSupply` from msg.sender
+function initializeDistribution(address token, uint256 totalSupply, bytes calldata configData, bytes32 salt) external;
+
+// After endBlock and migrationBlock:
+function migrate(ILBPInitializer initializer) external;
+```
+
+[IStrategy.sol L29-L30](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IStrategy.sol#L29-L30); [ILBPStrategy.sol L142-L143](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/ILBPStrategy.sol#L138-L143).
+
+Launchpad may call `LBPStrategy.initializeDistribution` directly (it pulls tokens) or go through `LiquidityLauncher.distributeToken`. `configData` is `abi.encode(MigratorParameters, bytes initializerParams)` where `initializerParams` is the CCA `AuctionParameters` (section 2.4).
+
+Must-set fields (sources: [MigratorParams.sol](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/libraries/MigratorParams.sol#L21-L131), [ILBPStrategy errors](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/ILBPStrategy.sol)):
+
+| Field | Path B value |
+|---|---|
+| `AuctionParameters.currency` | `address(0)` (ETH) |
+| `AuctionParameters.fundsRecipient` | **LBPStrategy** (else `InvalidFundsRecipient`) |
+| `AuctionParameters.tokensRecipient` | **not** the strategy (`InvalidTokensRecipient` if it is) — Launchpad or prophet |
+| `AuctionParameters` schedule | `startBlock` / `endBlock` / `claimBlock`; packed `auctionStepsData`; `requiredCurrencyRaised` (0 = always graduate) |
+| `MigratorParameters.migrationBlock` | **strictly after** `endBlock` (`InvalidEndBlock`) |
+| `reservedTokenAmountForLP` | `> 0` and `≤ int128.max` |
+| `recipient` / `positionRecipient` | nonzero; `positionRecipient` not `address(1)` / `address(2)` |
+| `poolParameters.hook` | official InitializerHook `0x1600…2000` (or `address(0)` only with a static fee) |
+| `positionDefinitions` / `lpAllocationSchedule` | valid `PositionDefinition[]`; brackets start at `lowerThreshold = 0` |
+
+Then anyone `migrate(auction)` after `migrationBlock`. LP is a PositionManager NFT to `positionRecipient`. No locker 24:76 on this path.
+
+### Variants (contracts + ForkE2E-style fork test only)
+
+Same fork harness as section 6 (`SEPOLIA_RPC_URL` + `vm.createSelectFork` + skip). Fork PRs skip the secret. Frontend / infra hours are **outside** these totals and still sit in the same 5h window.
+
+**B1 — keep curve + add CCA** (`launchWithAuction` or equivalent). Curve `launch` / `buy` / `sell` / `_graduate` on `main` stay. Both paths tested.
+
+| Step | ESTIMATE h | Notes |
+|---|---|---|
+| Launchpad changes | **3** | New function only: mint, ENS, approve strategy, `initializeDistribution`, store auction. No curve edits. |
+| LBPStrategy / factory wiring | **4** | Encode `MigratorParameters` + `AuctionParameters`; confirm factory via `initializerFactory()`. Hard part is the position plan + brackets. |
+| Fork test create → bid → settle/claim → `migrate` | **5** | Official factory/strategy/hook/PoolManager/PositionManager on the fork. `vm.roll` through `endBlock` / `claimBlock` / `migrationBlock`. Assert `Migrated` + `slot0`. |
+| Interface / ABI doc | **1** | `launchWithAuction` ABI, events, `VITE_*` for strategy/hook. |
+| **B1 total** | **13** | |
+
+**B2 — replace curve with CCA.** One `launch` path. Curve functions removed.
+
+| Step | ESTIMATE h | Notes |
+|---|---|---|
+| Launchpad changes | **5** | Same wiring as B1 plus delete `buy`/`sell`/`curve`/`quote*` and retarget existing tests (ForkE2E curve cases). |
+| LBPStrategy / factory wiring | **4** | Same encode as B1. |
+| Fork test create → bid → settle/claim → `migrate` | **5** | Same four-step spike; plus drop or rewrite curve ForkE2E. |
+| Interface / ABI doc | **1** | Path A-style removals plus strategy ABI. |
+| **B2 total** | **15** | |
+
+**Fit before 22:00 KST today (~5h left, including frontend/infra)?**
+
+| Variant | Hours | Fit? |
+|---|---|---|
+| B1 | 13 | **No** |
+| B2 | 15 | **No** |
+
+A thinner “wiring-only” slice (Launchpad call + create, no bid/migrate) is still ~7h ESTIMATE and does not reliably fit. Do not merge Path B into `main` today. Curve on `main` stays the fallback (section 6).
+
+---
+
 ## 10. Source index
 
 | What | Link |

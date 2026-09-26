@@ -5,7 +5,7 @@
 > **Path A (recommended):** official CCA factory on Sepolia + our Launchpad still initializes the v4 pool and locks LP in `LiquidityLocker`. Frontend talks to the CCA for bid / exit / claim.
 > **Path B (not recommended for the hackathon):** official `LBPStrategy.migrate`. Cannot attach today's `ProphecyHook` / `LiquidityLocker` without rewriting both. See CCA_RESEARCH section 3.
 >
-> Team addenda (same no-guess rule): Frontend §4, Designer §8, Infra §9, PM §10. Sources: [`CCA_RESEARCH.md`](CCA_RESEARCH.md) §§6–9.
+> Team addenda (same no-guess rule): Frontend §4, Designer §8, Infra §9, PM §10, Path B hours §11 in [`CCA_RESEARCH.md`](CCA_RESEARCH.md).
 
 What `contracts/`, `web/` and `world/` rely on from each other. Only the contract between folders, not how to implement it.
 
@@ -21,7 +21,7 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 | Name | Address record (coinType 60) | Text records | Who can write |
 |---|---|---|---|
 | `<prophet>.prophecy.eth` | prophet wallet | `avatar`, `description` | prophet only (per-key role) |
-| `<slug>.<prophet>.prophecy.eth` | prophecy token | `prophecy` = sentence (1–140 chars) | **nobody** (written at init only) |
+| `<slug>.<prophet>.prophecy.eth` | prophecy token | `prophecy` = sentence (1–140 UTF-8 bytes; `BadProphecy`) | **nobody** (written at init only) |
 | | | `deadline` = unix seconds, decimal string | **nobody** |
 | | | `avatar`, `description` | prophet only |
 
@@ -172,8 +172,22 @@ Reasons:
 
 - `registerProphet` recovers EIP-191 `personal_sign` of `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` (section 3). `chainId` must be `block.chainid` and `launchpad` must be this contract; the signed wallet must be `msg.sender`. Label is chosen by the caller and is not in the signed payload.
 - `Graduated.poolId` is the V4 `PoolId` (`keccak256` of the `PoolKey`). `currency0` is native ETH (`address(0)`); `currency1` is `token`. The frontend reconstructs the key from `token`, `fee`, `tickSpacing`, and `hooks`.
-- `graduate` is a separate transaction after the auction, not the last curve buy.
-- Official LBPStrategy (`0x95434E898Af471945Cab33D5064d2aC1A6Ba2000` on Sepolia) is **out of this Launchpad interface**. Path B would replace `graduate` with `LBPStrategy.migrate` and cannot use our hook/locker.
+- Path A: `graduate` is a separate transaction after the auction, not the last curve buy.
+- Constructor is `(protocolFeeRecipient, worldSigner, ens)`. This PR does not add constructor arguments.
+- Deploy order: Launchpad, then Hook (CREATE2 using the Launchpad address), then Locker, then a deployer-only one-time `setUniswap(poolManager, hook, locker)`. A second call or a non-deployer call reverts. Graduation reverts if Uniswap is not set. Path A then `setCcaFactory`.
+- `receive()` accepts leftover seed ETH only from the locker and the PoolManager.
+- Constants are exactly the "Constants" section of SPEC.md.
+- `memo` is only on `buy` / `sell` (INTERFACE / DECISIONS #15). `launch` has no memo argument; the first buy inside `launch` goes without a memo. `buy` / `sell` revert if the memo is longer than 140 UTF-8 bytes. Launchpad `MAX_MEMO` is internal (not a view) — the web hardcodes 140. The prophecy sentence is 1–140 UTF-8 bytes (`BadProphecy`).
+- Rounding:
+  - Buy: fee rounds up, tokens out round down.
+  - Sell: fee rounds up, ETH out rounds down.
+- Write-facing custom errors (names match `Launchpad.sol`). The web maps these six so a revert can show a human sentence instead of a raw name:
+  `NullifierUsed`, `LabelTaken`, `AlreadyProphet`, `SlugTaken`, `Slippage`, `CurveComplete`.
+  `registerProphet` checks in this order: `NullifierUsed`, `AlreadyProphet`, `LabelTaken`, `InvalidSignature`.
+  `CurveComplete` can come from `buy` or `sell`.
+  Other custom errors on the contract stay a generic write failure. `ZeroAmount` (`claimCreatorFee` when nothing is accrued) uses that generic banner — no extra designer sentence. Wallet rejection is not a revert.
+- The web prevents these before a send (no extra revert banners): `MemoTooLong` (buy/sell memo, 140 UTF-8 bytes), `BadProphecy` (sentence, 1–140 UTF-8 bytes), `NotProphet` (`launch` only after `registerProphet` succeeds or `prophetOf(wallet)` is a non-empty label), `ZeroAmount` (`claimCreatorFee` only when `creatorFeeOf(wallet)` is 0; the Claim fees button stays disabled).
+- Official LBPStrategy (`0x95434E898Af471945Cab33D5064d2aC1A6Ba2000` on Sepolia) is **out of the Path A Launchpad interface**. Path B hours and wiring: [`CCA_RESEARCH.md`](CCA_RESEARCH.md) section 11.
 
 ### `ProphecyToken`
 
@@ -347,7 +361,7 @@ Also: name next to a wallet = reverse lookup, falling back to `prophetOf(wallet)
 | `MOCK_USDC_MINT_AMOUNT` | optional MockUSDC `mint` amount (6 decimals). Empty = script mints enough for the fee |
 | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |
 
-Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0. The web app does not read `ENS_ADAPTER_ADDRESS`; if it needs the adapter it calls `launchpad.ens()`.
+Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. When the address is set, the web app sends `launch`, `buy`, `sell` (and ERC-20 `approve` before `sell` when allowance is short) only for tokens that came from a `Launched` log or a live `launch` receipt. Mock seed coins and `prototypeCoinFromName` rows are never simulate or write targets and do not render the trade box. `claimCreatorFee` is sent from a live prophet's own page (`prophetOf(wallet)` matches the name) only when `creatorFeeOf(wallet)` is greater than 0; the Claim fees button stays disabled (existing style) when the view is 0 so the send does not revert `ZeroAmount`. Mock prophet rows do not send it. `minTokensOut` / `minEthOut` use a 1% band under the local curve quote. `buy` / `sell` have no deadline argument; `launch` uses the form deadline. Empty address keeps the local mock store. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0. The web app does not read `ENS_ADAPTER_ADDRESS`; if it needs the adapter it calls `launchpad.ens()`.
 
 After a successful send, infra writes a machine-readable record (no secrets) to `deployments/sepolia.json`, or `deployments/anvil.json` on a local / fork run (gitignored). Format: [`infra/README.md`](../infra/README.md) “Deployment record”. Web copies `launchpad` into `VITE_LAUNCHPAD_ADDRESS` and `launchpadBlock` into `VITE_LAUNCHPAD_DEPLOY_BLOCK` (optional; empty means the web uses a recent block range). `hook` / `locker` / `poolManager` are recorded after `setUniswap`; optional `VITE_HOOK_ADDRESS` / `VITE_LOCKER_ADDRESS` copy the first two. Path A adds `ccaFactory` / `ccaLens` (section 9). `VITE_CHAIN_ID` stays `11155111` on Sepolia.
 

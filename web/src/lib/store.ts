@@ -19,8 +19,12 @@ export type Coin = CurveState & {
   creator: string;
   createdAt: number;
   history: { at: number; mcap: number }[];
-  /** Token address when known (ENS / Launchpad). Used to read curve().complete. */
+  /** Token address when known (ENS / Launchpad / live launch). Used to read curve().complete. */
   token?: `0x${string}`;
+  /** From Launchpad.curve. Used in chain mode so graduation is not inferred from the prototype sold count. */
+  complete?: boolean;
+  /** Set when the row came from a Launched log or a live launch receipt. */
+  fromChain?: boolean;
 };
 
 /** A one-line memo attached to a trade. */
@@ -173,10 +177,27 @@ export function useStore(): State {
 }
 
 export const actions = {
-  create(input: { name: string; ticker: string; prophecy: string; firstBuy: number }): string {
-    const id = newId();
+  create(input: {
+    name: string;
+    ticker: string;
+    prophecy: string;
+    firstBuy: number;
+    id?: string;
+    token?: `0x${string}`;
+    fromChain?: boolean;
+  }): string {
+    const id = input.id ?? newId();
     const now = Date.now();
-    let next = applyCreate(state, { id, ...input, creator: YOU, createdAt: now });
+    let next = applyCreate(state, {
+      id,
+      name: input.name,
+      ticker: input.ticker,
+      prophecy: input.prophecy,
+      creator: YOU,
+      createdAt: now,
+      token: input.token,
+      fromChain: input.fromChain,
+    });
     if (input.firstBuy > 0) next = applyBuy(next, YOU, id, Math.min(input.firstBuy, next.balance), now);
     set(next);
     return id;
@@ -189,6 +210,34 @@ export const actions = {
   },
   comment(coinId: string, text: string) {
     set(applyComment(state, YOU, coinId, text, Date.now()));
+  },
+  applyChainSnapshot(input: {
+    coinId: string;
+    sold: number;
+    ethRaised: number;
+    balance: number;
+    tokensHeld: number;
+  }) {
+    const coin = state.coins.find((c) => c.id === input.coinId);
+    const now = Date.now();
+    let next: State = { ...state, balance: input.balance };
+    if (coin) {
+      const updated: Coin = { ...coin, sold: input.sold, ethRaised: input.ethRaised };
+      updated.history = [...coin.history, { at: now, mcap: marketCap(updated) }];
+      next = { ...next, coins: state.coins.map((c) => (c.id === input.coinId ? updated : c)) };
+    }
+    const prev = state.positions[YOU]?.[input.coinId] ?? { tokens: 0, cost: 0 };
+    next = {
+      ...next,
+      positions: {
+        ...state.positions,
+        [YOU]: {
+          ...state.positions[YOU],
+          [input.coinId]: { tokens: input.tokensHeld, cost: prev.cost },
+        },
+      },
+    };
+    set(next);
   },
   reset() {
     set(seed(Date.now()));
