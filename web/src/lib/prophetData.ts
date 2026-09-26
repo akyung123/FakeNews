@@ -10,7 +10,7 @@
  * Sentences must come through this module. Screen components never hardcode them.
  */
 import { CURVE_SUPPLY as PROTOTYPE_CURVE_SUPPLY } from "./curve";
-import { MOCK_PARENT_NAME, MOCK_PROPHETS, MOCK_PROPHECIES } from "./mock";
+import { GRADUATION_ETH, MOCK_PARENT_NAME, MOCK_PROPHETS, MOCK_PROPHECIES } from "./mock";
 import { marketCap, type Coin } from "./store";
 
 /** Curve supply from SPEC.md. Used only to turn `sold` into a 0–1 bar. */
@@ -101,7 +101,7 @@ export function prototypeCoinFromName(name: string, nowSec?: number): Coin | nul
     creator: p.ensName.split(".").slice(1).join("."),
     createdAt,
     sold,
-    ethRaised: p.complete ? 0.02 : sold > 0 ? 0.001 : 0,
+    ethRaised: p.complete ? GRADUATION_ETH : sold > 0 ? 0.001 : 0,
     history: [],
   };
   coin.history = [

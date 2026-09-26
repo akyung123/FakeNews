@@ -2,13 +2,13 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
-import { graduated, progress, quoteBuy, quoteSell } from "../lib/curve";
-import { ago, eth, mcap, tokens } from "../lib/format";
+import { graduated, progress, quoteBuy, quoteSell, TOTAL_SUPPLY } from "../lib/curve";
+import { ago, eth, tokens } from "../lib/format";
+import { GRADUATION_ETH } from "../lib/mock";
 import { prototypeCoinFromName } from "../lib/prophetData";
 import {
   actions,
   holderCount,
-  marketCap,
   myPosition,
   useStore,
   type Coin,
@@ -48,7 +48,7 @@ export function CoinPage() {
             </div>
           </div>
           <h1 className="prophecy-title">{coin.prophecy}</h1>
-          <p className="big-num">{mcap(marketCap(coin))}</p>
+          <p className="big-num">{curveProgressHeader(coin)}</p>
           {graduated(coin) ? (
             <p className="up">Graduated to Uniswap V4</p>
           ) : (
@@ -167,8 +167,14 @@ function PostBox({ coinId, holds }: { coinId: string; holds: boolean }) {
   );
 }
 
+function curveProgressHeader(coin: Coin): string {
+  const pctFilled = Math.round(progress(coin) * 100);
+  const raised = (pctFilled / 100) * GRADUATION_ETH;
+  return `${pctFilled}% ${raised.toFixed(4)} / ${GRADUATION_ETH} ETH`;
+}
+
 function Sparkline({ coin }: { coin: Coin }) {
-  const points = coin.history.map((h) => h.mcap);
+  const points = coin.history.map((h) => h.mcap / TOTAL_SUPPLY);
   if (points.length < 2) return null;
   const w = 600;
   const h = 120;
