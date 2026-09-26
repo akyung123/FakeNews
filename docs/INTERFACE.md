@@ -13,7 +13,7 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 | Name | Address record (coinType 60) | Text records | Who can write |
 |---|---|---|---|
 | `<prophet>.prophecy.eth` | prophet wallet | `avatar`, `description` | prophet only (per-key role) |
-| `<slug>.<prophet>.prophecy.eth` | prophecy token | `prophecy` = sentence (1–140 chars) | **nobody** (written at init only) |
+| `<slug>.<prophet>.prophecy.eth` | prophecy token | `prophecy` = sentence (1–140 UTF-8 bytes; `BadProphecy`) | **nobody** (written at init only) |
 | | | `deadline` = unix seconds, decimal string | **nobody** |
 | | | `avatar`, `description` | prophet only |
 
@@ -96,7 +96,10 @@ event UniswapSet(address poolManager, address hook, address locker);
   - Sell: fee rounds up, ETH out rounds down.
 - Write-facing custom errors (names match `Launchpad.sol`). The web maps these six so a revert can show a human sentence instead of a raw name:
   `NullifierUsed`, `LabelTaken`, `AlreadyProphet`, `SlugTaken`, `Slippage`, `CurveComplete`.
+  `registerProphet` checks in this order: `NullifierUsed`, `AlreadyProphet`, `LabelTaken`, `InvalidSignature`.
+  `CurveComplete` can come from `buy` or `sell`.
   Other custom errors on the contract stay a generic write failure. Wallet rejection is not a revert.
+- The web prevents these before a send (no extra revert banners): `MemoTooLong` (buy/sell memo, 140 UTF-8 bytes), `BadProphecy` (sentence, 1–140 UTF-8 bytes), `NotProphet` (`launch` only after `registerProphet` succeeds or `prophetOf(wallet)` is a non-empty label).
 
 ### `ProphecyToken`
 

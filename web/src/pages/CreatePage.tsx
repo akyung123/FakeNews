@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { WorldGate } from "../components/WorldGate";
 import {
   fromDatetimeLocalValue,
   isIssueFormValid,
+  isIssueSubmitEnabled,
   isLaunchEnabled,
+  isRegisterSubmitEnabled,
   ISSUE_COPY,
   launchButtonLabel,
   prophecyName,
@@ -13,9 +15,10 @@ import {
   toDatetimeLocalValue,
   worldUserMessage,
   type IssueSession,
+  type RegisterStatus,
   type WorldStatus,
 } from "../lib/issue";
-import { createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
+import { createReadProphetOf, createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_ISSUE_SESSION, MOCK_PARENT_NAME, MOCK_RETURNING_SESSION } from "../lib/mock";
 import { actions } from "../lib/store";
 import {
@@ -45,6 +48,7 @@ export type IssueScreenProps = {
   onIssued?: (id: string) => void;
   registerProphet?: (input: RegisterProphetInput) => Promise<void>;
   launchProphecy?: (input: LaunchInput) => Promise<`0x${string}` | null>;
+  lookupProphet?: (wallet: string) => Promise<string>;
 };
 
 export function resolveIssueSession(search: URLSearchParams, storedLabel = readStoredProphetLabel()): IssueSession {
@@ -68,9 +72,12 @@ export function IssueScreen({
   onIssued,
   registerProphet = createRegisterProphet(),
   launchProphecy,
+  lookupProphet,
 }: IssueScreenProps) {
   const navigate = useNavigate();
-  const returningProphet = Boolean(session.prophetLabel);
+  const readProphet = useMemo(() => lookupProphet ?? createReadProphetOf(), [lookupProphet]);
+  const [onChainLabel, setOnChainLabel] = useState("");
+  const returningProphet = Boolean(session.prophetLabel || onChainLabel);
   const [prophetLabel, setProphetLabel] = useState(session.prophetLabel ?? "");
   const [prophecy, setProphecy] = useState("");
   const [slug, setSlug] = useState("");
@@ -79,7 +86,7 @@ export function IssueScreen({
   const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
   const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
-  const [registerStatus, setRegisterStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
+  const [registerStatus, setRegisterStatus] = useState<RegisterStatus>("idle");
   const [writeBusy, setWriteBusy] = useState(false);
   const [writePhase, setWritePhase] = useState<WritePhase | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
@@ -87,6 +94,18 @@ export function IssueScreen({
 
   const deadlineUnix = fromDatetimeLocalValue(deadlineLocal);
   const nowSeconds = Math.floor(now / 1000);
+  useEffect(() => {
+    let cancelled = false;
+    void readProphet(session.wallet).then((label) => {
+      if (cancelled || !label) return;
+      setOnChainLabel(label);
+      setProphetLabel((prev) => prev || label);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [readProphet, session.wallet]);
+
   const formValid = isIssueFormValid({
     prophetLabel,
     prophecy,
@@ -95,7 +114,10 @@ export function IssueScreen({
     firstBuy,
     nowSeconds,
   });
-  const canLaunch = isLaunchEnabled({ returningProphet, worldStatus, formValid });
+  const gate = { returningProphet, worldStatus, formValid, registerStatus };
+  const canLaunch = isLaunchEnabled(gate);
+  const canRegister = isRegisterSubmitEnabled(gate);
+  const canSubmit = isIssueSubmitEnabled(gate);
   const registerBusy = registerStatus === "pending";
   const busy = registerBusy || writeBusy;
   const pending = writeBusy
@@ -108,7 +130,7 @@ export function IssueScreen({
   const error =
     writeError ??
     (returningProphet || worldStatus === "pending" || busy ? null : worldUserMessage(worldError));
-  const submitLabel = launchButtonLabel({ returningProphet, worldStatus, canLaunch });
+  const submitLabel = launchButtonLabel({ returningProphet, worldStatus, canLaunch, canRegister });
   const fullName = prophetLabel && slug ? prophecyName(slug, prophetLabel, parentName) : "";
   const pendingTestId = writeBusy ? "write-pending" : registerBusy ? "register-pending" : "world-pending";
 
@@ -129,11 +151,11 @@ export function IssueScreen({
         className="block create"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!canLaunch || busy) return;
-          if (!returningProphet && !verified) return;
+          if (!canSubmit || busy) return;
           void (async () => {
             setWriteError(null);
-            if (!returningProphet && verified && registerProphet) {
+            if (canRegister) {
+              if (!verified) return;
               setRegisterStatus("pending");
               try {
                 await registerProphet({
@@ -146,9 +168,10 @@ export function IssueScreen({
                 const message = writeErrorMessage(err, "registerProphet");
                 setRegisterStatus(message ? "failed" : "idle");
                 setWriteError(message);
-                return;
               }
+              return;
             }
+            if (!canLaunch) return;
             setWriteBusy(true);
             setWritePhase("wallet");
             setWriteSuccess(null);
@@ -296,7 +319,12 @@ export function IssueScreen({
           </p>
         ) : null}
 
-        <button type="submit" className="btn primary full" disabled={!canLaunch || busy}>
+        <button
+          type="submit"
+          className="btn primary full"
+          data-testid={canLaunch ? "launch-submit" : canRegister ? "register-submit" : "issue-submit"}
+          disabled={!canSubmit || busy}
+        >
           {submitLabel}
         </button>
         {!returningProphet && worldStatus !== "success" ? (

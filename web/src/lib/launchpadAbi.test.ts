@@ -47,6 +47,28 @@ describe("Launchpad ABI from #25", () => {
     expect(ev.inputs.some((input) => input.name === "deadline")).toBe(false);
   });
 
+  it("includes the six write-facing custom errors for revert decoding", () => {
+    const names = launchpadAbi.filter((item) => item.type === "error").map((item) => item.name);
+    for (const name of ["NullifierUsed", "LabelTaken", "AlreadyProphet", "SlugTaken", "Slippage", "CurveComplete"]) {
+      expect(names).toContain(name);
+    }
+    for (const extra of [
+      "InvalidSignature",
+      "NotProphet",
+      "MemoTooLong",
+      "BadProphecy",
+      "BadSlug",
+      "BadLabel",
+      "ZeroAmount",
+      "UnexpectedEth",
+      "NotDeployer",
+      "UniswapAlreadySet",
+      "UniswapNotSet",
+    ]) {
+      expect(names).toContain(extra);
+    }
+  });
+
   it("constructor ends at ens; setUniswap is not in this ABI (graduation PR)", () => {
     const ctor = entry("constructor");
     if (!ctor || ctor.type !== "constructor") throw new Error("missing constructor");

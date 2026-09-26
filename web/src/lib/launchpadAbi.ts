@@ -1,6 +1,8 @@
 /**
- * Launchpad ABI from contracts/src/Launchpad.sol at d34aff8 (PR #25).
+ * Launchpad ABI from contracts/src/Launchpad.sol.
  *
+ * Custom errors match the source (and forge `out/Launchpad.sol/Launchpad.json`
+ * when present): every `error` on Launchpad so viem can decode reverts.
  * Constructor ends at ens: (protocolFeeRecipient, worldSigner, ens).
  * Uniswap addresses are not constructor args; graduation adds one-time
  * setUniswap(poolManager, hook, locker). Launched has no deadline.
@@ -226,4 +228,8 @@ export const launchpadAbi = [
   { type: "error", name: "ZeroAddress", inputs: [] },
   { type: "error", name: "Reentrant", inputs: [] },
   { type: "error", name: "TokenTransferFailed", inputs: [] },
+  { type: "error", name: "UnexpectedEth", inputs: [] },
+  { type: "error", name: "NotDeployer", inputs: [] },
+  { type: "error", name: "UniswapAlreadySet", inputs: [] },
+  { type: "error", name: "UniswapNotSet", inputs: [] },
 ] as const;

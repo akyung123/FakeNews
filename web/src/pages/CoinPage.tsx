@@ -17,6 +17,11 @@ import {
   type Coin,
 } from "../lib/store";
 import {
+  MEMO_COPY,
+  isMemoTooLong,
+  memoRemainingLabel,
+} from "../lib/limits";
+import {
   createBuy,
   createSell,
   ethInputToWei,
@@ -136,19 +141,21 @@ function TradeBox({
 }) {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("0.001");
+  const [memo, setMemo] = useState("");
   const [pending, setPending] = useState(false);
   const [phase, setPhase] = useState<WritePhase | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const value = Number(amount) || 0;
   const closed = graduated(coin);
+  const memoTooLong = isMemoTooLong(memo);
 
   const buyQuote = quoteBuy(coin, Math.min(value, balance));
   const sellTokens = Math.min(held, (held * Math.min(value, 100)) / 100);
   const sellQuote = quoteSell(coin, sellTokens).eth;
 
   function submit() {
-    if (pending) return;
+    if (pending || memoTooLong) return;
     const token = liveTokenAddress(coin.id, coin.token);
     const onChain = hasLaunchpad() && Boolean(token);
     if (!onChain || !token) {
@@ -166,7 +173,7 @@ function TradeBox({
           const sent = await sendBuy({
             token,
             ethIn: ethInputToWei(value),
-            memo: "",
+            memo,
             curve: coin,
             onPhase: setPhase,
           });
@@ -176,7 +183,7 @@ function TradeBox({
           const sent = await sendSell({
             token,
             tokensIn,
-            memo: "",
+            memo,
             curve: coin,
             onPhase: setPhase,
           });
@@ -207,6 +214,22 @@ function TradeBox({
         <span>{side === "buy" ? "Amount (ETH)" : "Amount (% of holding)"}</span>
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
+      <label className="field">
+        <span>Memo</span>
+        <input
+          aria-label="Memo"
+          value={memo}
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="Optional"
+          onChange={(e) => setMemo(e.target.value)}
+        />
+        {memoTooLong ? null : (
+          <span className="faint small" data-testid="memo-left">
+            {memoRemainingLabel(memo)}
+          </span>
+        )}
+      </label>
       <div className="quick">
         {(side === "buy" ? ["0.0005", "0.001", "0.002", "0.005"] : ["25", "50", "100"]).map((q) => (
           <button type="button" key={q} onClick={() => setAmount(q)}>
@@ -228,10 +251,15 @@ function TradeBox({
           {error}
         </p>
       ) : null}
+      {memoTooLong ? (
+        <p className="banner-error" role="alert">
+          {MEMO_COPY.tooLong}
+        </p>
+      ) : null}
       <button
         type="button"
         className={`btn ${side === "buy" ? "primary" : "sell"} full`}
-        disabled={pending || closed || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
+        disabled={pending || closed || memoTooLong || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
         onClick={submit}
       >
         {pending && phase === "approve"

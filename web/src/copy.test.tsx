@@ -7,6 +7,7 @@ import { gwei, mcap } from "./lib/format";
 import { ISSUE_COPY } from "./lib/issue";
 import { SEED_EVENTS } from "./lib/mock";
 import { WRITE_COPY } from "./lib/writes";
+import { MEMO_COPY } from "./lib/limits";
 import { WRITE_REVERT_COPY } from "./lib/writeErrors";
 
 const NEW_MEMOS = [
@@ -187,6 +188,14 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(create).toContain("It becomes a token.");
     expect(create).not.toContain(WRITE_COPY.failed);
     assertRemoved(create);
+  });
+
+  test("trade memo limit copy never says bytes", () => {
+    expect(MEMO_COPY.tooLong).toBe("Memo is too long. Shorten it to trade.");
+    expect(MEMO_COPY.tooLong.toLowerCase()).not.toMatch(/byte/);
+    const held = renderApp("/coin/wifi");
+    expect(held).toContain("140 left");
+    expect(held).not.toContain("bytes");
   });
 
   test("write revert banners use the designer sentences for the six Launchpad errors", () => {

@@ -18,6 +18,7 @@ function renderIssue(
     world?: WorldClient;
     registerProphet?: IssueScreenProps["registerProphet"];
     launchProphecy?: IssueScreenProps["launchProphecy"];
+    lookupProphet?: IssueScreenProps["lookupProphet"];
     onIssued?: (id: string) => void;
   } = {},
 ) {
@@ -29,6 +30,7 @@ function renderIssue(
         now={NOW}
         registerProphet={extras.registerProphet}
         launchProphecy={extras.launchProphecy}
+        lookupProphet={extras.lookupProphet}
         onIssued={extras.onIssued}
       />
     </MemoryRouter>,
@@ -38,6 +40,7 @@ function renderIssue(
 type IssueScreenProps = {
   registerProphet?: (input: RegisterProphetInput) => Promise<void>;
   launchProphecy?: (input: LaunchInput) => Promise<`0x${string}` | null>;
+  lookupProphet?: (wallet: string) => Promise<string>;
 };
 
 async function fillFirstTimeForm(user: ReturnType<typeof userEvent.setup>) {
@@ -340,6 +343,9 @@ describe("Screen 2 button gating", () => {
         serverSig: MOCK_WORLD_VERIFY.serverSig,
       },
     ]));
+    expect(issued).toEqual([]);
+    await waitFor(() => expect(screen.getByTestId("launch-submit")).toBeEnabled());
+    await user.click(screen.getByTestId("launch-submit"));
     await waitFor(() => expect(issued).toHaveLength(1));
     expect(screen.getByTestId("register-success")).toHaveTextContent(ISSUE_COPY.registerSuccess);
     expect(screen.getByTestId("register-success")).toHaveTextContent("Your name is claimed on Sepolia.");
@@ -416,6 +422,57 @@ describe("Screen 2 button gating", () => {
     expect(launchButton()).toBeEnabled();
     expect(launchButton()).toHaveTextContent(ISSUE_COPY.launch);
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("hides launch until registerProphet succeeds", async () => {
+    const user = userEvent.setup();
+    const launched: LaunchInput[] = [];
+    renderIssue(MOCK_ISSUE_SESSION, {
+      registerProphet: async () => undefined,
+      launchProphecy: async (input) => {
+        launched.push(input);
+        return null;
+      },
+    });
+    await fillFirstTimeForm(user);
+    await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
+    await waitFor(() => expect(launchButton()).toBeEnabled());
+    expect(screen.queryByTestId("launch-submit")).toBeNull();
+    expect(screen.getByTestId("register-submit")).toBeEnabled();
+    await user.click(launchButton());
+    await waitFor(() => expect(screen.getByTestId("register-success")).toBeInTheDocument());
+    expect(launched).toEqual([]);
+    expect(screen.getByTestId("launch-submit")).toBeEnabled();
+  });
+
+  it("skips registerProphet when prophetOf already returns a label", async () => {
+    const user = userEvent.setup();
+    const registered: RegisterProphetInput[] = [];
+    const issued: string[] = [];
+    renderIssue(MOCK_ISSUE_SESSION, {
+      lookupProphet: async () => "mina",
+      registerProphet: async (input) => {
+        registered.push(input);
+      },
+      onIssued: (id) => issued.push(id),
+    });
+    await waitFor(() => expect(screen.getByLabelText(/Prophet name/i)).toHaveValue("mina"));
+    await fillReturningForm(user);
+    expect(screen.queryByRole("button", { name: ISSUE_COPY.prove })).toBeNull();
+    expect(screen.getByTestId("launch-submit")).toBeEnabled();
+    await user.click(launchButton());
+    await waitFor(() => expect(issued).toHaveLength(1));
+    expect(registered).toEqual([]);
+  });
+
+  it("keeps Issue off when the prophecy exceeds the UTF-8 byte limit", async () => {
+    const user = userEvent.setup();
+    renderIssue(MOCK_RETURNING_SESSION);
+    await user.click(screen.getByLabelText(/^Prophecy$/i));
+    await user.paste("한".repeat(47));
+    await user.type(screen.getByLabelText(/^Slug$/i), "coffee-last");
+    expect(launchButton()).toBeDisabled();
+    expect(screen.queryByTestId("launch-submit")).toBeNull();
   });
 
   it("does not enable Issue on a first-time path with an empty form after success", async () => {

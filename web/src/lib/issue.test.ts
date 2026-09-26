@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   fromDatetimeLocalValue,
   isIssueFormValid,
+  isIssueSubmitEnabled,
   isLaunchEnabled,
+  isRegisterSubmitEnabled,
   isValidDeadline,
   isValidFirstBuy,
   isValidProphetLabel,
@@ -32,11 +34,13 @@ describe("issue field rules", () => {
     expect(isValidSlug("lingo-")).toBe(false);
   });
 
-  it("requires a one-line prophecy of 1–140 characters", () => {
+  it("requires a one-line prophecy of 1–140 characters and 1–140 UTF-8 bytes", () => {
     expect(isValidProphecy("x")).toBe(true);
     expect(isValidProphecy("")).toBe(false);
     expect(isValidProphecy("  ")).toBe(false);
     expect(isValidProphecy("x".repeat(141))).toBe(false);
+    expect(isValidProphecy("한".repeat(46))).toBe(true);
+    expect(isValidProphecy("한".repeat(47))).toBe(false);
   });
 
   it("requires a deadline in the future", () => {
@@ -72,15 +76,30 @@ describe("launch button gating", () => {
 
   it("stays off for a first-time prophet until World succeeds", () => {
     expect(isIssueFormValid(valid)).toBe(true);
-    expect(isLaunchEnabled({ returningProphet: false, worldStatus: "idle", formValid: true })).toBe(false);
-    expect(isLaunchEnabled({ returningProphet: false, worldStatus: "pending", formValid: true })).toBe(false);
-    expect(isLaunchEnabled({ returningProphet: false, worldStatus: "cancelled", formValid: true })).toBe(false);
-    expect(isLaunchEnabled({ returningProphet: false, worldStatus: "failed", formValid: true })).toBe(false);
-    expect(isLaunchEnabled({ returningProphet: false, worldStatus: "success", formValid: true })).toBe(true);
+    expect(isIssueSubmitEnabled({ returningProphet: false, worldStatus: "idle", formValid: true })).toBe(false);
+    expect(isIssueSubmitEnabled({ returningProphet: false, worldStatus: "pending", formValid: true })).toBe(false);
+    expect(isIssueSubmitEnabled({ returningProphet: false, worldStatus: "cancelled", formValid: true })).toBe(false);
+    expect(isIssueSubmitEnabled({ returningProphet: false, worldStatus: "failed", formValid: true })).toBe(false);
+    expect(isRegisterSubmitEnabled({ returningProphet: false, worldStatus: "success", formValid: true })).toBe(true);
+    expect(isLaunchEnabled({ returningProphet: false, worldStatus: "success", formValid: true })).toBe(false);
+  });
+
+  it("hides launch until the name is on chain", () => {
+    expect(isLaunchEnabled({ returningProphet: false, worldStatus: "success", formValid: true })).toBe(false);
+    expect(
+      isLaunchEnabled({
+        returningProphet: false,
+        worldStatus: "success",
+        formValid: true,
+        registerStatus: "success",
+      }),
+    ).toBe(true);
+    expect(isRegisterSubmitEnabled({ returningProphet: true, worldStatus: "idle", formValid: true })).toBe(false);
   });
 
   it("stays off when the form is incomplete even after success", () => {
     expect(isLaunchEnabled({ returningProphet: false, worldStatus: "success", formValid: false })).toBe(false);
+    expect(isIssueSubmitEnabled({ returningProphet: false, worldStatus: "success", formValid: false })).toBe(false);
   });
 
   it("skips World for a returning prophet", () => {
@@ -100,7 +119,12 @@ describe("launch button gating", () => {
       launchButtonLabel({ returningProphet: false, worldStatus: "cancelled", canLaunch: false }),
     ).toBe(ISSUE_COPY.disabledLaunch);
     expect(
-      launchButtonLabel({ returningProphet: false, worldStatus: "success", canLaunch: true }),
+      launchButtonLabel({
+        returningProphet: false,
+        worldStatus: "success",
+        canLaunch: false,
+        canRegister: true,
+      }),
     ).toBe(ISSUE_COPY.launch);
   });
 });
