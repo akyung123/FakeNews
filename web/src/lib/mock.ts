@@ -12,6 +12,94 @@
 // Do not mix those exports with the Screen 4 block.
 // ---------------------------------------------------------------------------
 
+import registerProphetSignature from "../../../world/fixture/register-prophet-signature.json";
+
+type Hex = `0x${string}`;
+
+/** First-time session: no prophet name yet, so World ID is required. */
+export const MOCK_ISSUE_SESSION = {
+  wallet: "0xa11ce00000000000000000000000000000000000" as const,
+  prophetLabel: null as string | null,
+};
+
+/** Returning prophet: already has a name, so World ID is skipped. */
+export const MOCK_RETURNING_SESSION = {
+  wallet: "0xb0b0000000000000000000000000000000000000" as const,
+  prophetLabel: "ringo",
+};
+
+/** Same action / ids the world/ server tests use. */
+export const MOCK_WORLD_APP_ID = "app_test_prophecy";
+export const MOCK_WORLD_ACTION = "register-prophet";
+export const MOCK_WORLD_RP_ID = "rp_test_prophecy";
+export const MOCK_WORLD_ENVIRONMENT = "staging" as const;
+
+/** Sepolia. Values come from world/fixture/register-prophet-signature.json. */
+export const MOCK_WORLD_CHAIN_ID = registerProphetSignature.chainId;
+export const MOCK_WORLD_LAUNCHPAD = registerProphetSignature.launchpad as Hex;
+export const MOCK_WORLD_WALLET = registerProphetSignature.wallet as Hex;
+export const MOCK_WORLD_NULLIFIER = registerProphetSignature.nullifier as Hex;
+
+/** IDKit 4 rp_context object (inner field of GET /rp-context). */
+export const MOCK_RP_CONTEXT = {
+  rp_id: MOCK_WORLD_RP_ID,
+  nonce: "0x6d6f636b2d6e6f6e63652d70726f7068656379",
+  created_at: 1_790_380_800,
+  expires_at: 1_790_381_100,
+  signature:
+    "0x1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+};
+
+/** GET /rp-context body published by world/README.md. */
+export const MOCK_RP_CONTEXT_RESPONSE = {
+  app_id: MOCK_WORLD_APP_ID,
+  action: MOCK_WORLD_ACTION,
+  environment: MOCK_WORLD_ENVIRONMENT,
+  rp_context: MOCK_RP_CONTEXT,
+};
+
+/** IDKit 4 uniqueness proof from world/test/helpers.ts uniquenessProof(). */
+export const MOCK_IDKIT_RESULT = {
+  protocol_version: "4.0" as const,
+  nonce: "0xabc123",
+  action: MOCK_WORLD_ACTION,
+  environment: MOCK_WORLD_ENVIRONMENT,
+  responses: [
+    {
+      identifier: "proof_of_human",
+      issuer_schema_id: 1,
+      nullifier: MOCK_WORLD_NULLIFIER,
+      expires_at_min: 49_012_345,
+      proof: ["0x111", "0x222", "0x333", "0x444", "0x555"],
+      signal_hash: "0x0",
+    },
+  ],
+};
+
+/**
+ * POST /verify success. nullifier + serverSig imported from
+ * world/fixture/register-prophet-signature.json
+ * (EIP-191 personal_sign of keccak256(abi.encode(uint256 chainId, address launchpad, address wallet, uint256 nullifier))).
+ */
+export const MOCK_WORLD_VERIFY = {
+  nullifier: MOCK_WORLD_NULLIFIER,
+  serverSig: registerProphetSignature.serverSig as Hex,
+};
+
+/** GET /health. Signer address imported from the world/ fixture. */
+export const MOCK_WORLD_HEALTH = {
+  ok: true as const,
+  signer: registerProphetSignature.signer,
+};
+
+export const DEFAULT_WORLD_SERVER_URL = "http://localhost:8787";
+
+export const MOCK_ISSUE_PLACEHOLDER = {
+  prophecy: "The venue projector survives the whole demo",
+  prophetLabel: "ringo",
+  slug: "lingo-2028",
+};
+
 // ---------------------------------------------------------------------------
 // Screen 4 — prophet page
 // ---------------------------------------------------------------------------

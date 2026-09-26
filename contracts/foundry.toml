@@ -1,5 +1,19 @@
 [profile.default]
 src = "src"
 out = "out"
+libs = ["lib"]
 test = "test"
 solc_version = "0.8.24"
+evm_version = "cancun"
+via_ir = true
+fs_permissions = [{ access = "read", path = "./" }]
+
+# ENSv2 at contracts-v2 `71a3b73` (docs/ENSV2.md section 0). Adapter compiles
+# against local interfaces; this remapping is for later Launchpad work.
+remappings = [
+    "@ensdomains/contracts-v2/=lib/contracts-v2/contracts/src/",
+    "@openzeppelin/contracts/=lib/contracts-v2/contracts/lib/openzeppelin-contracts/contracts/",
+]
+
+[fuzz]
+runs = 256
