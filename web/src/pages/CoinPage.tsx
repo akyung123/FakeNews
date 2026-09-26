@@ -12,6 +12,7 @@ import { usePoolPrice } from "../lib/cca/usePoolPrice";
 import { contracts, hasLaunchpad } from "../lib/contracts";
 import { coinPriceWei, coinProgress, coinRaisedWei } from "../lib/coinFigures";
 import { graduated, TOTAL_SUPPLY } from "../lib/curve";
+import { follow, unfollow, useFollowing } from "../lib/following";
 import { ago, ethToWei, formatEth, formatPrice, tokens } from "../lib/format";
 import {
   GRADUATED_BODY,
@@ -81,6 +82,7 @@ export function CoinPage({
   const poolPrice = usePoolPrice(coin?.token, contracts.hook);
   const ethBalance = useEthBalance();
   const tokenBalance = useTokenBalance(coin ? liveTokenAddress(coin.id, coin.token) : undefined);
+  const following = useFollowing();
   if (!coin) {
     if (chain && !chainReady) {
       return <main className="coin-page" />;
@@ -114,9 +116,15 @@ export function CoinPage({
                 <span className="faint">${coin.ticker}</span>
                 <SampleBadge />
               </div>
-              <p className="faint small">
-                by {coin.creator}
-                {ago(coin.createdAt) ? ` · ${ago(coin.createdAt)}` : null}
+              <p className="faint small coin-by">
+                {coin.creator ? (
+                  <>
+                    by <Link to={`/p/${coin.creator}`}>{coin.creator}</Link>{" "}
+                    <FollowToggle label={coin.creator} followed={following.includes(coin.creator.toLowerCase())} />
+                  </>
+                ) : null}
+                {coin.creator && ago(coin.createdAt) ? " · " : null}
+                {ago(coin.createdAt)}
               </p>
             </div>
           </div>
@@ -238,3 +246,15 @@ function auctionProgressHeader(coin: Coin): string {
   return raisedProgressCopy(coinRaisedWei(coin));
 }
 
+/** Same toggle as the prophet page header: Follow → Following, click again to unfollow. */
+function FollowToggle({ label, followed }: { label: string; followed: boolean }) {
+  return followed ? (
+    <button type="button" className="btn ghost small" aria-pressed="true" onClick={() => unfollow(label)}>
+      Following
+    </button>
+  ) : (
+    <button type="button" className="btn primary small" aria-pressed="false" onClick={() => follow(label)}>
+      Follow
+    </button>
+  );
+}
