@@ -222,9 +222,18 @@ main.narrow { max-width: 720px; }
 .launch:hover { border-color: var(--gold-500); }
 .launch .faint { color: var(--paper-muted); }
 .launch .up { color: var(--success-ink); }
-.launch-head { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+/* Name / ENS on the first line, ticker and date on the second; long text ends in "…". */
+.launch-head { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.launch-name,
+.launch-name .token-name,
+.launch-name .token-slug,
+.launch-name .token-ens { min-width: 0; max-width: 100%; }
+.launch-name .token-slug,
+.launch-name .token-ens { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+.launch-meta { display: flex; align-items: baseline; gap: 8px; min-width: 0; white-space: nowrap; }
+.launch-meta > span:first-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.launch-meta .small { margin-left: auto; flex-shrink: 0; }
 .launch-ticker { font-family: var(--font-mono); font-weight: 500; color: var(--gold-ink); }
-.launch-head .faint { margin-left: auto; }
 .launch-text {
   padding-top: 22px;
   font-family: var(--font-display);

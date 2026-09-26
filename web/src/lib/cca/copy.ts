@@ -5,7 +5,7 @@
  * `{claimBlock}`, `{migrationBlock}`, `{SYMBOL}`, `{minAmount}` are
  * interpolated by the helpers below.
  */
-import { formatEther } from "viem";
+import { formatEthAmount } from "../format";
 import { GRADUATION_ETH_WEI, SEPOLIA_BLOCK_SECONDS } from "./config";
 import { INTERFACE_CCA_TBD } from "./launchpadCca";
 
@@ -331,15 +331,15 @@ export function auctionLiveCopy(blocks: number): string {
 }
 
 export function raisedProgressCopy(raisedWei: bigint): string {
-  return fill(CCA_COPY.raisedProgress, { raised: formatEther(raisedWei) });
+  return fill(CCA_COPY.raisedProgress, { raised: formatEthAmount(raisedWei) });
 }
 
 export function refundUnusedCopy(amountWei: bigint): string {
-  return fill(CCA_COPY.refundUnused, { amount: formatEther(amountWei) });
+  return fill(CCA_COPY.refundUnused, { amount: formatEthAmount(amountWei) });
 }
 
 export function getEthBackCopy(amountWei: bigint): string {
-  return fill(CCA_COPY.getEthBack, { amount: formatEther(amountWei) });
+  return fill(CCA_COPY.getEthBack, { amount: formatEthAmount(amountWei) });
 }
 
 /** Goal-met leftover CTA vs goal-not-met full refund CTA. Same label for exitBid and exitPartiallyFilledBid. */

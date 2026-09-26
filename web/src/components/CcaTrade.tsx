@@ -16,7 +16,7 @@ import {
   exitHelpCopy,
   openMarketBeforeCopy,
   placeBid,
-  q96ToEthPerToken,
+  q96ToWeiPerToken,
   raisedProgressCopy,
   registerLocker,
   sendCcaWrite,
@@ -36,7 +36,7 @@ import { ccaFeatureFlags, type CcaFeatureFlags } from "../lib/cca/config";
 import { loadCcaAuction, type CcaAuctionSnapshot } from "../lib/cca/loadAuction";
 import { SEPOLIA_CHAIN_ID } from "../lib/env";
 import { graduated } from "../lib/curve";
-import { eth, tokens } from "../lib/format";
+import { eth, ethToWei, formatPrice, tokens } from "../lib/format";
 import { GRADUATION_ETH } from "../lib/mock";
 import { isCcaDemoMode } from "../lib/mode";
 import { actions, type Coin } from "../lib/store";
@@ -113,7 +113,7 @@ export function CcaTrade({
   const wrongChain = !demo && connectedChainId != null && connectedChainId !== SEPOLIA_CHAIN_ID;
   const writesBlocked = Boolean(pending) || wrongChain;
   const view = snap?.view;
-  const raisedWei = view?.currencyRaised ?? parseEther(Math.max(0, coin.ethRaised).toFixed(18));
+  const raisedWei = view?.currencyRaised ?? coin.raisedWei ?? ethToWei(coin.ethRaised);
   const goalReached = view?.goalReached ?? mockComplete;
   const header = auctionStatusCopy(
     copyStatus,
@@ -122,7 +122,7 @@ export function CcaTrade({
       : { blocks: view?.blocksRemaining ?? 0 },
   );
   const sub = auctionStatusSubCopy(copyStatus) ?? (copyStatus === "market_failed" ? CCA_COPY.marketFailedHelp : undefined);
-  const clearing = view ? q96ToEthPerToken(view.clearingPriceQ96) : undefined;
+  const clearing = view ? q96ToWeiPerToken(view.clearingPriceQ96) : undefined;
   const symbol = `$${coin.ticker}`;
   const showBid = copyStatus === "live" || copyStatus === "not_started" || copyStatus === "sold_out";
   const showSettle = copyStatus === "ended_not_finalized" || copyStatus === "graduated" || copyStatus === "failed" || copyStatus === "market_failed";
@@ -175,7 +175,7 @@ export function CcaTrade({
       <p className="faint">{raisedProgressCopy(raisedWei)}</p>
       <p className="faint small">
         {goalReached || mockComplete ? CCA_COPY.finalClearingPrice : CCA_COPY.currentClearingPrice}
-        {clearing ? ` · ${clearing} ETH` : ""}
+        {clearing ? ` · ${formatPrice(clearing)}` : ""}
       </p>
       <p className="faint small">{CCA_COPY.clearingPriceHelp}</p>
       {snap?.auction && snap.missing.length ? <p className="faint small">{MISSING_ADDRESS_COPY}</p> : null}
@@ -469,5 +469,5 @@ export function CcaTrade({
 
 export function mockRaisedProgress(coin: Coin): string {
   const raised = Math.min(GRADUATION_ETH, Math.max(0, coin.ethRaised));
-  return raisedProgressCopy(parseEther(raised.toFixed(18)));
+  return raisedProgressCopy(ethToWei(raised));
 }

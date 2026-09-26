@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { formatEther, parseEther } from "viem";
+import { formatEther } from "viem";
 import { CcaTrade } from "../components/CcaTrade";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
@@ -10,8 +10,9 @@ import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { CCA_COPY, raisedProgressCopy } from "../lib/cca";
 import { usePoolPrice } from "../lib/cca/usePoolPrice";
 import { contracts, hasLaunchpad } from "../lib/contracts";
-import { graduated, progress, TOTAL_SUPPLY } from "../lib/curve";
-import { ago, gwei, tokens } from "../lib/format";
+import { coinPriceWei, coinProgress, coinRaisedWei } from "../lib/coinFigures";
+import { graduated, TOTAL_SUPPLY } from "../lib/curve";
+import { ago, ethToWei, formatEth, formatPrice, tokens } from "../lib/format";
 import {
   GRADUATED_BODY,
   GRADUATED_LINK,
@@ -23,7 +24,6 @@ import { prototypeCoinFromName } from "../lib/prophetData";
 import {
   actions,
   myPosition,
-  price,
   useStore,
   type Coin,
 } from "../lib/store";
@@ -99,7 +99,6 @@ export function CoinPage({
   const held = chain ? (tokenBalance ?? 0) : (pos?.tokens ?? 0);
   const talk = s.comments.filter((c) => c.coinId === coin.id).sort((a, b) => b.at - a.at);
   const closed = graduated(coin) || Boolean(coin.complete);
-  const poolPriceEth = Number(formatEther(poolPrice.priceWei));
   const chartPoints = poolPrice.open
     ? poolPrice.history.map((p) => ({ at: p.at, value: Number(formatEther(p.wei)) }))
     : coin.history.map((h) => ({ at: h.at / 1000, value: h.mcap / TOTAL_SUPPLY }));
@@ -116,12 +115,13 @@ export function CoinPage({
                 <SampleBadge />
               </div>
               <p className="faint small">
-                by {coin.creator} · {ago(coin.createdAt)}
+                by {coin.creator}
+                {ago(coin.createdAt) ? ` · ${ago(coin.createdAt)}` : null}
               </p>
             </div>
           </div>
           <h1 className="prophecy-title">{coin.prophecy}</h1>
-          <p className="price-now">{gwei(poolPrice.open ? poolPriceEth : price(coin))}</p>
+          <p className="price-now">{formatPrice(poolPrice.open ? poolPrice.priceWei : coinPriceWei(coin))}</p>
           <p className="big-num">{auctionProgressHeader(coin)}</p>
           <p className="faint">
             {poolPrice.open
@@ -132,12 +132,12 @@ export function CoinPage({
           </p>
           <PriceChart
             points={chartPoints}
-            label={poolPrice.open ? "Pool price (ETH)" : "Price (ETH)"}
+            label={poolPrice.open ? "Pool price (ETH per token)" : "Price (ETH per token)"}
             live={poolPrice.open}
-            format={(value) => gwei(value)}
+            format={(value) => formatEth(ethToWei(value))}
             emptyText="No trades yet. The chart starts with the first trade."
           />
-          <Bar value={progress(coin)} labelled />
+          <Bar value={coinProgress(coin)} labelled />
         </section>
 
         <section className="block">
@@ -235,6 +235,6 @@ function PostBox({ coinId, holds }: { coinId: string; holds: boolean }) {
 }
 
 function auctionProgressHeader(coin: Coin): string {
-  const raisedWei = parseEther(Math.max(0, coin.ethRaised).toFixed(18));
-  return raisedProgressCopy(raisedWei);
+  return raisedProgressCopy(coinRaisedWei(coin));
 }
+

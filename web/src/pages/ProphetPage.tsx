@@ -8,7 +8,7 @@ import { loadMarketSnapshots, type MarketRow, type MarketSnapshot } from "../lib
 import { hasLaunchpad } from "../lib/contracts";
 import { avatarImageUrl } from "../lib/ens";
 import { follow, unfollow, useFollowing } from "../lib/following";
-import { ethFromWei } from "../lib/format";
+import { ethToWei, formatEth, formatPrice } from "../lib/format";
 import { createReadCreatorFee } from "../lib/launchpad";
 import { loadChainProphet, loadProfileText, type ProfileText } from "../lib/profile";
 import {
@@ -357,7 +357,7 @@ function PriceRow({ row, market }: { row: ProphetProphecy; market: MarketSnapsho
       <p className="post-text">
         <span className="faint">{market.priceLabel}</span>{" "}
         <span className="strong mono">
-          {market.priceWei > 0n ? `${ethFromWei(market.priceWei)} per token` : "Not set yet"}
+          {market.priceWei > 0n ? formatPrice(market.priceWei) : "Not set yet"}
         </span>
       </p>
       {points.length >= 2 ? (
@@ -365,7 +365,7 @@ function PriceRow({ row, market }: { row: ProphetProphecy; market: MarketSnapsho
           points={points}
           label={`${market.priceLabel} (ETH)`}
           live={market.status === "pool_open"}
-          format={(value) => ethFromWei(BigInt(Math.round(value * 1e18)))}
+          format={(value) => formatEth(ethToWei(value))}
         />
       ) : null}
     </li>
@@ -404,8 +404,7 @@ function ActivityTab({ data }: { data: ProphetPageData }) {
 }
 
 function formatFee(wei: bigint): string {
-  const value = formatEther(wei);
-  return `${value} ETH`;
+  return formatEth(wei);
 }
 
 function shortAddress(address: string): string {

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "./App";
 import { Web3Provider } from "./providers/Web3Provider";
-import { gwei, mcap } from "./lib/format";
+import { pricePerToken } from "./lib/format";
 import { ISSUE_COPY } from "./lib/issue";
 import { SEED_EVENTS } from "./lib/mock";
 import { WRITE_COPY, ZERO_QUOTE_COPY } from "./lib/writes";
@@ -165,11 +165,9 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(mine).toContain("Sell quote");
     expect(mine).toContain("trade memos");
     expect(mine).not.toContain("Return");
-    expect(mine).toContain("0.02702 gwei");
-    expect(mine).toContain("0.01773 gwei");
-    expect(mine).toContain(gwei(2.702024173734242e-11));
-    expect(mine).toContain(gwei(1.7727753707046925e-11));
-    expect(mine).not.toContain(mcap(0.017727753707046923));
+    expect(mine).toContain(pricePerToken(2.702024173734242e-11));
+    expect(mine).toContain(pricePerToken(1.7727753707046925e-11));
+    expect(mine).not.toContain("gwei");
     assertRemoved(mine);
   });
 

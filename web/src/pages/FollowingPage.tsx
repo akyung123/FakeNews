@@ -7,7 +7,7 @@ import { loadMarketSnapshots, type MarketRow, type MarketSnapshot } from "../lib
 import { hasLaunchpad } from "../lib/contracts";
 import { webEnv } from "../lib/env";
 import { unfollow, useFollowing } from "../lib/following";
-import { ago, ethFromWei } from "../lib/format";
+import { ago, formatPrice } from "../lib/format";
 import { ISSUE_COPY } from "../lib/issue";
 import { loadLaunchedCoins } from "../lib/launched";
 import {
@@ -252,7 +252,7 @@ function FeedPost({ item, market }: { item: FeedItem; market?: MarketSnapshot })
       <div className="post-head">
         <img src={DEFAULT_AVATAR} alt="" width={20} height={20} />
         <strong>{prophetEnsName(item.label, webEnv.parentName)}</strong>
-        {item.at != null ? <span className="faint small">{ago(item.at)}</span> : null}
+        {ago(item.at) ? <span className="faint small">{ago(item.at)}</span> : null}
       </div>
       <h2 className="post-text">{row.sentence || <TokenName slug={row.slug} ensName={row.ensName} />}</h2>
       <p className="post-meta">
@@ -268,7 +268,7 @@ function FeedPost({ item, market }: { item: FeedItem; market?: MarketSnapshot })
           {market.priceWei > 0n ? (
             <>
               {" "}
-              <span className="strong mono">{ethFromWei(market.priceWei)}</span>{" "}
+              <span className="strong mono">{formatPrice(market.priceWei)}</span>{" "}
               <span>{market.priceLabel}</span>
             </>
           ) : null}
