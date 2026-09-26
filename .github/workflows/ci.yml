@@ -33,10 +33,26 @@ jobs:
       - run: forge build
       - run: forge test -vv
 
+  detect-world:
+    # hashFiles is not valid on a job-level if. Detect after checkout instead.
+    runs-on: ubuntu-latest
+    outputs:
+      present: ${{ steps.detect.outputs.present }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect
+        run: |
+          if [[ -f world/package.json ]]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "world/ is not in the repo yet."
+          fi
+
   world:
-    # world/ is not in the repo yet. Keep the job so it starts checking
-    # as soon as the folder appears; do not fake a green result today.
-    if: ${{ hashFiles('world/package.json') != '' }}
+    # Skipped (not a fake pass) until world/package.json exists.
+    needs: detect-world
+    if: needs.detect-world.outputs.present == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:

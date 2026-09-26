@@ -132,7 +132,7 @@ Copy [`.env.example`](../.env.example) locally. Names only in git.
 |---|---|---|
 | `contracts` | `forge build` and `forge test` | Passes on the skeleton |
 | `web` | `bun install`, `lint`, `typecheck`, `build` | Passes. `lint` is `tsc --noEmit` until the web lane adds ESLint |
-| `world` | install / lint / typecheck / build / test | **Skipped** — `world/` is not in the repo. The job is kept so it runs when the folder appears. Not a fake pass. |
+| `world` | install / lint / typecheck / build / test | **Skipped** — `detect-world` looks for `world/package.json` after checkout (`hashFiles` is not allowed on a job-level `if`). Not a fake pass. |
 
 ## What this folder does not do
 
