@@ -40,6 +40,7 @@ import {
   writeErrorMessage,
   writePhaseCopy,
   WRITE_COPY,
+  ZERO_QUOTE_COPY,
   type BuyInput,
   type SellInput,
   type WritePhase,
@@ -204,11 +205,15 @@ export function TradeBox({
   const buyQuote = quoteBuy(coin, Math.min(value, balance));
   const sellTokens = Math.min(held, (held * Math.min(value, 100)) / 100);
   const sellQuote = quoteSell(coin, sellTokens).eth;
+  const cannotTrade = side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0 || sellQuote <= 0;
+  const rawBuyQuoteZero = quoteBuy(coin, value).tokens <= 0;
+  const rawSellQuoteZero = held > 0 && quoteSell(coin, (held * Math.min(value, 100)) / 100).eth <= 0;
+  const showTooSmallBanner = value > 0 && (side === "buy" ? rawBuyQuoteZero : rawSellQuoteZero);
   const writeTarget = isChainWriteTarget(coin);
   const showWrites = !chain || writeTarget;
 
   function submit() {
-    if (pending || memoTooLong || closed) return;
+    if (pending || memoTooLong || closed || cannotTrade) return;
     if (chain && !writeTarget) return;
     const token = liveTokenAddress(coin.id, coin.token);
     if (!writeTarget || !token) {
@@ -313,11 +318,16 @@ export function TradeBox({
           {MEMO_COPY.tooLong}
         </p>
       ) : null}
+      {showTooSmallBanner ? (
+        <p className="banner-error" role="alert">
+          {ZERO_QUOTE_COPY}
+        </p>
+      ) : null}
       {showWrites ? (
         <button
           type="button"
           className={`btn ${side === "buy" ? "primary" : "sell"} full`}
-          disabled={pending || memoTooLong || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
+          disabled={pending || memoTooLong || cannotTrade}
           onClick={submit}
         >
           {pending && phase === "approve"

@@ -2,10 +2,13 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it } from "vitest";
+import { mockGraduationState } from "../lib/graduation";
 import { MEMO_COPY, memoRemainingLabel } from "../lib/limits";
+import { prototypeCoinFromName } from "../lib/prophetData";
 import { actions } from "../lib/store";
+import { ZERO_QUOTE_COPY } from "../lib/writes";
 import { Web3Provider } from "../providers/Web3Provider";
-import { CoinPage } from "./CoinPage";
+import { CoinPage, TradeBox } from "./CoinPage";
 
 function renderWifi() {
   actions.reset();
@@ -39,5 +42,65 @@ describe("Screen 3 trade memo limit", () => {
     await user.click(screen.getByRole("button", { name: /^Sell$/i }));
     expect(screen.getByRole("button", { name: /Sell \$WIFI/i })).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveTextContent(MEMO_COPY.tooLong);
+  });
+});
+
+describe("Screen 3 zero-quote guard", () => {
+  it("disables Buy/Sell with no banner when the input is empty or 0", async () => {
+    const user = userEvent.setup();
+    renderWifi();
+    const amount = screen.getByLabelText(/Amount \(ETH\)/i);
+    await user.clear(amount);
+    expect(screen.queryByText(ZERO_QUOTE_COPY)).toBeNull();
+    expect(screen.queryByText("Amount too small to trade. Try a larger amount.")).toBeNull();
+    expect(screen.getByRole("button", { name: /Buy \$WIFI/i })).toBeDisabled();
+
+    await user.click(amount);
+    await user.paste("0");
+    expect(screen.queryByText(ZERO_QUOTE_COPY)).toBeNull();
+    expect(screen.getByRole("button", { name: /Buy \$WIFI/i })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /^Sell$/i }));
+    const sellAmount = screen.getByLabelText(/Amount \(% of holding\)/i);
+    await user.clear(sellAmount);
+    expect(screen.queryByText(ZERO_QUOTE_COPY)).toBeNull();
+    expect(screen.getByRole("button", { name: /Sell \$WIFI/i })).toBeDisabled();
+  });
+
+  it("shows the exact too-small line when the entered amount is > 0 and the quote is 0", async () => {
+    const user = userEvent.setup();
+    renderWifi();
+    const amount = screen.getByLabelText(/Amount \(ETH\)/i);
+    await user.clear(amount);
+    await user.click(amount);
+    await user.paste("0.000000000000000001");
+    expect(screen.getByRole("alert")).toHaveTextContent("Amount too small to trade. Try a larger amount.");
+    expect(screen.getByRole("alert")).toHaveTextContent(ZERO_QUOTE_COPY);
+    expect(screen.getByRole("button", { name: /Buy \$WIFI/i })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /^Sell$/i }));
+    const sellAmount = screen.getByLabelText(/Amount \(% of holding\)/i);
+    await user.clear(sellAmount);
+    await user.click(sellAmount);
+    await user.paste("0.000000000000000001");
+    expect(screen.getByRole("alert")).toHaveTextContent("Amount too small to trade. Try a larger amount.");
+    expect(screen.getByRole("button", { name: /Sell \$WIFI/i })).toBeDisabled();
+  });
+
+  it("does not show the too-small banner when ETH or token balance is 0 and the entered amount is > 0", async () => {
+    const user = userEvent.setup();
+    const coin = prototypeCoinFromName("badges-2028.ringo.prophecy.eth", 1_750_000_000)!;
+    const graduation = mockGraduationState(coin.token!, false);
+    render(<TradeBox coin={coin} balance={0} held={0} graduation={graduation} />);
+    expect(screen.getByLabelText(/Amount \(ETH\)/i)).toHaveValue("0.001");
+    expect(screen.queryByText(ZERO_QUOTE_COPY)).toBeNull();
+    expect(screen.queryByText("Amount too small to trade. Try a larger amount.")).toBeNull();
+    expect(screen.getByRole("button", { name: /Buy \$BADGES-2028/i })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /^Sell$/i }));
+    expect(screen.getByLabelText(/Amount \(% of holding\)/i)).toHaveValue("100");
+    expect(screen.queryByText(ZERO_QUOTE_COPY)).toBeNull();
+    expect(screen.queryByText("Amount too small to trade. Try a larger amount.")).toBeNull();
+    expect(screen.getByRole("button", { name: /Sell \$BADGES-2028/i })).toBeDisabled();
   });
 });
