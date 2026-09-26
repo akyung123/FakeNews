@@ -9,8 +9,8 @@ services:
     runtime: node
     plan: free
     rootDir: world
-    buildCommand: curl -fsSL https://bun.sh/install | bash && ~/.bun/bin/bun install
-    startCommand: ~/.bun/bin/bun start
+    buildCommand: bun install
+    startCommand: bun start
     healthCheckPath: /health
     envVars:
       - key: WORLD_APP_ID
