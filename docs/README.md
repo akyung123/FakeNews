@@ -6,9 +6,10 @@ Who reads what. Nobody needs to read everything.
 |-----|-------|------|
 | New teammate, not a developer | [`PRD.md`](PRD.md) | [`../README.md`](../README.md) "Status" |
 | New person or agent | [`../AGENTS.md`](../AGENTS.md) | [`PRD.md`](PRD.md), [`SPEC.md`](SPEC.md) |
-| Contracts | [`INTERFACE.md`](INTERFACE.md) | [`ENSV2.md`](ENSV2.md), [`PLAN.md`](PLAN.md) sections 1–2 |
-| Web | [`INTERFACE.md`](INTERFACE.md) | [`PLAN.md`](PLAN.md) section 3 |
+| Contracts | [`INTERFACE_CCA.md`](INTERFACE_CCA.md) | [`ENSV2.md`](ENSV2.md), [`PLAN.md`](PLAN.md) sections 1–2, 6 |
+| Web | [`INTERFACE_CCA.md`](INTERFACE_CCA.md) | [`PLAN.md`](PLAN.md) sections 3, 6 |
 | World server | [`INTERFACE.md`](INTERFACE.md) | [`PLAN.md`](PLAN.md) section 4 |
+| Uniswap reviewer | [`../FEEDBACK.md`](../FEEDBACK.md) | [`INTERFACE_CCA.md`](INTERFACE_CCA.md) sections 0, 4 |
 | "Why is it like this?" | [`DECISIONS.md`](DECISIONS.md) | — |
 
 ## Rules

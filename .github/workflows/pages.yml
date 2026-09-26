@@ -68,6 +68,10 @@ jobs:
           VITE_CHAIN_ID: ${{ vars.VITE_CHAIN_ID }}
           VITE_PARENT_NAME: ${{ vars.VITE_PARENT_NAME }}
           VITE_UNIVERSAL_RESOLVER: ${{ vars.VITE_UNIVERSAL_RESOLVER }}
+          # Auction screen sections. Empty = on (web/src/lib/cca/config.ts).
+          VITE_CCA_MIGRATE: ${{ vars.VITE_CCA_MIGRATE }}
+          VITE_CCA_SWAP: ${{ vars.VITE_CCA_SWAP }}
+          VITE_CCA_COLLECT: ${{ vars.VITE_CCA_COLLECT }}
           # Optional (PR #4). Empty vars must not fail the build.
           VITE_WALLETCONNECT_PROJECT_ID: ${{ vars.VITE_WALLETCONNECT_PROJECT_ID }}
           VITE_WORLD_SERVER_URL: ${{ vars.VITE_WORLD_SERVER_URL }}

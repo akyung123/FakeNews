@@ -54,22 +54,17 @@ export function addressesFromDeploymentRecord(record: SepoliaDeploymentRecord | 
   };
 }
 
+/**
+ * The deployment record lives at the repo root, outside this Vite project, so
+ * it is injected at build time (`__SEPOLIA_DEPLOYMENT__` in `vite.config.ts`)
+ * rather than imported. Undefined under a plain test runner, which is fine:
+ * every caller falls back to env or to the official addresses.
+ */
+declare const __SEPOLIA_DEPLOYMENT__: SepoliaDeploymentRecord | null | undefined;
+
 function bundledSepoliaDeployment(): SepoliaDeploymentRecord | undefined {
-  try {
-    const glob = (import.meta as ImportMeta & { glob?: (pattern: string, opts: { eager: boolean }) => Record<string, unknown> })
-      .glob;
-    if (!glob) return undefined;
-    const mods = {
-      ...glob("../../../deployments/sepolia.json", { eager: true }),
-      ...glob("../../../contracts/deployments/sepolia.json", { eager: true }),
-    };
-    const first = Object.values(mods)[0];
-    if (!first || typeof first !== "object") return undefined;
-    const record = "default" in first ? (first as { default: unknown }).default : first;
-    return record && typeof record === "object" ? (record as SepoliaDeploymentRecord) : undefined;
-  } catch {
-    return undefined;
-  }
+  const record = typeof __SEPOLIA_DEPLOYMENT__ === "undefined" ? undefined : __SEPOLIA_DEPLOYMENT__;
+  return record && typeof record === "object" ? record : undefined;
 }
 
 export const CCA_SEPOLIA = {
