@@ -4,8 +4,15 @@ import { CommentItem } from "../components/CommentItem";
 import { SampleBadge } from "../components/SampleBadge";
 import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { hasLaunchpad } from "../lib/contracts";
-import { coinPriceWei, coinProgress, coinRaisedWei } from "../lib/coinFigures";
-import { graduated } from "../lib/curve";
+import {
+  coinPriceWei,
+  coinProgress,
+  coinRaisedWei,
+  coinStage,
+  newestFirst,
+  pickFeatured,
+  STAGE_BADGE,
+} from "../lib/coinFigures";
 import { ago, formatEth, formatPrice } from "../lib/format";
 import { loadLaunchedCoins } from "../lib/launched";
 import { useStore, type Coin } from "../lib/store";
@@ -37,9 +44,10 @@ export function HomePage({ loadLaunched }: HomePageProps = {}) {
 
   const coins = chain ? (chainCoins ?? []) : s.coins;
   const talkCount = (id: string) => s.comments.filter((c) => c.coinId === id).length;
-  const live = coins.filter((c) => !graduated(c));
-  const featured = [...live].sort((a, b) => coinProgress(b) - coinProgress(a))[0] ?? null;
-  const grid = featured ? coins.filter((c) => c.id !== featured.id) : coins;
+  const featured = pickFeatured(coins, chain);
+  const listed = chain ? newestFirst(coins) : coins;
+  const grid = featured ? listed.filter((c) => c.id !== featured.id) : listed;
+  const noLiveAuction = chain && chainCoins !== null && coins.length > 0 && !featured;
   const coinById = new Map(coins.map((c) => [c.id, c]));
   const feed = [...s.comments].sort((a, b) => b.at - a.at).slice(0, 14);
 
@@ -78,6 +86,11 @@ export function HomePage({ loadLaunched }: HomePageProps = {}) {
               </span>
             </div>
           </Link>
+        ) : noLiveAuction ? (
+          <div className="featured launch featured-empty" data-testid="no-live-auction">
+            <p className="featured-kicker">No live auction</p>
+            <p className="faint">Every auction below has ended. Launch a prophecy to start a new one.</p>
+          </div>
         ) : null}
 
         <section className="block">
@@ -124,6 +137,9 @@ function LaunchCard({ coin, talk }: { coin: Coin; talk: number }) {
   return (
     <Link className="launch" to={`/coin/${coin.id}`}>
       <div className="launch-head">
+        {coinStage(coin) ? (
+          <span className={`stage-badge stage-${coinStage(coin)}`}>{STAGE_BADGE[coinStage(coin)!]}</span>
+        ) : null}
         <div className="launch-name">
           <TokenName {...tokenDisplayName(coin)} />
         </div>

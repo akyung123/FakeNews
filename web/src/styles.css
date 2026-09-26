@@ -197,6 +197,19 @@ main.narrow { max-width: 720px; }
   font-variant-numeric: tabular-nums;
 }
 .featured-meta .faint { color: var(--paper-muted); }
+.featured-empty { display: block; }
+.stage-badge {
+  align-self: flex-start;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid currentColor;
+}
+.stage-live { color: var(--gold-ink); }
+.stage-ended { color: var(--paper-muted); }
+.stage-market_open { color: var(--success-ink); }
 .featured-side { display: flex; flex-direction: column; justify-content: flex-end; gap: 8px; }
 .featured .bar { height: 8px; background: rgba(26, 26, 26, 0.12); }
 .featured .bar-fill { background: var(--gold-500); }
