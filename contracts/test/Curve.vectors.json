@@ -1,0 +1,81 @@
+{
+  "source": "docs/SPEC.md Constants, Price, Fees. Multiply first, divide once. Fees round up.",
+  "constants": {
+    "TOTAL_SUPPLY": "1000000000000000000000000000",
+    "CURVE_SUPPLY": "793100000000000000000000000",
+    "LP_SUPPLY": "206900000000000000000000000",
+    "VIRTUAL_TOKEN": "1073000000000000000000000000",
+    "VIRTUAL_ETH": "7058378514689194",
+    "FEE_BPS": 125,
+    "CREATOR_BPS": 30,
+    "PROTOCOL_BPS": 95,
+    "BPS": 10000
+  },
+  "start": {
+    "vEth": "7058378514689194",
+    "vToken": "1073000000000000000000000000",
+    "realEth": "0",
+    "sold": "0"
+  },
+  "formulas": {
+    "tokensOut": "vToken * ethNet / (vEth + ethNet)",
+    "ethOut": "vEth * tokensIn / (vToken + tokensIn)",
+    "fee": "ceil(amount * FEE_BPS / BPS)",
+    "ethNetBuy": "ethIn - fee(ethIn)",
+    "sellPayout": "ethOut - fee(ethOut)"
+  },
+  "vectors": [
+    {
+      "id": "buy_0_001_at_start",
+      "action": "buy",
+      "state": "start",
+      "ethIn": "1000000000000000",
+      "tokensOut": "131693201440406167649784217",
+      "fee": "12500000000000",
+      "ethNet": "987500000000000",
+      "ethUsed": "1000000000000000",
+      "refund": "0",
+      "creatorFee": "3000000000000",
+      "protocolFee": "9500000000000",
+      "completes": false
+    },
+    {
+      "id": "sell_back_0_001",
+      "action": "sell",
+      "state": "after buy_0_001_at_start",
+      "tokensIn": "131693201440406167649784217",
+      "ethOut": "975156249999999",
+      "rawOut": "987499999999999",
+      "fee": "12343750000000"
+    },
+    {
+      "id": "buy_0_01_at_start",
+      "action": "buy",
+      "state": "start",
+      "ethIn": "10000000000000000",
+      "tokensOut": "625738980015618190379932827",
+      "fee": "125000000000000",
+      "ethNet": "9875000000000000",
+      "ethUsed": "10000000000000000",
+      "refund": "0",
+      "creatorFee": "30000000000000",
+      "protocolFee": "95000000000000",
+      "completes": false
+    },
+    {
+      "id": "complete_fill",
+      "action": "buy",
+      "state": "start",
+      "ethIn": "1000000000000000000",
+      "tokensOut": "793100000000000000000000000",
+      "fee": "253164556962026",
+      "ethNet": "20000000000000000",
+      "ethUsed": "20253164556962026",
+      "refund": "979746835443037974",
+      "creatorFee": "60759493670886",
+      "protocolFee": "192405063291140",
+      "completes": true,
+      "realEthAfter": "20000000000000000"
+    }
+  ]
+}

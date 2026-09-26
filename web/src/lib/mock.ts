@@ -25,6 +25,94 @@ export const SEED_COINS = [
 // Do not mix those exports with the Screen 4 block.
 // ---------------------------------------------------------------------------
 
+import registerProphetSignature from "../../../world/fixture/register-prophet-signature.json";
+
+type Hex = `0x${string}`;
+
+/** First-time session: no prophet name yet, so World ID is required. */
+export const MOCK_ISSUE_SESSION = {
+  wallet: "0xa11ce00000000000000000000000000000000000" as const,
+  prophetLabel: null as string | null,
+};
+
+/** Returning prophet: already has a name, so World ID is skipped. */
+export const MOCK_RETURNING_SESSION = {
+  wallet: "0xb0b0000000000000000000000000000000000000" as const,
+  prophetLabel: "ringo",
+};
+
+/** Same action / ids the world/ server tests use. */
+export const MOCK_WORLD_APP_ID = "app_test_prophecy";
+export const MOCK_WORLD_ACTION = "register-prophet";
+export const MOCK_WORLD_RP_ID = "rp_test_prophecy";
+export const MOCK_WORLD_ENVIRONMENT = "staging" as const;
+
+/** Sepolia. Values come from world/fixture/register-prophet-signature.json. */
+export const MOCK_WORLD_CHAIN_ID = registerProphetSignature.chainId;
+export const MOCK_WORLD_LAUNCHPAD = registerProphetSignature.launchpad as Hex;
+export const MOCK_WORLD_WALLET = registerProphetSignature.wallet as Hex;
+export const MOCK_WORLD_NULLIFIER = registerProphetSignature.nullifier as Hex;
+
+/** IDKit 4 rp_context object (inner field of GET /rp-context). */
+export const MOCK_RP_CONTEXT = {
+  rp_id: MOCK_WORLD_RP_ID,
+  nonce: "0x6d6f636b2d6e6f6e63652d70726f7068656379",
+  created_at: 1_790_380_800,
+  expires_at: 1_790_381_100,
+  signature:
+    "0x1111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+};
+
+/** GET /rp-context body published by world/README.md. */
+export const MOCK_RP_CONTEXT_RESPONSE = {
+  app_id: MOCK_WORLD_APP_ID,
+  action: MOCK_WORLD_ACTION,
+  environment: MOCK_WORLD_ENVIRONMENT,
+  rp_context: MOCK_RP_CONTEXT,
+};
+
+/** IDKit 4 uniqueness proof from world/test/helpers.ts uniquenessProof(). */
+export const MOCK_IDKIT_RESULT = {
+  protocol_version: "4.0" as const,
+  nonce: "0xabc123",
+  action: MOCK_WORLD_ACTION,
+  environment: MOCK_WORLD_ENVIRONMENT,
+  responses: [
+    {
+      identifier: "proof_of_human",
+      issuer_schema_id: 1,
+      nullifier: MOCK_WORLD_NULLIFIER,
+      expires_at_min: 49_012_345,
+      proof: ["0x111", "0x222", "0x333", "0x444", "0x555"],
+      signal_hash: "0x0",
+    },
+  ],
+};
+
+/**
+ * POST /verify success. nullifier + serverSig imported from
+ * world/fixture/register-prophet-signature.json
+ * (EIP-191 personal_sign of keccak256(abi.encode(uint256 chainId, address launchpad, address wallet, uint256 nullifier))).
+ */
+export const MOCK_WORLD_VERIFY = {
+  nullifier: MOCK_WORLD_NULLIFIER,
+  serverSig: registerProphetSignature.serverSig as Hex,
+};
+
+/** GET /health. Signer address imported from the world/ fixture. */
+export const MOCK_WORLD_HEALTH = {
+  ok: true as const,
+  signer: registerProphetSignature.signer,
+};
+
+export const DEFAULT_WORLD_SERVER_URL = "http://localhost:8787";
+
+export const MOCK_ISSUE_PLACEHOLDER = {
+  prophecy: "The venue projector survives the whole demo",
+  prophetLabel: "ringo",
+  slug: "lingo-2028",
+};
+
 /** Real ETH at graduation (SPEC). Screen 3 header shows raised vs this target. */
 export const GRADUATION_ETH = 0.02;
 
@@ -38,30 +126,30 @@ export type SeedEvent =
   | { min: number; coin: string; user: string; say: string };
 
 export const SEED_EVENTS: readonly SeedEvent[] = [
-  { min: 178, coin: "wifi", user: "yuki.eth", buy: 0.3, say: "I've met this router before." },
-  { min: 170, coin: "wifi", user: "tokyo_bob", buy: 0.5 },
-  { min: 150, coin: "wifi", user: "rin_park", buy: 0.4, say: "Router light is blinking amber already." },
-  { min: 138, coin: "oops", user: "0xHana", buy: 0.2, say: "trust me, I know my teammates" },
-  { min: 120, coin: "wifi", user: "0xHana", buy: 0.2 },
-  { min: 110, coin: "oops", user: "satoshi_jr", buy: 0.6, say: "someone always does it" },
-  { min: 100, coin: "wifi", user: "you", buy: 0.1 },
-  { min: 93, coin: "coffee", user: "tokyo_bob", buy: 0.15 },
+  { min: 178, coin: "wifi", user: "yuki.eth", buy: 0.0015, say: "I've met this router before." },
+  { min: 170, coin: "wifi", user: "tokyo_bob", buy: 0.0025 },
+  { min: 150, coin: "wifi", user: "rin_park", buy: 0.002, say: "Router light is blinking amber already." },
+  { min: 138, coin: "oops", user: "0xHana", buy: 0.001, say: "trust me, I know my teammates" },
+  { min: 120, coin: "wifi", user: "0xHana", buy: 0.001 },
+  { min: 110, coin: "oops", user: "satoshi_jr", buy: 0.003, say: "someone always does it" },
+  { min: 100, coin: "wifi", user: "you", buy: 0.0005 },
+  { min: 93, coin: "coffee", user: "tokyo_bob", buy: 0.00075 },
   { min: 80, coin: "wifi", user: "tokyo_bob", sellShare: 0.8 },
   { min: 75, coin: "wifi", user: "rin_park", say: "Wi-Fi flickered at the demo table just now." },
-  { min: 70, coin: "oops", user: "june_kim", buy: 0.3 },
-  { min: 60, coin: "coffee", user: "yuki.eth", buy: 0.2, say: "there is no more coffee…" },
-  { min: 58, coin: "yolo", user: "rin_park", buy: 0.8, say: "tests are for people who doubt" },
-  { min: 50, coin: "yolo", user: "sam_lee", buy: 0.4 },
-  { min: 40, coin: "wifi", user: "sam_lee", buy: 0.1, say: "Wi-Fi still up at midnight. Checking again at 3." },
-  { min: 35, coin: "yolo", user: "june_kim", buy: 0.6, say: "this is literally us" },
-  { min: 24, coin: "why", user: "sam_lee", buy: 0.1 },
-  { min: 20, coin: "coffee", user: "rin_park", buy: 0.05 },
-  { min: 18, coin: "why", user: "yuki.eth", buy: 0.05, say: "count is at 3 already" },
-  { min: 15, coin: "yolo", user: "0xHana", buy: 0.3 },
+  { min: 70, coin: "oops", user: "june_kim", buy: 0.0015 },
+  { min: 60, coin: "coffee", user: "yuki.eth", buy: 0.001, say: "there is no more coffee…" },
+  { min: 58, coin: "yolo", user: "rin_park", buy: 0.004, say: "tests are for people who doubt" },
+  { min: 50, coin: "yolo", user: "sam_lee", buy: 0.002 },
+  { min: 40, coin: "wifi", user: "sam_lee", buy: 0.0005, say: "Wi-Fi still up at midnight. Checking again at 3." },
+  { min: 35, coin: "yolo", user: "june_kim", buy: 0.003, say: "this is literally us" },
+  { min: 24, coin: "why", user: "sam_lee", buy: 0.0005 },
+  { min: 20, coin: "coffee", user: "rin_park", buy: 0.00025 },
+  { min: 18, coin: "why", user: "yuki.eth", buy: 0.00025, say: "count is at 3 already" },
+  { min: 15, coin: "yolo", user: "0xHana", buy: 0.0015 },
   { min: 12, coin: "coffee", user: "tokyo_bob", sellShare: 0.6 },
   { min: 10, coin: "coffee", user: "tokyo_bob", say: "They refilled the coffee at 10pm." },
   { min: 5, coin: "yolo", user: "sam_lee", say: "Still haven't written a test." },
-  { min: 5, coin: "sleep", user: "june_kim", buy: 0.02, say: "Half the team is still awake at 4am." },
+  { min: 5, coin: "sleep", user: "june_kim", buy: 0.0001, say: "Half the team is still awake at 4am." },
 ];
 
 // ---------------------------------------------------------------------------

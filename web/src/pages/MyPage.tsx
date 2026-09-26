@@ -8,7 +8,7 @@ export function MyPage() {
   const held: { coin: Coin; pos: Position; value: number }[] = [];
   for (const coin of s.coins) {
     const pos = myPosition(s, coin.id);
-    if (pos) held.push({ coin, pos, value: quoteSell(coin, pos.tokens) });
+    if (pos) held.push({ coin, pos, value: quoteSell(coin, pos.tokens).eth });
   }
   const total = held.reduce((n, h) => n + h.value, 0);
   const cost = held.reduce((n, h) => n + h.pos.cost, 0);

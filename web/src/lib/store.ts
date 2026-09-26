@@ -4,12 +4,12 @@ import { SEED_COINS, SEED_EVENTS } from "./mock";
 
 /**
  * Prototype store: everything lives in this browser (localStorage).
- * TODO(event): coins/trades come from ProphecyFactory + ProphecyCoin logs; comments from a small API.
+ * Quotes go through curve.ts (SPEC constants). Chain reads come later.
  */
 
 export const YOU = "you";
-const START_BALANCE = 2;
-const STORAGE_KEY = "prophecy-pump:v2";
+const START_BALANCE = 0.05;
+const STORAGE_KEY = "prophecy-pump:v3";
 
 export type Coin = CurveState & {
   id: string;
@@ -66,7 +66,7 @@ function applyBuy(state: State, user: string, coinId: string, ethIn: number, at:
   const next: Coin = {
     ...coin,
     sold: coin.sold + q.tokens,
-    ethRaised: coin.ethRaised + q.eth,
+    ethRaised: coin.ethRaised + q.ethNet,
   };
   next.history = [...coin.history, { at, mcap: marketCap(next) }];
   const prev = state.positions[user]?.[coinId] ?? { tokens: 0, cost: 0 };
@@ -86,9 +86,9 @@ function applySell(state: State, user: string, coinId: string, tokensIn: number,
   const prev = position(state, user, coinId);
   if (!coin || !prev) return state;
   const tokens = Math.min(tokensIn, prev.tokens);
-  const eth = quoteSell(coin, tokens);
-  if (eth <= 0) return state;
-  const next: Coin = { ...coin, sold: coin.sold - tokens, ethRaised: coin.ethRaised - eth };
+  const q = quoteSell(coin, tokens);
+  if (q.ethOut <= 0) return state;
+  const next: Coin = { ...coin, sold: coin.sold - tokens, ethRaised: coin.ethRaised - q.ethOut };
   next.history = [...coin.history, { at, mcap: marketCap(next) }];
   const left = prev.tokens - tokens;
   return {
@@ -98,7 +98,7 @@ function applySell(state: State, user: string, coinId: string, tokensIn: number,
       ...state.positions,
       [user]: { ...state.positions[user], [coinId]: { tokens: left, cost: prev.cost * (left / prev.tokens) } },
     },
-    balance: user === YOU ? state.balance + eth : state.balance,
+    balance: user === YOU ? state.balance + q.eth : state.balance,
   };
 }
 
@@ -112,7 +112,7 @@ function applyComment(state: State, user: string, coinId: string, text: string, 
 // ---- seed: sample prophecies (records live in mock.ts) ----
 
 function seed(now: number): State {
-  let state: State = { coins: [], comments: [], positions: {}, balance: START_BALANCE + 0.1 };
+  let state: State = { coins: [], comments: [], positions: {}, balance: START_BALANCE + 0.0005 };
   const at = (min: number) => now - min * 60_000;
   const timeline = [
     ...SEED_COINS.map((c) => ({ min: c.min, run: (s: State) => applyCreate(s, { ...c, createdAt: at(c.min) }) })),

@@ -1,4 +1,5 @@
 import { Link, NavLink, Route, Routes } from "react-router-dom";
+import { WalletButton } from "./components/WalletButton";
 import { eth } from "./lib/format";
 import { YOU, actions, useStore } from "./lib/store";
 import { CoinPage } from "./pages/CoinPage";
@@ -34,7 +35,8 @@ export function App() {
         </Link>
 
         <div className="side-wallet">
-          <p className="faint small">Wallet (demo)</p>
+          <WalletButton />
+          <p className="faint small">Demo cash</p>
           <p className="strong">{eth(s.balance)}</p>
         </div>
 

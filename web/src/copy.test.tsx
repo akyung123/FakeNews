@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { App } from "./App";
+import { Web3Provider } from "./providers/Web3Provider";
 import { gwei, mcap } from "./lib/format";
 import { SEED_EVENTS } from "./lib/mock";
 
@@ -54,9 +55,11 @@ const SIGNED_PCT = /[+-]\d+(?:\.\d+)?%/;
 
 function renderApp(path: string): string {
   const html = renderToStaticMarkup(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-    </MemoryRouter>,
+    <Web3Provider>
+      <MemoryRouter initialEntries={[path]}>
+        <App />
+      </MemoryRouter>
+    </Web3Provider>,
   );
   return html.replace(/&#x27;/g, "'").replace(/&apos;/g, "'");
 }
@@ -77,8 +80,8 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(held).toContain("Add a one-line memo (optional)");
     expect(held).toContain("Curve progress");
     expect(held).toContain("Holder");
-    expect(held).toContain("62% 0.0124 of 0.02 ETH to graduate");
-    expect(held).not.toContain("3.19 ETH");
+    expect(held).toContain("53% 0.0106 of 0.02 ETH to graduate");
+    expect(held).not.toContain("0.0177 ETH");
     expect(held).not.toContain("Holder +");
     expect(held).not.toContain("Holder -");
     expect(held).toContain("I've met this router before.");
@@ -125,6 +128,10 @@ describe("DECISIONS #1 copy — new strings", () => {
     const home = renderApp("/");
     expect(home).toContain(">prophecy<");
     expect(home).not.toContain(".pump");
+    expect(home).toContain("Contracts not connected yet.");
+    expect(home).not.toContain("env");
+    expect(home).not.toContain("Launchpad address loaded from env.");
+    expect(home).not.toContain("Launchpad address not set yet.");
     assertRemoved(home);
   });
 
@@ -135,14 +142,11 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(mine).toContain("Sell quote");
     expect(mine).toContain("trade memos");
     expect(mine).not.toContain("Return");
-    expect(mine).not.toContain("5.59 ETH");
-    expect(mine).not.toContain("3.19 ETH");
-    expect(mine).toContain("5.592 gwei");
-    expect(mine).toContain("3.195 gwei");
-    expect(mine).toContain(gwei(5.591798695246977e-9));
-    expect(mine).toContain(gwei(3.194819350589578e-9));
-    expect(mine).not.toContain(mcap(5.591798695246977));
-    expect(mine).not.toContain(mcap(3.194819350589578));
+    expect(mine).toContain("0.02702 gwei");
+    expect(mine).toContain("0.01773 gwei");
+    expect(mine).toContain(gwei(2.702024173734242e-11));
+    expect(mine).toContain(gwei(1.7727753707046925e-11));
+    expect(mine).not.toContain(mcap(0.017727753707046923));
     assertRemoved(mine);
   });
 

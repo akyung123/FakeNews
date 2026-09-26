@@ -1,5 +1,6 @@
-export function eth(value: number, digits = 3): string {
-  return `${value.toFixed(digits)} ETH`;
+export function eth(value: number, digits?: number): string {
+  const d = digits ?? (value > 0 && value < 0.01 ? 5 : 3);
+  return `${value.toFixed(d)} ETH`;
 }
 
 /** ETH per token as gwei with four significant digits. */
@@ -9,7 +10,9 @@ export function gwei(ethValue: number): string {
 
 /** Format the current price as an ETH figure. */
 export function mcap(value: number): string {
-  return `${value < 10 ? value.toFixed(2) : value.toFixed(1)} ETH`;
+  if (value < 0.1) return `${value.toFixed(4)} ETH`;
+  if (value < 10) return `${value.toFixed(2)} ETH`;
+  return `${value.toFixed(1)} ETH`;
 }
 
 export function pct(change: number): string {
