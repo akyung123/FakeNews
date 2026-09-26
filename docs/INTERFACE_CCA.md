@@ -14,7 +14,7 @@ Read on 2026-09-26. Every external signature below is copied from these pins. If
 
 | Piece | Pin | What we read |
 |---|---|---|
-| Continuous Clearing Auction **v2.1.0** (same as web [PR #43](https://github.com/prism-toggle-ai/FakeNews/pull/43) `35c1302`) | git tag `v2.1.0` = `a56d42231e7bf048136d9d88fa61e8518c10c5ff`. Deployments-page factory commit `7d7602d257733315434570f2a0c2f94f1c7b207a`. **Same tree** `e534d08279d7a7f6bf18ba8150eabf1cc8fa8840` — not a different version | [`IContinuousClearingAuction.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/interfaces/IContinuousClearingAuction.sol), [`ContinuousClearingAuctionFactory.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuctionFactory.sol). Sepolia factory address from [Launchpad deployments](https://developers.uniswap.org/docs/liquidity/liquidity-launchpad/deployments) |
+| Continuous Clearing Auction **v2.1.0** (same as web [PR #43](https://github.com/prism-toggle-ai/FakeNews/pull/43) `448f3f8`) | git tag `v2.1.0` = `a56d42231e7bf048136d9d88fa61e8518c10c5ff`. Deployments-page factory commit `7d7602d257733315434570f2a0c2f94f1c7b207a`. **Same tree** `e534d08279d7a7f6bf18ba8150eabf1cc8fa8840` — not a different version | [`IContinuousClearingAuction.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/interfaces/IContinuousClearingAuction.sol), [`ContinuousClearingAuctionFactory.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuctionFactory.sol). Sepolia factory address from [Launchpad deployments](https://developers.uniswap.org/docs/liquidity/liquidity-launchpad/deployments) |
 | CCALens | tag `v2.1.0` (lens source) / deployed **v2.0.0** commit `aee9bca51c92c24eb24a00d75ad98e678bac61d3` | [`CCALens.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/v2.1.0/src/lens/CCALens.sol) = `AuctionStateLens` + `TickDataLens`. Address from the CCA README Deployments table |
 | LBPStrategy **v3.3.0** | commit `1c5904912aefceaceb89c24528cd5e25d0b61597` (no `v3.3.0` git tag exists) | [`IStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IStrategy.sol), [`ILBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/ILBPStrategy.sol), [`LBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol), [`MigratorParams.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/libraries/MigratorParams.sol) |
 | InitializerHook **v3.3.0** | source at `1c590491…`; Sepolia deploy commit `7ea523c9d75a51cb2f497be5e49bacdaeb80a342` | [`InitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/periphery/hooks/InitializerHook.sol), [`IInitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IInitializerHook.sol) |
@@ -24,9 +24,9 @@ Read on 2026-09-26. Every external signature below is copied from these pins. If
 
 The CCA README at tag `v2.1.0` still lists v2.0.0 as “latest” in its own table. The official deployments page lists factory **v2.1.0** at `0x000000001F26a0044BaA66024e7b6599c61963F8` / `7d7602d`. Use that address. The git tag SHA (`a56d422`) and the deployments SHA (`7d7602d`) are two commits of the same bump; `IContinuousClearingAuction` ABI is identical.
 
-**Cross-check vs web PR #43** (`web/src/lib/cca/abi/` at `35c1302`). External signatures that both files list **match**, including `owner` indexed on `BidSubmitted`, `BidExited`, and `TokensClaimed`. Differences that are **not** a CCA version split:
+**Cross-check vs web PR #43** (`web/src/lib/cca/abi/` at `448f3f8`). External signatures that both files list **match**, including `owner` indexed on `BidSubmitted`, `BidExited`, and `TokensClaimed`. Differences that are **not** a CCA version split:
 
-| Item | This file | PR #43 `35c1302` |
+| Item | This file | PR #43 `448f3f8` |
 |---|---|---|
 | CCA version / factory | v2.1.0 · `0x000000001F26…63F8` · tag `a56d422` / deploy `7d7602d` | same address and v2.1.0; events cited at `a56d422`, factory commit comment `7d7602d` |
 | `BidSubmitted` / `BidExited` / `TokensClaimed` | `owner` indexed | `owner` indexed — same |
@@ -38,7 +38,7 @@ The CCA README at tag `v2.1.0` still lists v2.0.0 as “latest” in its own tab
 
 ## 0.1 Fixed Sepolia addresses and parameters
 
-Verified on a Sepolia fork at block **11_784_960** in [PR #41](https://github.com/prism-toggle-ai/FakeNews/pull/41) `d84aed4` (`contracts/test/fork/CCAFork.t.sol` + `CCAForkHelpers.sol`). Forge green at 25 and 10 blocks. These rows replace the old `TBD(backend)` for the same fields.
+Verified on a Sepolia fork at block **11_784_960** in [PR #41](https://github.com/prism-toggle-ai/FakeNews/pull/41) `7139f72` (`contracts/test/fork/CCAFork.t.sol` + `CCAForkHelpers.sol`). Forge green at 25 and 10 blocks. These rows replace the old `TBD(backend)` for the same fields.
 
 | Item | Value | Who uses it | Source |
 |---|---|---|---|
@@ -61,11 +61,11 @@ Verified on a Sepolia fork at block **11_784_960** in [PR #41](https://github.co
 | Graduation threshold | **0.02 ETH** (`20000000000000000` wei) | `AuctionParameters.requiredCurrencyRaised` | **#41** |
 | Pool fee | **1% = `10000` pips** | `PoolParameters.fee` | **#41** |
 | Pool tickSpacing | **200** | `PoolParameters.tickSpacing` | **#41** |
-| First bid id | **0** | `submitBid` return / `BidSubmitted.id` | **#41** |
+| First bid id | **0** | `submitBid` return / `BidSubmitted.id` | official CCA [`BidStorage.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/BidStorage.sol) L11 (`uint256 private $_nextBidId` defaults to 0), L49–L51 (`bidId = $_nextBidId; $_nextBidId++`). **Not** asserted in #41 |
 | `fundsRecipient` | **LBPStrategy** (`0x9543…2000`) | official `InvalidFundsRecipient` if anything else | **#41** |
 | `tokensRecipient` | **protocol** (`protocolFeeRecipient`) — **never the prophet**, never LBPStrategy | unsold auction tokens via `sweepUnsoldTokens` | **#41** |
 | `recipient` | **protocol** (`protocolFeeRecipient`) — **never the prophet** | unused currency / recover-on-fail | **#41** |
-| Goal not reached (`raised < 0.02 ETH`) | `exitBid` refunds **full ETH**, **0 tokens**; `claimTokens` reverts `NotGraduated`; **no v4 pool** | UI **Get your ETH back ({amount} ETH)** | **#41** `test_goalNotReached_refundAndTokenSink` |
+| Goal not reached (`raised < 0.02 ETH`) | `exitBid` refunds **full ETH**, **0 tokens**; `claimTokens` reverts `NotGraduated`; **no v4 pool** | UI **Get your ETH back ({amount} ETH)** | **#41** `7139f72` [`test_goalNotReached_refundAndTokenSink`](https://github.com/prism-toggle-ai/FakeNews/blob/7139f721e7540dc0d5a733d08fdde953cbe0354b/contracts/test/fork/CCAFork.t.sol#L75): L93–L94 `vm.expectRevert(NotGraduated.selector)` then `claimTokens`; L121–L122 `getSlot0` `sqrtPriceX96 == 0` |
 | LP NFT holder | `LiquidityLocker` | `MigratorParameters.positionRecipient` (product). #41 used a temp address — harness only | product |
 | Fee split after the pool | prophet **24** : protocol **76** | locker `collect` | product |
 | Deadline vs auction | **not linked** | ENS `deadline` / Departed stay as today. Auction blocks do not read the deadline | DECISIONS #21 |
@@ -477,7 +477,7 @@ function submitBid(uint256 maxPriceQ96, uint128 amount, address owner, bytes cal
 | `owner` | bidder (receives tokens and leftover ETH) |
 | `prevTickPriceQ96` | hint; #41 uses `floor + (n-1) * tick` with `maxPrice = floor + n * tick` |
 
-First `submitBid` return / `BidSubmitted.id` is **0** ([PR #41](https://github.com/prism-toggle-ai/FakeNews/pull/41)).
+First `submitBid` return / `BidSubmitted.id` is **0**. Official CCA [`BidStorage.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/BidStorage.sol) L11 and L49–L51 (`$_nextBidId` starts at 0; `_createBid` assigns then increments). **Not** fork-asserted in #41.
 
 ```solidity
 event BidSubmitted(uint256 indexed id, address indexed owner, uint256 priceQ96, uint128 amount);
@@ -521,11 +521,11 @@ Demo: prefer a bid strictly above final clearing so the UI can `exitBid` without
 
 #### If the auction ends below 0.02 ETH (`requiredCurrencyRaised`)
 
-**Yes — every bid is fully refunded. 0 tokens. No pool.** Official source, and observed on the Sepolia fork in [PR #41](https://github.com/prism-toggle-ai/FakeNews/pull/41) `d84aed4` `test_goalNotReached_refundAndTokenSink` (raised 0.01 ETH):
+**Yes — every bid is fully refunded. 0 tokens. No pool.** Official source, and asserted on the Sepolia fork in [PR #41](https://github.com/prism-toggle-ai/FakeNews/pull/41) `7139f72` [`test_goalNotReached_refundAndTokenSink`](https://github.com/prism-toggle-ai/FakeNews/blob/7139f721e7540dc0d5a733d08fdde953cbe0354b/contracts/test/fork/CCAFork.t.sol#L75) (raised 0.01 ETH):
 
 - Graduation rule: `currencyRaised >= requiredCurrencyRaised`. “If the auction never graduates, bidders can refund their full bid amount via `exitBid` and all tokens are returned to the tokens recipient.” ([TechnicalDocumentation.md — Protocol Overview](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/docs/TechnicalDocumentation.md#protocol-overview), pin `7d7602d`)
 - Implementation: `exitBid` after `endBlock` — if `!_isGraduated()`, it `_processExit(_bidId, 0, 0)` (zero tokens filled, full currency back). Comment: “Fully refund the bid if the auction did not graduate, since it is over.” ([`ContinuousClearingAuction.sol` L495–L501](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuction.sol#L495-L501))
-- Fork (#41): `exitBid` refunds the **full ETH**; bidder token balance stays **0**. `claimTokens` **reverts `NotGraduated`**. `sweepUnsoldTokens` sends the auction supply to protocol. `LBPStrategy.migrate` does **not** revert: `tryMigrate` fails `NotGraduated`, then the strategy recovers the LP reserve to `recipient` (`FundsRecovered` + `MigrationFailed`). **No v4 pool** is opened.
+- Fork (#41 `7139f72` `test_goalNotReached_refundAndTokenSink`): `exitBid` refunds the **full ETH**; bidder token balance stays **0**. `claimTokens` reverts `NotGraduated` ([L93–L94](https://github.com/prism-toggle-ai/FakeNews/blob/7139f721e7540dc0d5a733d08fdde953cbe0354b/contracts/test/fork/CCAFork.t.sol#L93-L94) `vm.expectRevert(NotGraduated.selector)`). `sweepUnsoldTokens` sends the auction supply to protocol. `LBPStrategy.migrate` does **not** revert; then `getSlot0` `sqrtPriceX96 == 0` ([L121–L122](https://github.com/prism-toggle-ai/FakeNews/blob/7139f721e7540dc0d5a733d08fdde953cbe0354b/contracts/test/fork/CCAFork.t.sol#L121-L122)). **No v4 pool** is opened.
 - `exitPartiallyFilledBid` after `endBlock` does the same full refund when not graduated ([L525–L529](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuction.sol#L525-L529)). Prefer `exitBid` in the UI.
 
 UI copy for this state: **Get your ETH back ({amount} ETH)** → `exitBid(bidId)` on the CCA (full refund; not “unused”). Goal met uses **Get back unused ETH ({amount} ETH)** (section 7).
@@ -772,16 +772,16 @@ New Launchpad names (“LBP not set”, “auction already exists”, “not the
 
 ## 8. Four fork-test steps (02:00 KST gate)
 
-**Canonical sequence:** [PR #41](https://github.com/prism-toggle-ai/FakeNews/pull/41) `d84aed4` [`contracts/test/fork/CCAFork.t.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/d84aed4c327f8b2f169c92b2726f7a2d1c092fb8/contracts/test/fork/CCAFork.t.sol) `_runHappyPath` (25 and 10 blocks) plus `test_goalNotReached_refundAndTokenSink`. Pin `vm.createSelectFork(rpc, 11_784_960)`. Helpers: `CCAForkHelpers.sol`. That suite talks to official LBPStrategy / CCA directly (no Launchpad). A later Launchpad fork wraps step 1 with `launch`.
+**Canonical sequence:** [PR #41](https://github.com/prism-toggle-ai/FakeNews/pull/41) `7139f72` [`contracts/test/fork/CCAFork.t.sol`](https://github.com/prism-toggle-ai/FakeNews/blob/7139f721e7540dc0d5a733d08fdde953cbe0354b/contracts/test/fork/CCAFork.t.sol) `_runHappyPath` (25 and 10 blocks) plus `test_goalNotReached_refundAndTokenSink`. Pin `vm.createSelectFork(rpc, 11_784_960)`. Helpers: `CCAForkHelpers.sol`. That suite talks to official LBPStrategy / CCA directly (no Launchpad). A later Launchpad fork wraps step 1 with `launch`.
 
 | # | Step | Calls (as in #41) | Pass when |
 |---|---|---|---|
 | 1 | Create auction | `initializeDistribution` → factory `create` + `onTokensReceived` | Auction code at the predicted address. `fundsRecipient == LBPStrategy`, `tokensRecipient` and `recipient` are protocol, not the prophet |
-| 2 | Bid | 5-arg `submitBid{value: amount}(maxPrice, amount, owner, prevTick, "")`. First `bidId` is **0**. Hint: `maxPrice = floor + n * tick`, `prevTick = floor + (n-1) * tick` | `BidSubmitted`. Raised demand ≥ 0.02 ETH for the happy path |
+| 2 | Bid | 5-arg `submitBid{value: amount}(maxPrice, amount, owner, prevTick, "")`. First `bidId` is **0** (official `BidStorage`, not asserted in #41). Hint: `maxPrice = floor + n * tick`, `prevTick = floor + (n-1) * tick` | `BidSubmitted`. Raised demand ≥ 0.02 ETH for the happy path |
 | 3 | Settle + open market | `vm.roll` to `endBlock`, `checkpoint()`, `exitBid` (unused ETH), `claimTokens`. Then `vm.roll` to `endBlock + 1`, `LBPStrategy.migrate(auction)` | `isGraduated() == true`. `PoolManager.getSlot0(poolId)` non-zero. Fee 10000, tickSpacing 200 |
 | 4 | Swap | After (3), one ETH→token swap (`PoolSwapTest` in #41; product may use Universal Router once command bytes are set) | Token balance of the trader moves |
 
-Goal not reached is the same file, not a fifth happy-path step: `exitBid` full ETH / 0 tokens; `claimTokens` reverts `NotGraduated`; no pool (section 4.5).
+Goal not reached is the same file, not a fifth happy-path step: `exitBid` full ETH / 0 tokens; `claimTokens` reverts `NotGraduated` (L93–L94); no pool (`sqrtPriceX96 == 0`, L121–L122). See section 4.5.
 
 `TBD(backend):` gas for each step. Record in `FEEDBACK.md` after the run (`TODO(team)` until then).
 
