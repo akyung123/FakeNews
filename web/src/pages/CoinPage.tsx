@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { parseUnits } from "viem";
 import { CommentItem } from "../components/CommentItem";
@@ -7,6 +7,7 @@ import { hasLaunchpad } from "../lib/contracts";
 import { graduated, progress, quoteBuy, quoteSell, TOTAL_SUPPLY } from "../lib/curve";
 import { isEnsName, slugOf } from "../lib/ensName";
 import { ago, eth, tokens } from "../lib/format";
+import { findLaunchedCoin, loadLaunchedCoins } from "../lib/launched";
 import { GRADUATION_ETH } from "../lib/mock";
 import { prototypeCoinFromName } from "../lib/prophetData";
 import {
@@ -38,14 +39,47 @@ import {
 export type CoinPageProps = {
   sendBuy?: (input: BuyInput) => Promise<boolean>;
   sendSell?: (input: SellInput) => Promise<boolean>;
+  loadLaunched?: () => Promise<Coin[]>;
 };
 
-export function CoinPage({ sendBuy = createBuy(), sendSell = createSell() }: CoinPageProps = {}) {
+export function CoinPage({
+  sendBuy = createBuy(),
+  sendSell = createSell(),
+  loadLaunched,
+}: CoinPageProps = {}) {
   const { id = "", name = "" } = useParams();
   const s = useStore();
   const lookup = id || name;
-  const coin = s.coins.find((c) => c.id === lookup) ?? prototypeCoinFromName(lookup);
+  const chain = hasLaunchpad() || Boolean(loadLaunched);
+  const [chainCoin, setChainCoin] = useState<Coin | null>(null);
+  const [chainReady, setChainReady] = useState(!chain);
+
+  useEffect(() => {
+    if (!chain) return;
+    let cancelled = false;
+    const run = loadLaunched ?? (() => loadLaunchedCoins());
+    void run()
+      .then((rows) => {
+        if (cancelled) return;
+        setChainCoin(findLaunchedCoin(lookup, rows) ?? null);
+        setChainReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setChainCoin(null);
+        setChainReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chain, loadLaunched, lookup]);
+
+  const fromStore = s.coins.find((c) => c.id === lookup || c.token === lookup || c.name === lookup);
+  const coin = chain ? (fromStore ?? chainCoin) : (fromStore ?? prototypeCoinFromName(lookup));
   if (!coin) {
+    if (chain && !chainReady) {
+      return <main className="coin-page" />;
+    }
     return (
       <main className="narrow">
         <section className="block">

@@ -87,8 +87,7 @@ export function getProphecyByName(name: string, nowSec = Math.floor(Date.now() /
 }
 
 /**
- * Prototype Screen 3 (`CoinPage`) still reads a localStorage coin.
- * Map a name from this read interface onto that shape so `/n/:name` is not blank.
+ * Mock-mode Screen 3 only. Chain mode reads Launched + curve(token).
  */
 export function prototypeCoinFromName(name: string, nowSec?: number): Coin | null {
   const p = getProphecyByName(name, nowSec);

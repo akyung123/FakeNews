@@ -21,6 +21,8 @@ export type Coin = CurveState & {
   history: { at: number; mcap: number }[];
   /** Sepolia token address after a live launch. Mock coins leave this unset. */
   token?: `0x${string}`;
+  /** From Launchpad.curve. Used in chain mode so graduation is not inferred from the prototype sold count. */
+  complete?: boolean;
 };
 
 /** A one-line memo attached to a trade. */
