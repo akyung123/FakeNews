@@ -65,6 +65,7 @@ A launchpad that turns a one-line prophecy into a token. Buying raises the price
 | Doc | Contents |
 |-----|----------|
 | [`docs/README.md`](docs/README.md) | Map: who reads what |
+| [`docs/PRD.md`](docs/PRD.md) | Product requirements: users, goals, scope, open questions |
 | [`docs/SPEC.md`](docs/SPEC.md) | Product spec (source of truth) |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | Decisions and spec review |
 | [`docs/INTERFACE.md`](docs/INTERFACE.md) | Contract between folders |

@@ -4,7 +4,7 @@ How the team works together. Read this once before your first PR.
 
 ## First 10 minutes
 
-1. Read [`README.md`](README.md), then [`docs/SPEC.md`](docs/SPEC.md) up to "Screens".
+1. Read [`README.md`](README.md) and [`docs/PRD.md`](docs/PRD.md), then [`docs/SPEC.md`](docs/SPEC.md) up to "Screens".
 2. Skim [`docs/DECISIONS.md`](docs/DECISIONS.md) so you know what is already settled.
 3. Open [`docs/PLAN.md`](docs/PLAN.md), pick a task in your lane and add `@yourname` to it.
 4. Run the check for your folder:
