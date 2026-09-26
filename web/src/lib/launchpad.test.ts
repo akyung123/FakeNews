@@ -4,11 +4,12 @@ import { MOCK_WORLD_LAUNCHPAD, MOCK_WORLD_VERIFY } from "./mock";
 import {
   assertSuccessfulReceipt,
   createRegisterProphet,
+  curveRead,
+  ensAdapterRead,
   fetchLaunchedLogs,
   LAUNCHED_LOOKBACK_BLOCKS,
   launchedFromBlock,
   launchedLogsQuery,
-  ensAdapterRead,
   readEnsAdapter,
   registerProphetArgs,
   registerProphetWrite,
@@ -160,6 +161,15 @@ describe("registerProphet write shape", () => {
     expect(seen).toEqual([ensAdapterRead(MOCK_WORLD_LAUNCHPAD)]);
     expect(webEnv).not.toHaveProperty("ensAdapterAddress");
     expect(Object.keys(webEnv).join(",")).not.toMatch(/ENS_ADAPTER/);
+  });
+
+  it("reads curve(token) for the complete flag", () => {
+    const token = "0xa555555555555555555555555555555555555555" as const;
+    const request = curveRead(token, MOCK_WORLD_LAUNCHPAD);
+    expect(request.functionName).toBe("curve");
+    expect(request.args).toEqual([token]);
+    expect(request.abi).toBe(launchpadAbi);
+    expect(launchpadAbi.some((item) => "name" in item && item.name === "getState")).toBe(false);
   });
 });
 

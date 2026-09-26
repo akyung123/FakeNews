@@ -5,8 +5,15 @@ import { Bar } from "../components/CoinCard";
 import { graduated, progress, quoteBuy, quoteSell, TOTAL_SUPPLY } from "../lib/curve";
 import { isEnsName, slugOf } from "../lib/ensName";
 import { ago, eth, tokens } from "../lib/format";
+import {
+  GRADUATED_BODY,
+  GRADUATED_LINK,
+  GRADUATED_TITLE,
+  uniswapGraduationHref,
+  type GraduationState,
+} from "../lib/graduation";
 import { GRADUATION_ETH } from "../lib/mock";
-import { prototypeCoinFromName } from "../lib/prophetData";
+import { getProphecyByName, prototypeCoinFromName } from "../lib/prophetData";
 import {
   actions,
   holderCount,
@@ -14,6 +21,7 @@ import {
   useStore,
   type Coin,
 } from "../lib/store";
+import { useGraduation } from "../lib/useGraduation";
 
 export function CoinPage() {
   const { id = "", name = "" } = useParams();
@@ -33,6 +41,8 @@ export function CoinPage() {
 
   const pos = myPosition(s, coin.id);
   const talk = s.comments.filter((c) => c.coinId === coin.id).sort((a, b) => b.at - a.at);
+  const token = coin.token ?? getProphecyByName(coin.name)?.token;
+  const graduation = useGraduation(token, graduated(coin));
 
   return (
     <main className="coin-page">
@@ -56,11 +66,7 @@ export function CoinPage() {
           </div>
           <h1 className="prophecy-title">{coin.prophecy}</h1>
           <p className="big-num">{curveProgressHeader(coin)}</p>
-          {graduated(coin) ? (
-            <p className="up">Graduated to Uniswap V4</p>
-          ) : (
-            <p className="faint">Curve progress</p>
-          )}
+          {graduation.graduated ? null : <p className="faint">Curve progress</p>}
           <Sparkline coin={coin} />
           <Bar value={progress(coin)} labelled />
         </section>
@@ -81,7 +87,12 @@ export function CoinPage() {
       </div>
 
       <aside className="stack side">
-        <TradeBox coin={coin} balance={s.balance} held={pos?.tokens ?? 0} />
+        <TradeBox
+          coin={coin}
+          balance={s.balance}
+          held={pos?.tokens ?? 0}
+          graduation={graduation}
+        />
         {pos ? (
           <section className="block you-hold">
             <p className="faint small">You hold</p>
@@ -95,11 +106,21 @@ export function CoinPage() {
   );
 }
 
-function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: number }) {
+export function TradeBox({
+  coin,
+  balance,
+  held,
+  graduation,
+}: {
+  coin: Coin;
+  balance: number;
+  held: number;
+  graduation: GraduationState;
+}) {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("0.001");
   const value = Number(amount) || 0;
-  const closed = graduated(coin);
+  const closed = graduation.graduated;
 
   const buyQuote = quoteBuy(coin, Math.min(value, balance));
   const sellTokens = Math.min(held, (held * Math.min(value, 100)) / 100);
@@ -108,6 +129,10 @@ function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: 
   function submit() {
     if (side === "buy") actions.buy(coin.id, value);
     else actions.sell(coin.id, sellTokens);
+  }
+
+  if (closed) {
+    return <GraduationPanel href={uniswapGraduationHref(graduation)} />;
   }
 
   return (
@@ -139,12 +164,24 @@ function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: 
       <button
         type="button"
         className={`btn ${side === "buy" ? "primary" : "sell"} full`}
-        disabled={closed || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
+        disabled={side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0}
         onClick={submit}
       >
-        {closed ? "Curve sold out" : side === "buy" ? `Buy $${coin.ticker}` : `Sell $${coin.ticker}`}
+        {side === "buy" ? `Buy $${coin.ticker}` : `Sell $${coin.ticker}`}
       </button>
       <p className="faint small">Cash {eth(balance)}</p>
+    </section>
+  );
+}
+
+export function GraduationPanel({ href }: { href: string }) {
+  return (
+    <section className="block trade">
+      <h2>{GRADUATED_TITLE}</h2>
+      <p className="faint">{GRADUATED_BODY}</p>
+      <a className="link" href={href} target="_blank" rel="noreferrer">
+        {GRADUATED_LINK}
+      </a>
     </section>
   );
 }

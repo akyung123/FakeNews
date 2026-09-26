@@ -102,11 +102,15 @@ describe("DECISIONS #1 copy — new strings", () => {
     assertRemoved(empty);
 
     const graduated = renderApp("/n/two-min.ringo.prophecy.eth");
-    expect(graduated).toContain("Graduated to Uniswap V4");
+    expect(graduated.split("Graduated to Uniswap V4").length - 1).toBe(1);
+    expect(graduated).toContain("The curve is closed. Trading continues on Uniswap.");
+    expect(graduated).toContain("View pool on Uniswap");
     expect(graduated).toContain("Trade memos");
     expect(graduated).toContain("100% 0.0200 of 0.02 ETH to graduate");
     expect(graduated).not.toContain("Curve progress");
     expect(graduated).not.toContain("3.74 ETH");
+    expect(graduated).not.toContain(">Buy<");
+    expect(graduated).not.toContain(">Sell<");
     assertRemoved(graduated);
   });
 
