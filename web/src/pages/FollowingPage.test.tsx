@@ -7,7 +7,7 @@ import { App } from "../App";
 import { auctionStatusCopy, CCA_COPY } from "../lib/cca/copy";
 import { POOL_PRICE_LABEL, type MarketSnapshot } from "../lib/cca/loadAuction";
 import { follow, getFollowing } from "../lib/following";
-import { ethFromWei } from "../lib/format";
+import { formatPrice } from "../lib/format";
 import { getProphetPage } from "../lib/prophetData";
 import type { Coin } from "../lib/store";
 import { Web3Provider } from "../providers/Web3Provider";
@@ -171,7 +171,7 @@ describe("Following page", () => {
     );
     expect(within(first).getByRole("link", { name: "Prophet page" })).toHaveAttribute("href", "/p/alice");
     await waitFor(() => expect(first.querySelector(".hold")).toHaveTextContent(auctionStatusCopy("live", { blocks: 5 })));
-    expect(first.querySelector(".strong.mono")).toHaveTextContent(ethFromWei(2_000_000_000n));
+    expect(first.querySelector(".strong.mono")).toHaveTextContent(formatPrice(2_000_000_000n));
     expect(first.textContent).toContain(CCA_COPY.currentClearingPrice);
 
     // Stage without a readable price: chip only.

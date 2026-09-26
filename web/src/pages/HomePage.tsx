@@ -4,10 +4,11 @@ import { CommentItem } from "../components/CommentItem";
 import { SampleBadge } from "../components/SampleBadge";
 import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { hasLaunchpad } from "../lib/contracts";
-import { graduated, progress } from "../lib/curve";
-import { ago, eth, gwei } from "../lib/format";
+import { coinPriceWei, coinProgress, coinRaisedWei } from "../lib/coinFigures";
+import { graduated } from "../lib/curve";
+import { ago, formatEth, formatPrice } from "../lib/format";
 import { loadLaunchedCoins } from "../lib/launched";
-import { price, useStore, type Coin } from "../lib/store";
+import { useStore, type Coin } from "../lib/store";
 
 export type HomePageProps = {
   loadLaunched?: () => Promise<Coin[]>;
@@ -37,7 +38,7 @@ export function HomePage({ loadLaunched }: HomePageProps = {}) {
   const coins = chain ? (chainCoins ?? []) : s.coins;
   const talkCount = (id: string) => s.comments.filter((c) => c.coinId === id).length;
   const live = coins.filter((c) => !graduated(c));
-  const featured = [...live].sort((a, b) => progress(b) - progress(a))[0] ?? null;
+  const featured = [...live].sort((a, b) => coinProgress(b) - coinProgress(a))[0] ?? null;
   const grid = featured ? coins.filter((c) => c.id !== featured.id) : coins;
   const coinById = new Map(coins.map((c) => [c.id, c]));
   const feed = [...s.comments].sort((a, b) => b.at - a.at).slice(0, 14);
@@ -61,16 +62,16 @@ export function HomePage({ loadLaunched }: HomePageProps = {}) {
               <div className="featured-meta">
                 <TokenName {...tokenDisplayName(featured)} />
                 <span className="faint">${featured.ticker}</span>
-                <span className="strong">Price {gwei(price(featured))}</span>
-                <span className="faint small">{ago(featured.createdAt)}</span>
+                <span className="strong">Price {formatPrice(coinPriceWei(featured))}</span>
+                {ago(featured.createdAt) ? <span className="faint small">{ago(featured.createdAt)}</span> : null}
               </div>
             </div>
             <div className="featured-side">
               <span className="bar">
-                <span className="bar-fill" style={{ width: `${(progress(featured) * 100).toFixed(1)}%` }} />
+                <span className="bar-fill" style={{ width: `${(coinProgress(featured) * 100).toFixed(1)}%` }} />
               </span>
-              {featured.ethRaised > 0 ? (
-                <span className="faint small">Raised {eth(featured.ethRaised)}</span>
+              {coinRaisedWei(featured) > 0n ? (
+                <span className="faint small">Raised {formatEth(coinRaisedWei(featured))}</span>
               ) : null}
               <span className="faint small">
                 {talkCount(featured.id)} {talkCount(featured.id) === 1 ? "memo" : "memos"}
@@ -125,15 +126,15 @@ function LaunchCard({ coin, talk }: { coin: Coin; talk: number }) {
       <div className="launch-head">
         <TokenName {...tokenDisplayName(coin)} />
         <span className="faint">${coin.ticker}</span>
-        <span className="faint small">{ago(coin.createdAt)}</span>
+        {ago(coin.createdAt) ? <span className="faint small">{ago(coin.createdAt)}</span> : null}
       </div>
       <p className="launch-text">{coin.prophecy}</p>
       <div className="launch-foot">
-        <span className="strong">{gwei(price(coin))}</span>
+        <span className="strong">{formatPrice(coinPriceWei(coin))}</span>
         <span className="faint small">{talk} {talk === 1 ? "memo" : "memos"}</span>
       </div>
       <span className="bar">
-        <span className="bar-fill" style={{ width: `${(progress(coin) * 100).toFixed(1)}%` }} />
+        <span className="bar-fill" style={{ width: `${(coinProgress(coin) * 100).toFixed(1)}%` }} />
       </span>
     </Link>
   );

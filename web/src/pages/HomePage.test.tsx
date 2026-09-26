@@ -54,7 +54,7 @@ describe("Home copy follows the auction flow", () => {
     };
     renderHome([live, ended]);
     await waitFor(() => expect(screen.getByText("Auction live")).toBeInTheDocument());
-    expect(screen.getByText("Raised 0.010 ETH")).toBeInTheDocument();
+    expect(screen.getByText("Raised 0.01 ETH")).toBeInTheDocument();
     const text = document.body.textContent ?? "";
     expect(text).not.toContain("Curve");
     expect(text.toLowerCase()).not.toContain("graduat");
@@ -65,6 +65,14 @@ describe("Home copy follows the auction flow", () => {
     renderHome([launched("lingo-2028", TOKEN)]);
     await waitFor(() => expect(screen.getByText("Auction live")).toBeInTheDocument());
     expect(screen.queryByText(/^Raised /)).toBeNull();
+  });
+
+  it("shows exact raised wei without float noise and hides an unknown launch time", async () => {
+    const live = { ...launched("lingo-2028", TOKEN), raisedWei: 40_000_000_000_000_001n };
+    renderHome([live]);
+    await waitFor(() => expect(screen.getByText("Raised 0.04 ETH")).toBeInTheDocument());
+    expect(document.body.textContent).not.toContain("ago");
+    expect(document.body.textContent).not.toContain("gwei");
   });
 
   it("keeps an ended auction in Just launched", async () => {

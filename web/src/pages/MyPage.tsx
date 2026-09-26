@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { formatEther, type Address } from "viem";
+import type { Address } from "viem";
 import { useAccount } from "wagmi";
 import { SampleBadge } from "../components/SampleBadge";
 import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { hasLaunchpad } from "../lib/contracts";
 import { price, quoteSell } from "../lib/curve";
-import { eth, ethFromWei, gwei, tokens } from "../lib/format";
+import { eth, formatEth, formatTokenAmount, pricePerToken, tokens } from "../lib/format";
 import { loadMyHoldings, type MyHoldings } from "../lib/holdings";
 import { isMockMode } from "../lib/mode";
 import { myPosition, useStore, type Coin, type Position } from "../lib/store";
@@ -90,8 +90,8 @@ export function MyPage({ loadHoldings, loadLaunched }: MyPageProps = {}) {
                     </span>
                   </span>
                   <span className="num col-mid">{tokens(pos.tokens)}</span>
-                  <span className="num col-mid">{gwei(pos.cost / pos.tokens)}</span>
-                  <span className="num col-mid">{gwei(price(coin))}</span>
+                  <span className="num col-mid">{pricePerToken(pos.cost / pos.tokens)}</span>
+                  <span className="num col-mid">{pricePerToken(price(coin))}</span>
                   <span className="num strong">{eth(value)}</span>
                   <span className="num col-opt">{talk}</span>
                 </Link>
@@ -141,7 +141,7 @@ function ChainSummary({ loadHoldings }: { loadHoldings?: (wallet: Address) => Pr
     );
   }
 
-  const show = (wei: bigint | undefined) => (wei === undefined ? "…" : ethFromWei(wei));
+  const show = (wei: bigint | undefined) => (wei === undefined ? "…" : formatEth(wei));
   return (
     <section className="block summary" aria-busy={data ? "false" : "true"}>
       <div>
@@ -150,7 +150,7 @@ function ChainSummary({ loadHoldings }: { loadHoldings?: (wallet: Address) => Pr
       </div>
       <div>
         <p className="faint small">Tokens held</p>
-        <p className="big-num">{data ? tokens(Number(formatEther(data.tokensHeldWei))) : "…"}</p>
+        <p className="big-num">{data ? formatTokenAmount(data.tokensHeldWei) : "…"}</p>
       </div>
       <div>
         <p className="faint small">ETH spent on bids</p>
@@ -159,7 +159,7 @@ function ChainSummary({ loadHoldings }: { loadHoldings?: (wallet: Address) => Pr
       {data && data.feesWei !== null ? (
         <div>
           <p className="faint small">Fees ready to claim</p>
-          <p className="big-num">{ethFromWei(data.feesWei)}</p>
+          <p className="big-num">{formatEth(data.feesWei)}</p>
         </div>
       ) : null}
     </section>

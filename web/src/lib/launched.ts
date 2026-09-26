@@ -4,7 +4,8 @@
  * On the cca branch, raised / complete come from auctionOf + CCALens.
  */
 import { formatEther, isAddress, zeroAddress, type Address, type PublicClient } from "viem";
-import { auctionOfRead, readAuctionView } from "./cca";
+import { auctionOfRead, q96ToWeiPerToken, readAuctionView } from "./cca";
+import { ethPerTokenWei, isPoolOpen, poolIdForToken, slot0Request } from "./cca/pool";
 import { contracts, hasLaunchpad } from "./contracts";
 import { TOTAL_SUPPLY } from "./curve";
 import { ENS_TEXT_PROPHECY, getEnsText } from "./ens";
@@ -21,13 +22,20 @@ export type LaunchedLogLike = {
     prophetLabel?: string;
     slug?: string;
   };
-  blockNumber?: bigint;
+  blockNumber?: bigint | null;
+  /** Seconds. Some RPCs include it on logs; otherwise it is read from the block. */
+  blockTimestamp?: bigint | null;
 };
 
 export type CurveView = {
   sold: number;
   ethRaised: number;
   complete: boolean;
+  raisedWei?: bigint;
+  priceWei?: bigint;
+  endBlock?: number;
+  readBlock?: number;
+  marketOpen?: boolean;
 };
 
 export function coinFromLaunchedLog(log: LaunchedLogLike, parentName = webEnv.parentName): Coin | null {
@@ -43,7 +51,8 @@ export function coinFromLaunchedLog(log: LaunchedLogLike, parentName = webEnv.pa
     ticker: slug.toUpperCase().slice(0, 11),
     prophecy: "",
     creator: label,
-    createdAt: log.blockNumber != null ? Number(log.blockNumber) * 1000 : 0,
+    // Launch time is the block's timestamp. 0 until it is known, so the UI hides "ago".
+    createdAt: log.blockTimestamp != null ? Number(log.blockTimestamp) * 1000 : 0,
     sold: 0,
     ethRaised: 0,
     history: [],
@@ -81,6 +90,7 @@ export async function readCurveView(
     getBlockNumber?: () => Promise<bigint>;
   },
   address = contracts.launchpad,
+  hook = contracts.hook,
 ): Promise<CurveView> {
   if (!address) return { sold: 0, ethRaised: 0, complete: false };
   const auction = (await client.readContract(auctionOfRead(address, token))) as Address;
@@ -88,19 +98,41 @@ export async function readCurveView(
   if (!client.simulateContract || !client.getBlockNumber) {
     return { sold: 0, ethRaised: 0, complete: false, };
   }
+  let readBlock: bigint | undefined;
+  const getBlockNumber = client.getBlockNumber;
   const view = await readAuctionView(
     {
       simulateContract: client.simulateContract as never,
       readContract: client.readContract as never,
-      getBlockNumber: client.getBlockNumber,
+      getBlockNumber: async () => (readBlock = await getBlockNumber()),
     },
     auction,
   );
   const frac = view.graduationWei === 0n ? 0 : Number(view.currencyRaised) / Number(view.graduationWei);
+  const ended = view.phase === "ended_goal_reached" || view.phase === "ended_goal_not_reached";
+  let marketOpen = false;
+  let priceWei = view.clearingPriceQ96 > 0n ? q96ToWeiPerToken(view.clearingPriceQ96) : 0n;
+  if (ended && view.goalReached && hook) {
+    try {
+      const slot0 = (await client.readContract(slot0Request(poolIdForToken(token, hook)) as never)) as unknown;
+      const sqrt = Array.isArray(slot0) ? (slot0[0] as bigint | undefined) : undefined;
+      if (isPoolOpen(sqrt)) {
+        marketOpen = true;
+        priceWei = ethPerTokenWei(sqrt!);
+      }
+    } catch {
+      // pool not open or unreadable: keep the final clearing price
+    }
+  }
   return {
     sold: Math.min(1, frac) * TOTAL_SUPPLY,
     ethRaised: Number(formatEther(view.currencyRaised)),
     complete: view.isGraduated,
+    raisedWei: view.currencyRaised,
+    priceWei,
+    endBlock: Number(view.endBlock),
+    readBlock: readBlock != null ? Number(readBlock) : undefined,
+    marketOpen,
   };
 }
 
@@ -111,10 +143,54 @@ export type LoadLaunchedOptions = {
     getContractEvents: (query: unknown) => Promise<unknown>;
     readContract?: PublicClient["readContract"];
     simulateContract?: PublicClient["simulateContract"];
+    getBlock?: (args: { blockNumber: bigint }) => Promise<{ timestamp: bigint }>;
   };
   readCurve?: (token: Address) => Promise<CurveView>;
   readSentence?: (name: string) => Promise<string | null>;
+  /** Skip the one-block shared result, e.g. right after a launch. */
+  fresh?: boolean;
 };
+
+/** Block number → timestamp (ms). A block's time never changes, so it is kept for the session. */
+const blockTimes = new Map<bigint, number>();
+
+/** Test-only. */
+export function resetBlockTimesForTests(): void {
+  blockTimes.clear();
+}
+
+/**
+ * Fill `createdAt` from the Launched block's timestamp. A row whose block
+ * cannot be read keeps 0, and the UI hides its "ago" line.
+ */
+export async function fillLaunchTimes(
+  coins: Coin[],
+  getBlock: ((args: { blockNumber: bigint }) => Promise<{ timestamp: bigint }>) | undefined,
+): Promise<Coin[]> {
+  const missing = new Set<bigint>();
+  for (const coin of coins) {
+    if (coin.createdAt > 0 || coin.launchedBlock == null) continue;
+    const block = BigInt(coin.launchedBlock);
+    if (!blockTimes.has(block)) missing.add(block);
+  }
+  if (getBlock && missing.size > 0) {
+    await Promise.all(
+      [...missing].map(async (blockNumber) => {
+        try {
+          const { timestamp } = await getBlock({ blockNumber });
+          blockTimes.set(blockNumber, Number(timestamp) * 1000);
+        } catch {
+          // leave it unknown
+        }
+      }),
+    );
+  }
+  return coins.map((coin) => {
+    if (coin.createdAt > 0 || coin.launchedBlock == null) return coin;
+    const at = blockTimes.get(BigInt(coin.launchedBlock));
+    return at ? { ...coin, createdAt: at } : coin;
+  });
+}
 
 function defaultClient(): PublicClient {
   return getPublicClient();
@@ -124,7 +200,8 @@ function defaultClient(): PublicClient {
 const loadLaunchedCoinsShared = shareFor(SEPOLIA_POLLING_MS, () => readLaunchedCoins({}));
 
 export function loadLaunchedCoins(options: LoadLaunchedOptions = {}): Promise<Coin[]> {
-  return Object.keys(options).length === 0 ? loadLaunchedCoinsShared() : readLaunchedCoins(options);
+  const { fresh, ...rest } = options;
+  return Object.keys(rest).length === 0 && !fresh ? loadLaunchedCoinsShared() : readLaunchedCoins(rest);
 }
 
 async function readLaunchedCoins(options: LoadLaunchedOptions): Promise<Coin[]> {
@@ -132,7 +209,14 @@ async function readLaunchedCoins(options: LoadLaunchedOptions): Promise<Coin[]> 
   const client = options.client ?? defaultClient();
   const logs = await (options.fetchLogs ?? fetchLaunchedLogsChunked)(client);
   const list = Array.isArray(logs) ? logs : [];
-  const coins = coinsFromLaunchedLogs(list);
+  for (const log of list) {
+    const row = log as LaunchedLogLike;
+    if (row.blockNumber != null && row.blockTimestamp != null) {
+      blockTimes.set(row.blockNumber, Number(row.blockTimestamp) * 1000);
+    }
+  }
+  const getBlock = client.getBlock ? (args: { blockNumber: bigint }) => client.getBlock!(args) : undefined;
+  const coins = await fillLaunchTimes(coinsFromLaunchedLogs(list), getBlock);
   return Promise.all(
     coins.map(async (coin) => {
       const token = coin.token;
@@ -155,7 +239,17 @@ async function readLaunchedCoins(options: LoadLaunchedOptions): Promise<Coin[]> 
               : null;
           const curve = read ? await read(token) : null;
           if (curve) {
-            next = { ...next, sold: curve.sold, ethRaised: curve.ethRaised, complete: curve.complete };
+            next = {
+              ...next,
+              sold: curve.sold,
+              ethRaised: curve.ethRaised,
+              complete: curve.complete,
+              raisedWei: curve.raisedWei,
+              priceWei: curve.priceWei,
+              endBlock: curve.endBlock,
+              readBlock: curve.readBlock,
+              marketOpen: curve.marketOpen,
+            };
           }
         } catch {
           // keep zeros; list still shows the token

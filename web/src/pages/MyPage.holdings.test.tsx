@@ -31,7 +31,7 @@ describe("My page value cards", () => {
     expect(loadHoldings).toHaveBeenCalledTimes(1);
     const labels = [...document.querySelectorAll(".summary .faint.small")].map((n) => n.textContent);
     expect(labels).toEqual(["Holdings value", "Tokens held", "ETH spent on bids", "Fees ready to claim"]);
-    expect(screen.getByText("2.0K")).toBeInTheDocument();
+    expect(screen.getByText("2K")).toBeInTheDocument();
     expect(screen.getByText("0.04 ETH")).toBeInTheDocument();
     expect(screen.getByText("0.005 ETH")).toBeInTheDocument();
     const text = document.body.textContent ?? "";

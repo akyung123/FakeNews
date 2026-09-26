@@ -31,6 +31,16 @@ export type Coin = CurveState & {
   prophet?: `0x${string}`;
   /** Block of the Launched log. */
   launchedBlock?: number;
+  /** Chain mode: ETH raised in the auction, in wei. Kept as bigint so progress is exact. */
+  raisedWei?: bigint;
+  /** Chain mode: price of one whole token in wei (clearing price, or pool price once open). */
+  priceWei?: bigint;
+  /** Chain mode: the auction's end block. */
+  endBlock?: number;
+  /** Chain mode: the block the row was read at. */
+  readBlock?: number;
+  /** Chain mode: the Uniswap v4 pool is open (migrate ran). */
+  marketOpen?: boolean;
 };
 
 /** A one-line memo attached to a trade. */
