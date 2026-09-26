@@ -18,15 +18,11 @@ import {ProphecyHook} from "../src/uniswap/ProphecyHook.sol";
 import {HookMiner} from "../src/uniswap/HookMiner.sol";
 import {Graduation} from "../src/uniswap/Graduation.sol";
 import {LiquidityLocker} from "../src/uniswap/LiquidityLocker.sol";
+import {LaunchpadStack} from "./LaunchpadStack.sol";
 
-contract GraduationTest is Test {
+contract GraduationTest is LaunchpadStack {
     using StateLibrary for IPoolManager;
     using PoolIdLibrary for PoolKey;
-
-    IPoolManager internal manager;
-    ProphecyHook internal hook;
-    LiquidityLocker internal locker;
-    Launchpad internal launchpad;
 
     address internal prophet = address(0xA11CE);
     address internal protocol = address(0xFEE);
@@ -34,15 +30,8 @@ contract GraduationTest is Test {
     receive() external payable {}
 
     function setUp() public {
-        manager = new PoolManager(address(this));
-        launchpad = new Launchpad(protocol, address(0x51C));
+        _deployStack(protocol, address(0x51C));
         vm.deal(prophet, 10 ether);
-
-        bytes memory ctorArgs = abi.encode(manager, address(this));
-        (, bytes32 salt) =
-            HookMiner.find(address(this), HookMiner.prophecyFlags(), type(ProphecyHook).creationCode, ctorArgs);
-        hook = new ProphecyHook{salt: salt}(manager, address(this));
-        locker = new LiquidityLocker(manager, address(this), IHooks(address(hook)));
     }
 
     function test_fullRangeTicksMatchSpacing200() public pure {
@@ -86,20 +75,14 @@ contract GraduationTest is Test {
         address token = launchpad.launch("lingo-2028", "", 0, 0);
         vm.prank(prophet);
         launchpad.buy{value: 1 ether}(token, 0, "");
-        (uint256 vEth, uint256 vToken, uint256 realEth,, bool complete) = launchpad.curve(token);
+        (uint256 vEth, uint256 vToken,,, bool complete) = launchpad.curve(token);
         assertTrue(complete);
 
         PoolKey memory key = Graduation.poolKey(token, IHooks(address(hook)));
-        uint160 sqrtP = Graduation.initializePool(manager, key, vEth, vToken);
         (uint160 stored,,,) = manager.getSlot0(key.toId());
-        assertEq(stored, sqrtP);
+        uint160 expected = Graduation.sqrtPriceX96FromVirtualReserves(vEth, vToken);
+        assertEq(stored, expected);
         assertLt(Graduation.priceGapPpm(vEth, vToken, stored), Graduation.MAX_PRICE_GAP_PPM);
-
-        uint256 seedToken = launchpad.LP_SUPPLY();
-        vm.prank(address(launchpad));
-        ProphecyToken(token).transfer(address(this), seedToken);
-        ProphecyToken(token).approve(address(locker), seedToken);
-        locker.lock{value: realEth}(token, prophet, protocol, key, seedToken);
 
         (uint128 liquidity,,) = manager.getPositionInfo(
             key.toId(), address(locker), Graduation.tickLower(), Graduation.tickUpper(), bytes32(0)

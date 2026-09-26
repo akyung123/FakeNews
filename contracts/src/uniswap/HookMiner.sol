@@ -6,6 +6,10 @@ import {Hooks} from "v4-core/src/libraries/Hooks.sol";
 /// CREATE2 salt miner so a hook lands on an address whose low bits match its
 /// permission flags. V4 reads those bits; a mismatch means `beforeInitialize`
 /// is never called.
+///
+/// Launchpad CREATE address is predicted from the deployer nonce (after this
+/// CREATE2 and the locker CREATE). Pass that predicted address into the hook
+/// constructor so the two contracts can point at each other.
 library HookMiner {
     uint160 internal constant FLAG_MASK = Hooks.ALL_HOOK_MASK;
     uint256 internal constant MAX_LOOP = 160_000;

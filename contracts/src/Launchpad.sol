@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
+import {PoolKey} from "v4-core/src/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
+
 import {ProphecyToken} from "./ProphecyToken.sol";
+import {Graduation} from "./uniswap/Graduation.sol";
+import {LiquidityLocker} from "./uniswap/LiquidityLocker.sol";
 
 /// Constant-product quotes and fee rounding. Multiply first, divide once.
 library CurveMath {
@@ -46,7 +53,20 @@ library CurveMath {
 
 /// Bonding-curve launchpad. Price is the ratio of two reserves; fees sit in a
 /// separate ledger so they never move that price.
+///
+/// Constructor order (infra must match this in `script/Deploy.s.sol`):
+///   1. protocolFeeRecipient_
+///   2. worldSigner_
+///   3. poolManager_
+///   4. hook_
+///   5. locker_
+///
+/// Hook needs this address and this contract needs the hook. Predict this
+/// Launchpad's CREATE address from the deployer nonce (CREATE does not hash
+/// constructor args), mine the hook CREATE2 salt with that address, deploy
+/// hook then locker, then deploy this contract at the predicted nonce.
 contract Launchpad {
+    using PoolIdLibrary for PoolKey;
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
     uint256 private _status = _NOT_ENTERED;
@@ -85,6 +105,9 @@ contract Launchpad {
     uint256 public protocolFees;
     address public immutable protocolFeeRecipient;
     address public immutable worldSigner;
+    IPoolManager public immutable poolManager;
+    IHooks public immutable hook;
+    LiquidityLocker public immutable locker;
 
     event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
     event Trade(
@@ -100,6 +123,16 @@ contract Launchpad {
     );
     event CreatorFeeClaimed(address indexed prophet, uint256 amount);
     event ProtocolFeeClaimed(address indexed recipient, uint256 amount);
+    event Graduated(
+        address indexed token,
+        bytes32 indexed poolId,
+        uint256 ethToPool,
+        uint256 tokensToPool,
+        uint160 sqrtPriceX96,
+        uint24 fee,
+        int24 tickSpacing,
+        address hooks
+    );
 
     error UnknownToken();
     error CurveComplete();
@@ -113,6 +146,7 @@ contract Launchpad {
     error ZeroAddress();
     error Reentrant();
     error TokenTransferFailed();
+    error UnexpectedEth();
 
     modifier nonReentrant() {
         if (_status == _ENTERED) revert Reentrant();
@@ -121,10 +155,27 @@ contract Launchpad {
         _status = _NOT_ENTERED;
     }
 
-    constructor(address protocolFeeRecipient_, address worldSigner_) {
+    constructor(
+        address protocolFeeRecipient_,
+        address worldSigner_,
+        IPoolManager poolManager_,
+        IHooks hook_,
+        LiquidityLocker locker_
+    ) {
         if (protocolFeeRecipient_ == address(0) || worldSigner_ == address(0)) revert ZeroAddress();
+        if (address(poolManager_) == address(0) || address(hook_) == address(0) || address(locker_) == address(0)) {
+            revert ZeroAddress();
+        }
         protocolFeeRecipient = protocolFeeRecipient_;
         worldSigner = worldSigner_;
+        poolManager = poolManager_;
+        hook = hook_;
+        locker = locker_;
+    }
+
+    /// Seed leftovers from the locker (and PoolManager native take/settle).
+    receive() external payable {
+        if (msg.sender != address(locker) && msg.sender != address(poolManager)) revert UnexpectedEth();
     }
 
     /// World ID prophet names are a later milestone. The server signature
@@ -301,6 +352,27 @@ contract Launchpad {
         _emitTrade(token, buyer, true, preview.ethUsed, preview.tokensOut, preview.fee, c.vEth, c.vToken, memo);
         _transferToken(token, buyer, preview.tokensOut);
         if (preview.refund > 0) _sendEth(buyer, preview.refund);
+        if (preview.completes) _graduate(token, c);
+    }
+
+    /// Last curve buy: open the V4 pool at the curve-end price and lock LP.
+    function _graduate(address token, Curve storage c) internal {
+        PoolKey memory key = Graduation.poolKey(token, hook);
+        uint160 sqrtPriceX96 = Graduation.initializePool(poolManager, key, c.vEth, c.vToken);
+        uint256 ethToPool = c.realEth;
+        uint256 tokensToPool = LP_SUPPLY;
+        ProphecyToken(token).approve(address(locker), tokensToPool);
+        locker.lock{value: ethToPool}(token, c.prophet, protocolFeeRecipient, key, tokensToPool);
+        emit Graduated(
+            token,
+            PoolId.unwrap(key.toId()),
+            ethToPool,
+            tokensToPool,
+            sqrtPriceX96,
+            key.fee,
+            key.tickSpacing,
+            address(key.hooks)
+        );
     }
 
     function _emitTrade(

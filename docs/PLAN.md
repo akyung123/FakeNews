@@ -38,7 +38,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - rounding rules
 - [ ] `Launchpad.registerProphet`: server signature and nullifier checks, then prophet name + prophet registry + prophet resolver
 - [ ] `Launchpad.launch`: initialize the prophecy resolver (sentence, deadline, address), register the name, mint the token
-- [ ] Graduation: fill only the remaining supply and refund, `complete`, V4 pool, `LiquidityLocker`
+- [x] Graduation: fill only the remaining supply and refund, `complete`, V4 pool, `LiquidityLocker` @cursor-agent
 - [x] `ProphecyHook`: `beforeInitialize` allows only the Launchpad. Mine the CREATE2 salt @cursor-agent
 - [x] `LiquidityLocker.collect`: 24 : 76 @cursor-agent
 - [ ] `memo` on `buy` / `sell`, emitted in `Trade`, reverts above 140 bytes

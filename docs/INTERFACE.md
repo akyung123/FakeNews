@@ -29,7 +29,14 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 ### `Launchpad` `(draft)`
 
 ```solidity
-constructor(address protocolFeeRecipient, address worldSigner);
+// Exact constructor order. Infra must update contracts/script/Deploy.s.sol.
+constructor(
+    address protocolFeeRecipient, // 1
+    address worldSigner,          // 2
+    address poolManager,          // 3
+    address hook,                 // 4
+    address locker                // 5
+);
 
 // Create a prophet name. Needs a World ID server signature. Once per nullifier.
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
@@ -52,6 +59,9 @@ function prophetOf(address wallet) external view returns (string label);
 function creatorFeeOf(address wallet) external view returns (uint256);
 function protocolFeeRecipient() external view returns (address);
 function worldSigner() external view returns (address);
+function poolManager() external view returns (address);
+function hook() external view returns (address);
+function locker() external view returns (address);
 ```
 
 ```solidity
@@ -59,9 +69,21 @@ event ProphetRegistered(address indexed wallet, string label, uint256 nullifier)
 event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug, uint64 deadline);
 event Trade(address indexed token, address indexed trader, bool isBuy,
             uint256 ethAmount, uint256 tokenAmount, uint256 fee, uint256 vEthAfter, uint256 vTokenAfter, string memo);
-event Graduated(address indexed token, uint256 ethToPool, uint256 tokensToPool);
+event Graduated(
+    address indexed token,
+    bytes32 indexed poolId,
+    uint256 ethToPool,
+    uint256 tokensToPool,
+    uint160 sqrtPriceX96,
+    uint24 fee,
+    int24 tickSpacing,
+    address hooks
+);
 event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 ```
+
+- `Graduated` is emitted in the buy that sells the last curve tokens. `poolId` is the V4 `PoolId` (`keccak256` of the `PoolKey`). `currency0` is native ETH (`address(0)`); `currency1` is `token`. The frontend reconstructs the key from `token`, `fee`, `tickSpacing`, and `hooks`.
+- Constructor circularity: `ProphecyHook` stores the Launchpad address; Launchpad stores the hook and locker. CREATE of Launchpad does not hash constructor args, so the deployer predicts that address from its nonce, mines the hook CREATE2 salt with it, deploys hook then locker, then deploys Launchpad at the predicted nonce. `receive()` accepts leftover seed ETH only from the locker and the PoolManager.
 
 - The sentence is not in `Launched`. It is read from ENS (DECISIONS #5).
 - Constants are exactly the "Constants" section of SPEC.md.
@@ -78,8 +100,11 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 
 ### `LiquidityLocker`
 
+- `lock(address token, address prophet, address protocolFeeRecipient, PoolKey key, uint256 tokenAmount)` is called only by the Launchpad at graduation. Recipients are fixed then.
 - `collect(address token)` can be called by anyone. Collected fees go **only** to prophet 24 : protocol 76.
-- No withdraw function.
+- No withdraw of principal. Liquidity cannot be decreased or burned.
+- If sending ETH to the prophet fails, `collect` still pays the protocol and accrues the prophet share. The prophet later calls `withdrawAccrued()`.
+- `withdrawAccrued()` sends only accrued ETH, never pool principal.
 
 ## 3. World server → Launchpad `(draft)`
 

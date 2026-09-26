@@ -4,18 +4,20 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+
 import {CurveMath, Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
+import {LaunchpadStack} from "./LaunchpadStack.sol";
 
-contract CurveTest is Test {
-    Launchpad internal launchpad;
+contract CurveTest is LaunchpadStack {
     address internal prophet = address(0xA11CE);
     address internal buyer = address(0xB0B);
     address internal protocol = address(0xFEE);
     address internal signer = address(0x51C);
 
     function setUp() public {
-        launchpad = new Launchpad(protocol, signer);
+        _deployStack(protocol, signer);
         vm.deal(prophet, 100 ether);
         vm.deal(buyer, 100 ether);
     }
@@ -169,23 +171,25 @@ contract CurveTest is Test {
         assertEq(vEth, launchpad.VIRTUAL_ETH() + 0.02 ether);
         assertEq(ProphecyToken(token).balanceOf(buyer), launchpad.CURVE_SUPPLY());
         assertLt(before - buyer.balance, 1 ether);
-        assertEq(address(launchpad).balance, before - buyer.balance);
         _assertSolvent(token);
     }
 
     function test_constructorRejectsZeroRecipient() public {
         vm.expectRevert(Launchpad.ZeroAddress.selector);
-        new Launchpad(address(0), signer);
+        new Launchpad(address(0), signer, manager, IHooks(address(hook)), locker);
     }
 
     function test_constructorRejectsZeroWorldSigner() public {
         vm.expectRevert(Launchpad.ZeroAddress.selector);
-        new Launchpad(protocol, address(0));
+        new Launchpad(protocol, address(0), manager, IHooks(address(hook)), locker);
     }
 
     function test_constructorStoresProtocolRecipient() public view {
         assertEq(launchpad.protocolFeeRecipient(), protocol);
         assertEq(launchpad.worldSigner(), signer);
+        assertEq(address(launchpad.poolManager()), address(manager));
+        assertEq(address(launchpad.hook()), address(hook));
+        assertEq(address(launchpad.locker()), address(locker));
     }
 
     function test_claimProtocolFeePaysOnlyTheRecipient() public {
@@ -231,9 +235,9 @@ contract CurveTest is Test {
         vm.deal(address(launchpad), 5 ether);
         (uint256 tokensA, uint256 feeA) = launchpad.quoteBuy(token, 0.001 ether);
 
-        address clean = address(new Launchpad(protocol, signer));
+        address clean = address(_newStack(protocol, signer));
         vm.prank(prophet);
-        address tokenB = Launchpad(clean).launch("eth-10k", "", 0, 0);
+        address tokenB = Launchpad(payable(clean)).launch("eth-10k", "", 0, 0);
         (uint256 tokensB, uint256 feeB) = Launchpad(clean).quoteBuy(tokenB, 0.001 ether);
         assertEq(tokensA, tokensB);
         assertEq(feeA, feeB);
@@ -260,8 +264,10 @@ contract CurveTest is Test {
     }
 
     function _assertSolvent(address token) internal view {
-        (,, uint256 realEth,,) = launchpad.curve(token);
-        assertGe(address(launchpad).balance, realEth + launchpad.protocolFees() + launchpad.creatorFeeOf(prophet));
+        (,, uint256 realEth,, bool complete) = launchpad.curve(token);
+        uint256 reserved = launchpad.protocolFees() + launchpad.creatorFeeOf(prophet);
+        if (!complete) reserved += realEth;
+        assertGe(address(launchpad).balance, reserved);
     }
 
     function _containsWord(bytes memory data, bytes32 word) internal pure returns (bool) {

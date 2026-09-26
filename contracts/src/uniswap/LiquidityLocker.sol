@@ -10,7 +10,7 @@ import {Currency} from "v4-core/src/types/Currency.sol";
 import {BalanceDelta} from "v4-core/src/types/BalanceDelta.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {IERC20Minimal} from "v4-core/src/interfaces/external/IERC20Minimal.sol";
-import {CurrencySettler} from "v4-core/test/utils/CurrencySettler.sol";
+import {CurrencySettler} from "./CurrencySettler.sol";
 
 import {Graduation} from "./Graduation.sol";
 
@@ -45,6 +45,7 @@ contract LiquidityLocker is IUnlockCallback {
     }
 
     mapping(address token => Position) public positions;
+    mapping(address prophet => uint256) public accruedEth;
 
     event Locked(address indexed token, address indexed prophet, address indexed protocolFeeRecipient, uint128 liquidity);
     event Collected(
@@ -54,6 +55,8 @@ contract LiquidityLocker is IUnlockCallback {
         uint256 prophetAmount1,
         uint256 protocolAmount1
     );
+    event ProphetAccrued(address indexed prophet, uint256 amount);
+    event ProphetWithdrawn(address indexed prophet, uint256 amount);
 
     error NotPoolManager();
     error NotLaunchpad();
@@ -66,6 +69,7 @@ contract LiquidityLocker is IUnlockCallback {
     error EthTransferFailed();
     error TokenTransferFailed();
     error Reentrant();
+    error NothingAccrued();
 
     modifier nonReentrant() {
         if (_status == _ENTERED) revert Reentrant();
@@ -130,6 +134,17 @@ contract LiquidityLocker is IUnlockCallback {
         Position storage p = positions[token];
         if (!p.locked) revert UnknownLock();
         poolManager.unlock(abi.encode(false, token, address(0), uint256(0), uint256(0)));
+    }
+
+    /// Prophet-only path for ETH that `collect` could not send (rejecting contract).
+    /// Does not unlock principal.
+    function withdrawAccrued() external nonReentrant {
+        uint256 amount = accruedEth[msg.sender];
+        if (amount == 0) revert NothingAccrued();
+        accruedEth[msg.sender] = 0;
+        emit ProphetWithdrawn(msg.sender, amount);
+        (bool ok,) = msg.sender.call{value: amount}("");
+        if (!ok) revert EthTransferFailed();
     }
 
     function unlockCallback(bytes calldata data) external returns (bytes memory) {
@@ -205,11 +220,10 @@ contract LiquidityLocker is IUnlockCallback {
         if (amount0 > 0) key.currency0.take(poolManager, address(this), amount0, false);
         if (amount1 > 0) key.currency1.take(poolManager, address(this), amount1, false);
 
-        // Protocol first. A later follow-up can drop the revert on prophet payout
-        // without changing who is paid first.
+        // Protocol first so a rejecting prophet cannot block the protocol share.
         _pay(key.currency0, p.protocolFeeRecipient, protocol0);
         _pay(key.currency1, p.protocolFeeRecipient, protocol1);
-        _pay(key.currency0, p.prophet, prophet0);
+        _payEthOrAccrue(p.prophet, prophet0);
         _pay(key.currency1, p.prophet, prophet1);
 
         emit Collected(token, prophet0, protocol0, prophet1, protocol1);
@@ -222,6 +236,15 @@ contract LiquidityLocker is IUnlockCallback {
             if (!ok) revert EthTransferFailed();
         } else if (!IERC20Minimal(Currency.unwrap(currency)).transfer(to, amount)) {
             revert TokenTransferFailed();
+        }
+    }
+
+    function _payEthOrAccrue(address prophet, uint256 amount) internal {
+        if (amount == 0) return;
+        (bool ok,) = prophet.call{value: amount}("");
+        if (!ok) {
+            accruedEth[prophet] += amount;
+            emit ProphetAccrued(prophet, amount);
         }
     }
 

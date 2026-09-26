@@ -10,13 +10,13 @@ Prophecy is a Sepolia launchpad that turns one sentence into a token. Buying rai
 
 ## What we built / planned with Uniswap V4
 
-**Status:** hook, locker and graduation math are implemented and tested against a locally deployed `PoolManager`. Launchpad still does not call them (follow-up PR). No Sepolia V4 deploy in this change.
+**Status:** Launchpad now graduates on the completing curve buy: initialize the V4 pool, lock LP in `LiquidityLocker`. Hook, locker and graduation math were already in PR #23. No Sepolia V4 deploy in this change.
 
 | Piece | Spec (DECISIONS #11 / SPEC “Uniswap V4”) | Built? |
 |---|---|---|
-| Graduation | Last curve buy fills remaining supply, refunds excess ETH, sets `complete`, opens a V4 pool (native ETH / token, 1% = 10000 pips, tickSpacing 200, full-range liquidity), sends the position NFT to the locker, burns leftover tokens | Math + seed helper built. Launchpad wiring not in this PR |
-| `ProphecyHook` | `beforeInitialize` allows only the Launchpad. Hook address is part of the `PoolKey`. Deployed with a mined CREATE2 salt so the address bits carry the hook permission flags | Built. Tested with HookMiner CREATE2 |
-| `LiquidityLocker` | Holds the position. No withdraw. Anyone may call `collect`; fees go only to prophet 24 : protocol 76 | Built. Position is owned by the locker via `modifyLiquidity` (no PositionManager NFT yet) |
+| Graduation | Last curve buy fills remaining supply, refunds excess ETH, sets `complete`, opens a V4 pool (native ETH / token, 1% = 10000 pips, tickSpacing 200, full-range liquidity), sends the position to the locker | Launchpad wires this. Leftover seed ETH/tokens refund to the Launchpad (`receive` from locker / PoolManager only) |
+| `ProphecyHook` | `beforeInitialize` allows only the Launchpad. Hook address is part of the `PoolKey`. Deployed with a mined CREATE2 salt so the address bits carry the hook permission flags | Built. CREATE-predicted Launchpad address breaks the hook/launchpad cycle |
+| `LiquidityLocker` | Holds the position. No principal withdraw. Anyone may call `collect`; fees go only to prophet 24 : protocol 76. A rejecting prophet does not block the protocol share | Built. Failed prophet ETH is accrued; `withdrawAccrued` pays it later |
 
 Notes while implementing (addresses, salts, `PoolManager` used):
 
@@ -34,6 +34,7 @@ Add a row when something slows V4 work. Leave unused rows blank. Times in KST.
 | 09-26 ~12:45 | Graduation / Hook | `beforeInitialize` sees the `initialize` caller as `sender`. A locker or helper that initializes on behalf of the Launchpad is rejected. | Library `Graduation.initializePool` runs in the Launchpad (or test) context. Locker only adds liquidity after that. | Call this out next to the hook `sender` docs. It is easy to put initialize inside the locker unlock and then spend an hour on a revert with no selector. |
 | 09-26 ~13:00 | Tooling | `LiquidityAmounts` and `CurrencySettler` live under `v4-core/test/utils`, not `src/`. Production locker code has to import test helpers. | Import those two files. | Promote them to `src/libraries` or document that test-utils are the supported integration path. |
 | 09-26 ~13:10 | Tooling | `PoolManager.sol` is `pragma solidity 0.8.26` (exact). The repo was on 0.8.24. | Bump `foundry.toml` to 0.8.26. Existing `^0.8.24` sources still compile. | A one-line “solc must be exactly 0.8.26 to compile v4.0.0” on the install page would have saved a failed first build. |
+| 09-26 ~12:50 | Graduation | Hook constructor needs Launchpad; Launchpad constructor needs hook and locker. CREATE2 of both is circular because init-code hashes include those args. | Predict Launchpad via CREATE (nonce, independent of args). Mine hook salt with that address. Deploy hook, locker, then Launchpad. | Document CREATE vs CREATE2 when two constructors store each other. |
 | | | | | |
 
 ## Docs / tooling gaps

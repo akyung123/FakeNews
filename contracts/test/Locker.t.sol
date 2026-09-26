@@ -152,6 +152,38 @@ contract LockerTest is Test {
         locker.lock{value: 1}(address(token), prophet, protocol, key, 1);
     }
 
+    function test_collectPaysProtocolWhenProphetRejectsEth() public {
+        RejectingProphet rejector = new RejectingProphet();
+        ProphecyToken tok = new ProphecyToken("reject.prophecy.eth", "REJECT", address(this));
+        PoolKey memory rejectKey = Graduation.poolKey(address(tok), IHooks(address(hook)));
+        Graduation.initializePool(manager, rejectKey, 3 * 7_058_378_514_689_194, 279_900_000e18);
+        tok.approve(address(locker), SEED_TOKEN);
+        vm.deal(address(this), SEED_ETH);
+        locker.lock{value: SEED_ETH}(address(tok), address(rejector), protocol, rejectKey, SEED_TOKEN);
+
+        uint256 ethFee = 100;
+        vm.deal(address(this), ethFee);
+        donor.donate{value: ethFee}(rejectKey, ethFee, 0, "");
+
+        uint256 protocolBefore = protocol.balance;
+        locker.collect(address(tok));
+        assertGt(protocol.balance, protocolBefore);
+        assertEq(address(rejector).balance, 0);
+        uint256 accrued = locker.accruedEth(address(rejector));
+        assertGt(accrued, 0);
+
+        rejector.setAccept(true);
+        uint256 before = address(rejector).balance;
+        rejector.withdraw(locker);
+        assertEq(address(rejector).balance, before + accrued);
+        assertEq(locker.accruedEth(address(rejector)), 0);
+    }
+
+    function test_withdrawAccruedRevertsWhenEmpty() public {
+        vm.expectRevert(LiquidityLocker.NothingAccrued.selector);
+        locker.withdrawAccrued();
+    }
+
     function _liquidity() internal view returns (uint128 liquidity) {
         (liquidity,,) = manager.getPositionInfo(
             key.toId(), address(locker), Graduation.tickLower(), Graduation.tickUpper(), bytes32(0)
@@ -163,5 +195,21 @@ contract LockerTest is Test {
         assertEq(prophetShare, expP);
         assertEq(protocolShare, expR);
         assertEq(prophetShare + protocolShare, expP + expR);
+    }
+}
+
+contract RejectingProphet {
+    bool public accept;
+
+    function setAccept(bool v) external {
+        accept = v;
+    }
+
+    receive() external payable {
+        if (!accept) revert();
+    }
+
+    function withdraw(LiquidityLocker loc) external {
+        loc.withdrawAccrued();
     }
 }

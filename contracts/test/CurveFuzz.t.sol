@@ -5,15 +5,15 @@ import {Test} from "forge-std/Test.sol";
 
 import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
+import {LaunchpadStack} from "./LaunchpadStack.sol";
 
-contract CurveFuzzTest is Test {
-    Launchpad internal launchpad;
+contract CurveFuzzTest is LaunchpadStack {
     address internal prophet = address(0xA11CE);
 
     address[] internal traders;
 
     function setUp() public {
-        launchpad = new Launchpad(address(0xFEE), address(0x51C));
+        _deployStack(address(0xFEE), address(0x51C));
         vm.deal(prophet, 100 ether);
         traders.push(address(0x101));
         traders.push(address(0x102));
@@ -29,8 +29,9 @@ contract CurveFuzzTest is Test {
     }
 
     function _assertSolvent(address token) internal view {
-        (uint256 vEth,, uint256 realEth, uint256 sold,) = launchpad.curve(token);
-        uint256 reserved = realEth + launchpad.protocolFees() + launchpad.creatorFeeOf(prophet);
+        (uint256 vEth,, uint256 realEth, uint256 sold, bool complete) = launchpad.curve(token);
+        uint256 reserved = launchpad.protocolFees() + launchpad.creatorFeeOf(prophet);
+        if (!complete) reserved += realEth;
         assertGe(address(launchpad).balance, reserved, "balance covers reserves and fees");
         assertEq(vEth, launchpad.VIRTUAL_ETH() + realEth, "realEth tracks vEth");
         assertEq(sold, launchpad.VIRTUAL_TOKEN() - _vToken(token), "sold tracks vToken");
