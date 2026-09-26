@@ -103,7 +103,56 @@ The deployer must be a **plain EOA**. `ETHRegistrar.register` mints an ERC-1155 
 
 Gas on a Sepolia fork (10 txs, ~4.27M gas, mint skipped because the account already held MockUSDC): about 0.0043 ETH at 1 gwei, 0.021 ETH at 5 gwei, 0.085 ETH at 20 gwei. A 0.05 ETH deployer balance covers 1–5 gwei, not 20 gwei. If `Deploy.s.sol` is split from `deployAdapter()`, do not send any other deployer transaction in between — the Launchpad CREATE nonce is predicted.
 
-The script prints paste-ready lines for a visual check: `WORLD_CHAIN_ID=11155111`, `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`, and `worldSigner address: 0x…` (address only, never the private key).
+The script prints paste-ready lines for a visual check: `WORLD_CHAIN_ID=11155111`, `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`, and `worldSigner address: 0x…` (address only, never the private key). After a send it also writes the deployment record below and prints `chainId`, `launchpad`, `launchpadBlock`, `adapter`, `parentUserRegistry`, `deployer`, and `commit`.
+
+## Deployment record
+
+After a successful **send** (`SEND=1` / `--broadcast`), `infra/scripts/write-deployment-record.sh` writes one JSON file. No private keys, RPC URLs, or signer keys.
+
+| File | When |
+|------|------|
+| `deployments/sepolia.json` | Chain 11155111 on a remote Sepolia RPC. A person may commit this after the live send. |
+| `deployments/anvil.json` | Anvil (`31337`) or a local / forked RPC (`127.0.0.1`, `localhost`, `WARP_COMMIT=1`). **Gitignored.** |
+
+```json
+{
+  "chainId": 11155111,
+  "launchpad": "0xLaunchpadAddress…",
+  "launchpadBlock": 12345678,
+  "adapter": "0xProphecyEnsAddress…",
+  "parentUserRegistry": "0xParentUserRegistry…",
+  "deployer": "0xDeployerAddress…",
+  "commit": "<git rev-parse HEAD>"
+}
+```
+
+JSON values are hex addresses or numbers — the ellipses above are documentation only.
+
+`launchpadBlock` is the receipt block of the Launchpad CREATE (from Foundry `broadcast/Deploy.s.sol/<chainId>/run-latest.json`). Addresses are checksummed when Foundry logs them.
+
+**Web** (existing INTERFACE §5 names only):
+
+| JSON field | Web |
+|---|---|
+| `launchpad` | `VITE_LAUNCHPAD_ADDRESS` (Actions variable / `web/.env`) |
+| `launchpadBlock` | `fromBlock` for `Launched` event queries. Read from this file — **no new `VITE_*`.** |
+| `chainId` | `VITE_CHAIN_ID` is already `11155111` on Sepolia |
+
+Stdout after a send (same keys, plus the two existing web env lines):
+
+```
+--- deployment ---
+chainId=11155111
+launchpad=0x…
+launchpadBlock=11783750
+adapter=0x…
+parentUserRegistry=0x…
+deployer=0x…
+commit=7c075cd…
+VITE_LAUNCHPAD_ADDRESS=0x…
+VITE_CHAIN_ID=11155111
+wrote /…/deployments/sepolia.json
+```
 
 **Mandatory after Launchpad deploy.** Set these on Render and restart the world service. Empty `WORLD_CHAIN_ID` / `WORLD_LAUNCHPAD_ADDRESS` turns the server-side context check off (PR #16).
 
@@ -122,7 +171,7 @@ Never commit `WORLD_SIGNER_KEY`. Never print it in CI logs. A person pastes it f
 | Variable | Value |
 |----------|--------|
 | `VITE_WORLD_SERVER_URL` | Render `https://….onrender.com` origin |
-| `VITE_LAUNCHPAD_ADDRESS` | Deployed Launchpad |
+| `VITE_LAUNCHPAD_ADDRESS` | `launchpad` from `deployments/sepolia.json` |
 | `VITE_CHAIN_ID` | `11155111` |
 | `VITE_RPC_URL` | Public / rate-limited Sepolia RPC (not the `SEPOLIA_RPC_URL` secret) |
 | `VITE_PARENT_NAME` | `prophecy.eth` |
