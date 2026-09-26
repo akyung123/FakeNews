@@ -1,4 +1,4 @@
-import { ContractFunctionExecutionError, ContractFunctionRevertedError, encodeErrorResult, UserRejectedRequestError } from "viem";
+import { ContractFunctionRevertedError, encodeErrorResult, UserRejectedRequestError } from "viem";
 import { describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "./issue";
 import { launchpadAbi } from "./launchpadAbi";
@@ -18,10 +18,7 @@ function revertNamed(errorName: string, functionName = "buy") {
 }
 
 function wrappedRevert(errorName: string, functionName = "buy") {
-  return new ContractFunctionExecutionError(revertNamed(errorName, functionName), {
-    abi: launchpadAbi,
-    functionName,
-  });
+  return { name: "ContractFunctionExecutionError", cause: revertNamed(errorName, functionName) };
 }
 
 describe("classifyWriteError", () => {
