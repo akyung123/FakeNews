@@ -124,5 +124,19 @@ describe("getProphecyByName", () => {
     expect(coin).not.toBeNull();
     expect(coin!.prophecy).toBe("Every hackathon badge is an ENS name by 2028");
     expect(coin!.name).toBe("badges-2028.ringo.prophecy.eth");
+    expect(coin!.ticker).toBe("BADGES-2028");
+  });
+});
+
+describe("ENS text records", () => {
+  test("sentence and deadline come from getEnsText keys, not from Launched", async () => {
+    const { mockEnsText, parseDeadlineText, ENS_TEXT_DEADLINE, ENS_TEXT_PROPHECY } = await import("./ens");
+    const name = "last-talk.ringo.prophecy.eth";
+    expect(mockEnsText(name, ENS_TEXT_PROPHECY)).toBe("The last hallway talk is standing room only");
+    expect(parseDeadlineText(mockEnsText(name, ENS_TEXT_DEADLINE))).toBe(1_700_000_000);
+    const row = getProphecyByName(name, NOW)!;
+    expect(row.sentence).toBe(mockEnsText(name, ENS_TEXT_PROPHECY));
+    expect(row.deadline).toBe(parseDeadlineText(mockEnsText(name, ENS_TEXT_DEADLINE)));
+    expect(row.departed).toBe(true);
   });
 });

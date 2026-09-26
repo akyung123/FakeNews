@@ -1,0 +1,229 @@
+/**
+ * Launchpad ABI generated from contracts/src/Launchpad.sol on
+ * cursor/launchpad-ens-world-eec2 (PR #25).
+ *
+ * Constructor is (protocolFeeRecipient, worldSigner, ens). Uniswap addresses
+ * are not constructor args on this ABI — graduation may add a one-time
+ * setUniswap later. Launched has no deadline; read it from ENS text.
+ */
+export const launchpadAbi = [
+  {
+    type: "constructor",
+    inputs: [
+      { name: "protocolFeeRecipient", type: "address" },
+      { name: "worldSigner", type: "address" },
+      { name: "ens", type: "address" },
+    ],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "registerProphet",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "label", type: "string" },
+      { name: "nullifier", type: "uint256" },
+      { name: "serverSig", type: "bytes" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "launch",
+    stateMutability: "payable",
+    inputs: [
+      { name: "slug", type: "string" },
+      { name: "prophecy", type: "string" },
+      { name: "deadline", type: "uint64" },
+      { name: "minTokensOut", type: "uint256" },
+    ],
+    outputs: [{ name: "token", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "buy",
+    stateMutability: "payable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "minTokensOut", type: "uint256" },
+      { name: "memo", type: "string" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "sell",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "tokensIn", type: "uint256" },
+      { name: "minEthOut", type: "uint256" },
+      { name: "memo", type: "string" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "claimCreatorFee",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "claimProtocolFee",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "curve",
+    stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [
+      { name: "vEth", type: "uint256" },
+      { name: "vToken", type: "uint256" },
+      { name: "realEth", type: "uint256" },
+      { name: "sold", type: "uint256" },
+      { name: "complete", type: "bool" },
+    ],
+  },
+  {
+    type: "function",
+    name: "quoteBuy",
+    stateMutability: "view",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "ethIn", type: "uint256" },
+    ],
+    outputs: [
+      { name: "tokensOut", type: "uint256" },
+      { name: "fee", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "quoteSell",
+    stateMutability: "view",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "tokensIn", type: "uint256" },
+    ],
+    outputs: [
+      { name: "ethOut", type: "uint256" },
+      { name: "fee", type: "uint256" },
+    ],
+  },
+  {
+    type: "function",
+    name: "prophetOf",
+    stateMutability: "view",
+    inputs: [{ name: "wallet", type: "address" }],
+    outputs: [{ name: "label", type: "string" }],
+  },
+  {
+    type: "function",
+    name: "creatorFeeOf",
+    stateMutability: "view",
+    inputs: [{ name: "wallet", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "protocolFeeRecipient",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "worldSigner",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "ens",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }],
+  },
+  {
+    type: "function",
+    name: "protocolFees",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "event",
+    name: "ProphetRegistered",
+    inputs: [
+      { name: "wallet", type: "address", indexed: true },
+      { name: "label", type: "string", indexed: false },
+      { name: "nullifier", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Launched",
+    inputs: [
+      { name: "token", type: "address", indexed: true },
+      { name: "prophet", type: "address", indexed: true },
+      { name: "prophetLabel", type: "string", indexed: false },
+      { name: "slug", type: "string", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Trade",
+    inputs: [
+      { name: "token", type: "address", indexed: true },
+      { name: "trader", type: "address", indexed: true },
+      { name: "isBuy", type: "bool", indexed: false },
+      { name: "ethAmount", type: "uint256", indexed: false },
+      { name: "tokenAmount", type: "uint256", indexed: false },
+      { name: "fee", type: "uint256", indexed: false },
+      { name: "vEthAfter", type: "uint256", indexed: false },
+      { name: "vTokenAfter", type: "uint256", indexed: false },
+      { name: "memo", type: "string", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "CreatorFeeClaimed",
+    inputs: [
+      { name: "prophet", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "ProtocolFeeClaimed",
+    inputs: [
+      { name: "recipient", type: "address", indexed: true },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  { type: "error", name: "UnknownToken", inputs: [] },
+  { type: "error", name: "CurveComplete", inputs: [] },
+  { type: "error", name: "ZeroAmount", inputs: [] },
+  { type: "error", name: "Slippage", inputs: [] },
+  { type: "error", name: "MemoTooLong", inputs: [] },
+  { type: "error", name: "BadSlug", inputs: [] },
+  { type: "error", name: "BadLabel", inputs: [] },
+  { type: "error", name: "BadProphecy", inputs: [] },
+  { type: "error", name: "InvalidSignature", inputs: [] },
+  { type: "error", name: "NullifierUsed", inputs: [] },
+  { type: "error", name: "LabelTaken", inputs: [] },
+  { type: "error", name: "AlreadyProphet", inputs: [] },
+  { type: "error", name: "NotProphet", inputs: [] },
+  { type: "error", name: "SlugTaken", inputs: [] },
+  { type: "error", name: "ExceedsSold", inputs: [] },
+  { type: "error", name: "EthTransferFailed", inputs: [] },
+  { type: "error", name: "ZeroAddress", inputs: [] },
+  { type: "error", name: "Reentrant", inputs: [] },
+  { type: "error", name: "TokenTransferFailed", inputs: [] },
+] as const;

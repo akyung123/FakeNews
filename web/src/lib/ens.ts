@@ -1,0 +1,125 @@
+/**
+ * ENS reads for a prophecy name.
+ *
+ * Live: viem `getEnsText` / `getEnsAddress` on Sepolia through
+ * `VITE_UNIVERSAL_RESOLVER` (INTERFACE §4).
+ * Mock: sample records in mock.ts, same keys (`prophecy`, `deadline`).
+ *
+ * Sentence and deadline live only on the prophecy resolver (DECISIONS #5).
+ */
+import { createPublicClient, http, type Address, type PublicClient } from "viem";
+import { sepolia } from "viem/chains";
+import { normalize } from "viem/ens";
+import { SEPOLIA_CHAIN_ID, webEnv } from "./env";
+import { MOCK_PARENT_NAME, MOCK_PROPHECIES, MOCK_PROPHETS } from "./mock";
+
+export const ENS_TEXT_PROPHECY = "prophecy";
+export const ENS_TEXT_DEADLINE = "deadline";
+
+export type EnsPublicClient = Pick<PublicClient, "getEnsText" | "getEnsAddress">;
+
+export function prophecyMockName(slug: string, prophetLabel: string, parent = MOCK_PARENT_NAME): string {
+  return `${slug}.${prophetLabel}.${parent}`;
+}
+
+export function prophetMockName(label: string, parent = MOCK_PARENT_NAME): string {
+  return `${label}.${parent}`;
+}
+
+function decodeName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+/** Mock ENS text store. Same keys the Universal Resolver uses on Sepolia. */
+export function mockEnsText(name: string, key: string): string | null {
+  const n = decodeName(name);
+  if (!n) return null;
+  const row = MOCK_PROPHECIES.find((item) => {
+    const ens = prophecyMockName(item.slug, item.prophetLabel);
+    return ens === n || item.slug === n;
+  });
+  if (!row) return null;
+  if (key === ENS_TEXT_PROPHECY) return row.sentence;
+  if (key === ENS_TEXT_DEADLINE) return String(row.deadline);
+  return null;
+}
+
+export function mockEnsAddress(name: string): Address | null {
+  const n = decodeName(name);
+  if (!n) return null;
+  const prophecy = MOCK_PROPHECIES.find((item) => prophecyMockName(item.slug, item.prophetLabel) === n);
+  if (prophecy) return prophecy.token;
+  const prophet = MOCK_PROPHETS.find((item) => prophetMockName(item.label) === n || item.label === n);
+  return prophet?.wallet ?? null;
+}
+
+/** `deadline` text is unix seconds as a decimal string (INTERFACE §1). */
+export function parseDeadlineText(value: string | null | undefined): number | null {
+  if (value == null || value === "") return null;
+  if (!/^[0-9]+$/.test(value)) return null;
+  const n = Number(value);
+  if (!Number.isSafeInteger(n) || n <= 0) return null;
+  return n;
+}
+
+export function createEnsClient(rpcUrl = webEnv.rpcUrl): PublicClient {
+  return createPublicClient({
+    chain: sepolia,
+    transport: http(rpcUrl),
+  });
+}
+
+export function useLiveEns(): boolean {
+  return Boolean(webEnv.universalResolver);
+}
+
+/** Args for wagmi `useEnsText` / viem `getEnsText` on Sepolia. */
+export function ensTextQuery(name: string, key: string) {
+  const resolver = webEnv.universalResolver;
+  const ready = Boolean(resolver && name);
+  return {
+    name: ready ? normalize(name) : undefined,
+    key,
+    chainId: SEPOLIA_CHAIN_ID,
+    universalResolverAddress: resolver,
+    query: { enabled: ready },
+  };
+}
+
+export async function getEnsText(
+  name: string,
+  key: string,
+  options: { client?: EnsPublicClient; universalResolver?: Address } = {},
+): Promise<string | null> {
+  const resolver = options.universalResolver ?? webEnv.universalResolver;
+  if (!resolver) return mockEnsText(name, key);
+  const client = options.client ?? createEnsClient();
+  const text = await client.getEnsText({
+    name: normalize(name),
+    key,
+    universalResolverAddress: resolver,
+  });
+  return text ?? null;
+}
+
+export async function getEnsAddress(
+  name: string,
+  options: { client?: EnsPublicClient; universalResolver?: Address } = {},
+): Promise<Address | null> {
+  const resolver = options.universalResolver ?? webEnv.universalResolver;
+  if (!resolver) return mockEnsAddress(name);
+  const client = options.client ?? createEnsClient();
+  const address = await client.getEnsAddress({
+    name: normalize(name),
+    universalResolverAddress: resolver,
+    coinType: 60n,
+  });
+  return address ?? null;
+}
+
+export async function getEnsDeadline(
+  name: string,
+  options: { client?: EnsPublicClient; universalResolver?: Address } = {},
+): Promise<number | null> {
+  return parseDeadlineText(await getEnsText(name, ENS_TEXT_DEADLINE, options));
+}

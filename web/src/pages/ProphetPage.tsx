@@ -119,8 +119,8 @@ function ProphetView({ data }: { data: ProphetPageData }) {
               <Link key={row.ensName} className="tr" role="row" to={prophecyDetailPath(row.ensName)}>
                 <span className="cell-coin">
                   <span className="cell-coin-text">
-                    <span className="row-title">{row.ensName}</span>
-                    <span className="row-sub">{row.slug}</span>
+                    <span className="row-title">{row.slug}</span>
+                    <span className="row-sub">{row.ensName}</span>
                   </span>
                 </span>
                 <span className="prophet-sentence">{row.sentence}</span>
@@ -152,6 +152,7 @@ function ProphecyCard({ row }: { row: ProphetProphecy }) {
   const label = prophecyTradeLabel(row);
   return (
     <article className="prophet-card">
+      <p className="row-title">{row.slug}</p>
       <p className="row-sub">{row.ensName}</p>
       <p className="prophet-card-sentence">{row.sentence}</p>
       <Status row={row} />

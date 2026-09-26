@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5174",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run && bun test src/lib/curve.vectors.test.ts src/lib/prophetData.test.ts src/pages/CoinPage.test.tsx src/pages/ProphetPage.test.tsx src/copy.test.tsx"
+    "test": "vitest run && bun test src/lib/curve.vectors.test.ts src/lib/ensName.test.ts src/lib/prophetData.test.ts src/pages/CoinPage.test.tsx src/pages/ProphetPage.test.tsx src/copy.test.tsx"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.103.3",
