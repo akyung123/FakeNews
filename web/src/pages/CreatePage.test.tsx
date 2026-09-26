@@ -423,6 +423,25 @@ describe("Screen 2 button gating", () => {
     expect(document.body.textContent).not.toContain("140 left");
   });
 
+  it("keeps Issue enabled with no too-small banner when first buy is empty or 0", async () => {
+    const user = userEvent.setup();
+    renderIssue(MOCK_RETURNING_SESSION);
+    await fillReturningForm(user);
+    expect(launchButton()).toBeEnabled();
+    expect(screen.queryByText(ZERO_QUOTE_COPY)).toBeNull();
+
+    const firstBuy = screen.getByLabelText(/First buy/i);
+    await user.clear(firstBuy);
+    expect(screen.queryByText(ZERO_QUOTE_COPY)).toBeNull();
+    expect(screen.queryByText("Amount too small to trade. Try a larger amount.")).toBeNull();
+    expect(launchButton()).toBeEnabled();
+
+    await user.click(firstBuy);
+    await user.paste("0");
+    expect(screen.queryByText(ZERO_QUOTE_COPY)).toBeNull();
+    expect(launchButton()).toBeEnabled();
+  });
+
   it("disables Issue and shows the exact too-small line when the first-buy quote is 0", async () => {
     const user = userEvent.setup();
     const launched: LaunchInput[] = [];

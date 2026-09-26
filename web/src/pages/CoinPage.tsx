@@ -205,12 +205,14 @@ export function TradeBox({
   const buyQuote = quoteBuy(coin, Math.min(value, balance));
   const sellTokens = Math.min(held, (held * Math.min(value, 100)) / 100);
   const sellQuote = quoteSell(coin, sellTokens).eth;
-  const quoteTooSmall = side === "buy" ? buyQuote.tokens <= 0 : sellQuote <= 0;
+  const cannotTrade = side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0 || sellQuote <= 0;
+  const rawQuoteZero = side === "buy" ? quoteBuy(coin, value).tokens <= 0 : sellQuote <= 0;
+  const showTooSmallBanner = value > 0 && rawQuoteZero;
   const writeTarget = isChainWriteTarget(coin);
   const showWrites = !chain || writeTarget;
 
   function submit() {
-    if (pending || memoTooLong || closed || quoteTooSmall) return;
+    if (pending || memoTooLong || closed || cannotTrade) return;
     if (chain && !writeTarget) return;
     const token = liveTokenAddress(coin.id, coin.token);
     if (!writeTarget || !token) {
@@ -315,7 +317,7 @@ export function TradeBox({
           {MEMO_COPY.tooLong}
         </p>
       ) : null}
-      {quoteTooSmall ? (
+      {showTooSmallBanner ? (
         <p className="banner-error" role="alert">
           {ZERO_QUOTE_COPY}
         </p>
@@ -324,7 +326,7 @@ export function TradeBox({
         <button
           type="button"
           className={`btn ${side === "buy" ? "primary" : "sell"} full`}
-          disabled={pending || memoTooLong || quoteTooSmall}
+          disabled={pending || memoTooLong || cannotTrade}
           onClick={submit}
         >
           {pending && phase === "approve"
