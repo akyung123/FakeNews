@@ -160,6 +160,8 @@ Live IDKit uses `app_id`, `action`, and `environment` from this envelope so the 
 }
 ```
 
+`wallet` is the connected wallet (the wagmi account) that will send `registerProphet`. The IDKit `proofOfHuman` signal, this `wallet`, the `prophetOf(wallet)` read and the `registerProphet` sender are the same address, so the signed digest matches `msg.sender`. With no wallet connected the web app does not start the World step. A mock wallet is used only in mock mode (no Launchpad address). When the wallet changes, the web app drops the earlier World result and reads `prophetOf` again.
+
 `idkitResponse` is the IDKit 4 result, forwarded as-is (`proof` is an accepted alias on the server). Verify errors: `portal_rejected`, `malformed_payload`, `context_mismatch` — the last two share the retry sentence. On success:
 
 ```json

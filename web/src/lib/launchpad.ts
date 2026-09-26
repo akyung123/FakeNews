@@ -8,8 +8,13 @@ import { withRpcRetry } from "./rpc";
 import { wagmiConfig } from "./wagmi";
 import type { Hex } from "./world";
 
-/** Launchpad.registerProphet calldata. Label is chosen by the caller, not signed. */
+/**
+ * Launchpad.registerProphet calldata. Label is chosen by the caller, not signed.
+ * `wallet` is the address the World server signed for; the write is sent from
+ * that account so `msg.sender` matches the signed digest.
+ */
 export type RegisterProphetInput = {
+  wallet: Address;
   label: string;
   nullifier: Hex;
   serverSig: Hex;
@@ -126,6 +131,7 @@ export function registerProphetWrite(input: RegisterProphetInput, address = cont
     abi: launchpadAbi,
     functionName: "registerProphet" as const,
     args: registerProphetArgs(input),
+    account: input.wallet,
   };
 }
 

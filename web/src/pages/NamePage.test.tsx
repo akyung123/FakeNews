@@ -67,6 +67,7 @@ describe("/name registerProphet write path", () => {
     await waitFor(() => expect(screen.getByTestId("create-page")).toBeInTheDocument());
     expect(seen).toEqual([
       {
+        wallet: MOCK_ISSUE_SESSION.wallet,
         label: "mina",
         nullifier: MOCK_WORLD_VERIFY.nullifier,
         serverSig: MOCK_WORLD_VERIFY.serverSig,

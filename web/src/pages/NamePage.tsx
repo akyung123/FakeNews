@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import type { Address } from "viem";
+import { WalletGate } from "../components/WalletGate";
 import { WorldGate } from "../components/WorldGate";
 import { SampleBadge } from "../components/SampleBadge";
 import {
@@ -8,61 +10,91 @@ import {
   storeProphetLabel,
   worldUserMessage,
   type IssueSession,
-  type WorldStatus,
 } from "../lib/issue";
-import { createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
+import { useIssueSession, useProphetLookup, useWalletBoundWorld } from "../lib/issueSession";
+import { createReadProphetOf, createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_PARENT_NAME } from "../lib/mock";
+import { isMockMode } from "../lib/mode";
 import { writeErrorMessage } from "../lib/writes";
-import { resolveIssueSession } from "./CreatePage";
-import {
-  createWorldClient,
-  type WorldClient,
-  type WorldErrorKind,
-  type WorldServerSignature,
-} from "../lib/world";
+import { createWorldClient, type WorldClient } from "../lib/world";
 
 export function NamePage() {
-  const [params] = useSearchParams();
-  const session = useMemo(() => resolveIssueSession(params), [params]);
-  return <ClaimNameScreen session={session} />;
+  const { session, connecting } = useIssueSession();
+  return <ClaimNameScreen session={session} walletConnecting={connecting} />;
 }
 
 export function ClaimNameScreen({
   session,
+  walletConnecting = false,
   world: worldProp,
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
   registerProphet = createRegisterProphet(),
+  lookupProphet,
 }: {
-  session: IssueSession;
+  /** null: chain mode with no wallet connected. */
+  session: IssueSession | null;
+  walletConnecting?: boolean;
   world?: WorldClient;
   parentName?: string;
   registerProphet?: (input: RegisterProphetInput) => Promise<void>;
+  lookupProphet?: (wallet: string) => Promise<string>;
 }) {
   const navigate = useNavigate();
   // One client per screen. A new one each render makes WorldGate recheck the
   // server and drop the open World ID widget.
   const [world] = useState(() => worldProp ?? createWorldClient());
-  const returningProphet = Boolean(session.prophetLabel);
-  const [prophetLabel, setProphetLabel] = useState(session.prophetLabel ?? "");
-  const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
-  const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
-  const [verified, setVerified] = useState<WorldServerSignature | null>(null);
+  const wallet = session?.wallet ?? null;
+  const presetLabel = session?.prophetLabel ?? null;
+  const readProphet = useMemo(() => lookupProphet ?? createReadProphetOf(), [lookupProphet]);
+  const { lookup, retry: retryLookup } = useProphetLookup(wallet, presetLabel, readProphet);
+  const onChainLabel = lookup.status === "ready" ? lookup.label : "";
+  const walletReady = Boolean(wallet) && lookup.status === "ready";
+  const returningProphet = Boolean(onChainLabel);
+  const {
+    walletRef,
+    worldStatus,
+    worldError,
+    verified,
+    onStatus: onWorldStatus,
+    onErrorKind: onWorldError,
+    onVerified: onWorldVerified,
+    reset: resetWorld,
+  } = useWalletBoundWorld(wallet);
+  const [typedLabel, setProphetLabel] = useState(presetLabel ?? "");
+  // A wallet that already has a name keeps it; the field is read-only then.
+  const prophetLabel = onChainLabel || typedLabel;
   const [registerStatus, setRegisterStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
   const [writeError, setWriteError] = useState<string | null>(null);
 
+  // A different wallet is a different person on chain: drop its World result and banners.
+  const [stateWallet, setStateWallet] = useState(wallet);
+  if (stateWallet !== wallet) {
+    setStateWallet(wallet);
+    resetWorld();
+    setProphetLabel(presetLabel ?? "");
+    setRegisterStatus("idle");
+    setWriteError(null);
+  }
+
   const labelOk = isValidProphetLabel(prophetLabel);
   const registerBusy = registerStatus === "pending";
-  const canContinue = (returningProphet || (labelOk && worldStatus === "success")) && !registerBusy;
+  const canContinue =
+    walletReady && (returningProphet || (labelOk && worldStatus === "success")) && !registerBusy;
   const pending =
     registerBusy
       ? ISSUE_COPY.registerPending
-      : !returningProphet && worldStatus === "pending"
+      : walletReady && !returningProphet && worldStatus === "pending"
         ? ISSUE_COPY.pending
         : null;
   const error =
     writeError ??
     (returningProphet || worldStatus === "pending" || registerBusy ? null : worldUserMessage(worldError));
   const fullName = prophetLabel ? `${prophetLabel}.${parentName}` : "";
+  const submitLabel = !wallet
+    ? ISSUE_COPY.connectWallet
+    : returningProphet
+      ? ISSUE_COPY.oneTransaction
+      : ISSUE_COPY.continueIssue;
 
   return (
     <main className="narrow stack">
@@ -82,7 +114,7 @@ export function ClaimNameScreen({
         )}
       </div>
 
-      {world.isMock ? (
+      {world.isMock && isMockMode() ? (
         <p className="faint small">
           Mock session: <Link to="/name?fresh=1">first-time</Link>
           {" · "}
@@ -94,27 +126,31 @@ export function ClaimNameScreen({
         className="block create name-hero"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!canContinue || registerBusy) return;
+          if (!canContinue || registerBusy || !wallet) return;
           if (!returningProphet && !verified) return;
+          const signer = wallet;
           void (async () => {
             setWriteError(null);
             if (!returningProphet && verified) {
               setRegisterStatus("pending");
               try {
                 await registerProphet({
+                  wallet: signer as Address,
                   label: prophetLabel,
                   nullifier: verified.nullifier,
                   serverSig: verified.serverSig,
                 });
-                setRegisterStatus("success");
               } catch (err) {
+                if (walletRef.current !== signer) return;
                 const message = writeErrorMessage(err, "registerProphet");
                 setRegisterStatus(message ? "failed" : "idle");
                 setWriteError(message);
                 return;
               }
+              if (walletRef.current !== signer) return;
+              storeProphetLabel(signer, prophetLabel);
+              setRegisterStatus("success");
             }
-            if (!returningProphet) storeProphetLabel(prophetLabel);
             navigate("/create");
           })();
         }}
@@ -136,19 +172,21 @@ export function ClaimNameScreen({
 
         {fullName ? <p className="name-preview">{fullName}</p> : null}
 
-        <WorldGate
-          returningProphet={returningProphet}
-          prophetName={session.prophetLabel ? `${session.prophetLabel}.${parentName}` : ""}
-          wallet={session.wallet}
-          world={world}
-          status={worldStatus}
-          onStatus={(status) => {
-            setWorldStatus(status);
-            if (status === "pending" || status === "success") setWorldError(null);
-          }}
-          onErrorKind={setWorldError}
-          onVerified={setVerified}
-        />
+        {wallet && walletReady ? (
+          <WorldGate
+            key={wallet}
+            returningProphet={returningProphet}
+            prophetName={onChainLabel ? `${onChainLabel}.${parentName}` : ""}
+            wallet={wallet}
+            world={world}
+            status={worldStatus}
+            onStatus={onWorldStatus}
+            onErrorKind={onWorldError}
+            onVerified={onWorldVerified}
+          />
+        ) : (
+          <WalletGate hasWallet={Boolean(wallet)} connecting={walletConnecting} lookup={lookup} onRetry={retryLookup} />
+        )}
 
         {pending ? (
           <p className="banner-lock" data-testid={registerBusy ? "register-pending" : "world-pending"}>
@@ -167,7 +205,7 @@ export function ClaimNameScreen({
         ) : null}
 
         <button type="submit" className="btn primary full" disabled={!canContinue || registerBusy}>
-          {returningProphet ? ISSUE_COPY.oneTransaction : ISSUE_COPY.continueIssue}
+          {submitLabel}
         </button>
       </form>
     </main>
