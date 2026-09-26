@@ -1,0 +1,67 @@
+/* Prophecy — Visual Direction v1 tokens (DRAFT)
+   v1: display serif -> Fraunces; red seal accent, textures and motif tokens removed (see tokens.md).
+   Palette still sampled from the hero reference illustration, nudged for UI + WCAG. */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Ink (backgrounds) */
+  --ink-950: #0C0C0C;   /* page bg */
+  --ink-900: #121212;   /* default bg */
+  --ink-800: #1A1A1A;   /* surface / panels on dark */
+  --ink-700: #242322;   /* raised surface, input fill */
+  --ink-600: #3A3A3A;   /* dividers */
+  --grey-400: #979694;  /* neutral grey, disabled icons (was wash-400) */
+
+  /* Navy / indigo */
+  --indigo-950: #14152B; /* deep navy surface */
+  --indigo-800: #22233B; /* navy card (Graduated) */
+  --indigo-700: #26293D; /* progress track on navy */
+  --indigo-600: #32334B; /* hover on navy */
+  --indigo-300: #9EA3C8; /* links on dark */
+
+  /* Gold */
+  --gold-300: #DFBC7C;  /* highlight: accent text, focus ring */
+  --gold-500: #D5B470;  /* primary gold: CTA fill, logo ring, progress fill */
+  --gold-600: #A88953;  /* strong hairline, card rule, secondary border */
+  --gold-800: #725E43;  /* subtle hairline (decorative only) */
+  --gold-ink: #6E5220;  /* gold-toned text on paper */
+
+  /* Paper (light card surfaces) */
+  --paper-50: #F1ECE4;  /* brightest paper, headline on dark */
+  --paper-100: #EEEAE1; /* Live card; also --text */
+  --paper-200: #E4DCCF; /* pressed */
+  --paper-faded: #DDD8CE; /* Departed card */
+  --paper-ink: #1A1A1A; /* text on paper */
+  --paper-muted: #5E574C; /* secondary text on paper */
+  --paper-faded-ink: #4A453D; /* prophecy line on Departed card */
+
+  /* Text on dark */
+  --text: #EEEAE1;       /* primary text on dark (= paper-100) */
+  --text-muted: #9A958A; /* secondary text on dark */
+
+  /* States only (never decorative accents) */
+  --danger: #E0705C;      /* error text/icons on dark */
+  --success: #8FB08A;     /* "Live" on dark */
+  --success-ink: #2F5A2B; /* "Live" badge text on paper */
+
+  /* Type */
+  --font-display: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --fs-display: clamp(44px, 5vw, 72px);
+  --fs-h1: 44px; --fs-h2: 32px; --fs-h3: 22px;
+  --fs-body: 16px; --fs-small: 14px; --fs-micro: 12px;
+  --lh-tight: 1.08; --lh-body: 1.6;
+  --tracking-caps: 0.18em;
+
+  /* Shape */
+  --radius-card: 6px;   /* prophecy cards */
+  --radius-1: 2px;      /* buttons, inputs */
+  --radius-pill: 999px; /* badges */
+  --hairline: 1px solid var(--gold-800);
+  --hairline-strong: 1px solid var(--gold-600);
+
+  /* Light */
+  --glow-gold: 0 0 0 1px rgba(213,180,112,.35), 0 0 28px rgba(213,180,112,.18);
+  --shadow-card: 0 18px 40px -18px rgba(0,0,0,.85);
+}

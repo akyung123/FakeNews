@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512" fill="none" stroke="#D5B470" stroke-linecap="round" stroke-linejoin="round">
+  <title>Prophecy mark A2: ring + eye line</title>
+  <circle cx="50" cy="50" r="42" stroke-width="3.5"/>
+  <path d="M24 50Q50 28 76 50Q50 72 24 50Z" stroke-width="2.4"/>
+  <circle cx="50" cy="50" r="5" fill="#D5B470" stroke="none"/>
+</svg>
