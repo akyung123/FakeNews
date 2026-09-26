@@ -165,6 +165,11 @@ export function worldErrorKindFromServerCode(code: unknown): WorldErrorKind {
   return "network";
 }
 
+/** Live IDKit must use the server envelope. The server compares the proof action to WORLD_ACTION. */
+export function idKitConfigFromRpContext(envelope: RpContextResponse): { appId: string; action: string } {
+  return { appId: envelope.app_id, action: envelope.action };
+}
+
 async function errorFromResponse(response: Response): Promise<WorldClientError> {
   try {
     const body = (await response.json()) as { error?: unknown };
@@ -176,8 +181,12 @@ async function errorFromResponse(response: Response): Promise<WorldClientError> 
 
 export function createWorldClient(options: WorldClientOptions = {}): WorldClient {
   const mock = options.mock ?? isWorldMockEnabled();
-  const appId = options.appId ?? import.meta.env.VITE_WORLD_APP_ID ?? MOCK_WORLD_APP_ID;
-  const action = options.action ?? import.meta.env.VITE_WORLD_ACTION ?? MOCK_WORLD_ACTION;
+  const appId = mock
+    ? (options.appId ?? import.meta.env.VITE_WORLD_APP_ID ?? MOCK_WORLD_APP_ID)
+    : (options.appId ?? "");
+  const action = mock
+    ? (options.action ?? import.meta.env.VITE_WORLD_ACTION ?? MOCK_WORLD_ACTION)
+    : (options.action ?? "");
   const chainId = options.chainId ?? (Number(import.meta.env.VITE_CHAIN_ID) || SEPOLIA_CHAIN_ID);
   const launchpad = options.launchpad ?? import.meta.env.VITE_LAUNCHPAD_ADDRESS ?? (mock ? MOCK_WORLD_LAUNCHPAD : "");
   const serverUrl = (options.serverUrl ?? import.meta.env.VITE_WORLD_SERVER_URL ?? DEFAULT_WORLD_SERVER_URL).replace(

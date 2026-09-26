@@ -3,6 +3,8 @@ import {
   DEFAULT_WORLD_SERVER_URL,
   MOCK_IDKIT_RESULT,
   MOCK_RP_CONTEXT_RESPONSE,
+  MOCK_WORLD_ACTION,
+  MOCK_WORLD_APP_ID,
   MOCK_WORLD_CHAIN_ID,
   MOCK_WORLD_HEALTH,
   MOCK_WORLD_LAUNCHPAD,
@@ -10,6 +12,7 @@ import {
 } from "./mock";
 import {
   createWorldClient,
+  idKitConfigFromRpContext,
   isWorldMockEnabled,
   WorldClientError,
   WORLD_REQUEST_TIMEOUT_MS,
@@ -52,6 +55,29 @@ describe("world client", () => {
     });
     expect(MOCK_WORLD_HEALTH.signer).toBe(fixture.signer);
     expect(JSON.stringify({ ...MOCK_WORLD_VERIFY, ...MOCK_WORLD_HEALTH })).not.toContain(fixture.signerKey);
+  });
+
+  it("uses app_id and action from GET /rp-context in live mode, not the VITE mock defaults", async () => {
+    const serverEnvelope = {
+      ...MOCK_RP_CONTEXT_RESPONSE,
+      app_id: "app_from_server",
+      action: "action_from_server",
+    };
+    const client = createWorldClient({
+      mock: false,
+      appId: "app_from_env",
+      action: "action_from_env",
+      serverUrl: "http://world.test",
+      launchpad: MOCK_WORLD_LAUNCHPAD,
+      fetch: async () => new Response(JSON.stringify(serverEnvelope), { status: 200 }),
+    });
+    const envelope = await client.fetchRpContext();
+    expect(idKitConfigFromRpContext(envelope)).toEqual({
+      appId: "app_from_server",
+      action: "action_from_server",
+    });
+    expect(idKitConfigFromRpContext(envelope).appId).not.toBe(client.appId);
+    expect(idKitConfigFromRpContext(envelope).action).not.toBe(client.action);
   });
 
   it("returns the world/ GET /rp-context envelope, fixture signature, and health", async () => {

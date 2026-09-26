@@ -4,6 +4,7 @@ import { MOCK_IDKIT_RESULT } from "../lib/mock";
 import {
   createWorldClient,
   WorldClientError,
+  idKitConfigFromRpContext,
   worldErrorKindFromIdKit,
   worldStatusFromKind,
   type IdKitResultV4,
@@ -239,6 +240,7 @@ function IdKitHost({
   const [Widget, setWidget] = useState<IdKitWidget | null>(null);
   const [preset, setPreset] = useState<unknown>(null);
   const [rpContext, setRpContext] = useState<RpContext | null>(null);
+  const [idKitApp, setIdKitApp] = useState<{ appId: string; action: string } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -250,6 +252,7 @@ function IdKitHost({
         setWidget(() => idkit.IDKitRequestWidget as unknown as IdKitWidget);
         setPreset(idkit.proofOfHuman({ signal: wallet }));
         setRpContext(envelope.rp_context);
+        setIdKitApp(idKitConfigFromRpContext(envelope));
       } catch (error) {
         if (!cancelled) {
           const kind = error instanceof WorldClientError ? error.kind : "network";
@@ -265,14 +268,14 @@ function IdKitHost({
   }, [wallet, world, onStatus]);
 
   if (loadError) return <p className="banner-error">{loadError}</p>;
-  if (!Widget || !rpContext) return <p className="faint">{ISSUE_COPY.pending}</p>;
+  if (!Widget || !rpContext || !idKitApp) return <p className="faint">{ISSUE_COPY.pending}</p>;
 
   return (
     <Widget
       open
       onOpenChange={onClose}
-      app_id={world.appId}
-      action={world.action}
+      app_id={idKitApp.appId}
+      action={idKitApp.action}
       rp_context={rpContext}
       allow_legacy_proofs
       preset={preset}
