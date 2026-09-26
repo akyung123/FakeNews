@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Route, Routes } from "react-router-dom";
+import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { useAccount } from "wagmi";
 import { WalletButton } from "./components/WalletButton";
 import { SampleBadge } from "./components/SampleBadge";
 import { webEnv } from "./lib/env";
+import { useFollowing } from "./lib/following";
 import { eth } from "./lib/format";
 import { createReadProphetOf } from "./lib/launchpad";
 import { isMockMode } from "./lib/mode";
@@ -22,6 +23,11 @@ export function App() {
   const s = useStore();
   const { address, isConnected } = useAccount();
   const [prophetLabel, setProphetLabel] = useState<string | null>(null);
+  const following = useFollowing();
+  const { pathname, hash } = useLocation();
+  // NavLink ignores the hash, so /me and /me#following would both light up.
+  const onMe = pathname === "/me";
+  const onFollowing = onMe && hash === "#following";
   const held = mock ? Object.values(s.positions[YOU] ?? {}).filter((p) => p.tokens > 1e-6).length : 0;
 
   useEffect(() => {
@@ -61,9 +67,20 @@ export function App() {
           <NavLink to="/name">
             Claim your name
           </NavLink>
-          <NavLink to="/me">
-            My prophecies <span className="count">{held}</span>
-          </NavLink>
+          <Link
+            to="/me"
+            className={onMe && !onFollowing ? "active" : undefined}
+            aria-current={onMe && !onFollowing ? "page" : undefined}
+          >
+            My prophecies{"\u00a0"}<span className="count">{held}</span>
+          </Link>
+          <Link
+            to="/me#following"
+            className={onFollowing ? "active" : undefined}
+            aria-current={onFollowing ? "page" : undefined}
+          >
+            Following{"\u00a0"}<span className="count">{following.length}</span>
+          </Link>
         </nav>
 
         <Link to="/create" className="btn primary full side-cta">

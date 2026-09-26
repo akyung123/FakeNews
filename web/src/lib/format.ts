@@ -1,3 +1,5 @@
+import { formatEther } from "viem";
+
 export function eth(value: number, digits?: number): string {
   const d = digits ?? (value > 0 && value < 0.01 ? 5 : 3);
   return `${value.toFixed(d)} ETH`;
@@ -41,4 +43,21 @@ export function ago(at: number, now = Date.now()): string {
   const h = Math.floor(m / 60);
   if (h < 24) return `${h}h ago`;
   return `${Math.floor(h / 24)}d ago`;
+}
+
+/**
+ * Wei as an ETH figure with `sig` significant digits after any leading zeros,
+ * so a per-token price of a few gwei never shows as 0.
+ */
+export function ethFromWei(wei: bigint, sig = 4): string {
+  const [whole, frac = ""] = formatEther(wei < 0n ? -wei : wei).split(".");
+  let digits: string;
+  if (whole !== "0") {
+    digits = frac.slice(0, sig);
+  } else {
+    const zeros = frac.length - frac.replace(/^0+/, "").length;
+    digits = frac.slice(0, zeros + sig);
+  }
+  digits = digits.replace(/0+$/, "");
+  return `${wei < 0n ? "-" : ""}${whole}${digits ? `.${digits}` : ""} ETH`;
 }

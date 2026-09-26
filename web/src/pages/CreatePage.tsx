@@ -8,6 +8,7 @@ import {
   isLaunchEnabled,
   isRegisterSubmitEnabled,
   ISSUE_COPY,
+  ISSUE_PLACEHOLDER,
   launchButtonLabel,
   prophecyName,
   storeProphetLabel,
@@ -43,6 +44,11 @@ export type IssueScreenProps = {
   launchProphecy?: (input: LaunchInput) => Promise<`0x${string}` | null>;
   lookupProphet?: (wallet: string) => Promise<string>;
 };
+
+/** Sample hints in demo mode only, so chain mode never shows a sample prophet name. */
+export function issuePlaceholder(mock = isMockMode()) {
+  return mock ? MOCK_ISSUE_PLACEHOLDER : ISSUE_PLACEHOLDER;
+}
 
 export function CreatePage() {
   const { session, connecting } = useIssueSession();
@@ -236,7 +242,7 @@ export function IssueScreen({
             aria-label="Prophet name"
             value={prophetLabel}
             maxLength={16}
-            placeholder={MOCK_ISSUE_PLACEHOLDER.prophetLabel}
+            placeholder={issuePlaceholder().prophetLabel}
             readOnly={returningProphet}
             autoComplete="off"
             spellCheck={false}
@@ -251,7 +257,7 @@ export function IssueScreen({
             aria-label="Prophecy"
             rows={3}
             value={prophecy}
-            placeholder={MOCK_ISSUE_PLACEHOLDER.prophecy}
+            placeholder={issuePlaceholder().prophecy}
             onChange={(e) => setProphecy(e.target.value)}
           />
           <span className="faint small">{utf8ByteLength(prophecy)}/{MAX_PROPHECY_BYTES} · written once, then locked</span>
@@ -264,7 +270,7 @@ export function IssueScreen({
               aria-label="Slug"
               value={slug}
               maxLength={32}
-              placeholder={MOCK_ISSUE_PLACEHOLDER.slug}
+              placeholder={issuePlaceholder().slug}
               autoComplete="off"
               spellCheck={false}
               onChange={(e) => setSlug(e.target.value.toLowerCase())}

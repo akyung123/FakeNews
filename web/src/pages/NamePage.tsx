@@ -13,10 +13,11 @@ import {
 } from "../lib/issue";
 import { useIssueSession, useProphetLookup, useWalletBoundWorld } from "../lib/issueSession";
 import { createReadProphetOf, createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
-import { MOCK_ISSUE_PLACEHOLDER, MOCK_PARENT_NAME } from "../lib/mock";
+import { MOCK_PARENT_NAME } from "../lib/mock";
 import { isMockMode } from "../lib/mode";
 import { writeErrorMessage } from "../lib/writes";
 import { createWorldClient, type WorldClient } from "../lib/world";
+import { issuePlaceholder } from "./CreatePage";
 
 export function NamePage() {
   const { session, connecting } = useIssueSession();
@@ -161,7 +162,7 @@ export function ClaimNameScreen({
             aria-label="Name"
             value={prophetLabel}
             maxLength={16}
-            placeholder={MOCK_ISSUE_PLACEHOLDER.prophetLabel}
+            placeholder={issuePlaceholder().prophetLabel}
             readOnly={returningProphet}
             autoComplete="off"
             spellCheck={false}
