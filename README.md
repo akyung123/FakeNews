@@ -4,18 +4,39 @@ Launch a prophecy. It starts trading the moment you say it.
 
 A launchpad where every token is a one-line prophecy. Half the supply sells through a Uniswap Continuous Clearing Auction (CCA); once the auction ends, anyone can migrate it into a Uniswap V4 pool, where the position is locked and trading continues.
 
-- **An address book first.** `ringo.prophecy.eth` points to the prophet's wallet, `badges-2028.ringo.prophecy.eth` to that prophecy's token (ENSv2 on Sepolia).
+- **An address book first.** `alice.prophecy.eth` points to the prophet's wallet, `badges-2028.alice.prophecy.eth` to that prophecy's token (ENSv2 on Sepolia).
 - **Written once, never edited.** The sentence lives in the prophecy's own ENS resolver, and nobody holds the role to change it.
 - **No judging.** No oracle, no True or False. There is no status about the sentence; the only stage on screen is the market stage (auction, graduated or ended), read from the chain.
 - **One prophet name per person**, checked with World ID when you first issue.
 
 New to the project, or not a developer? Start with the **[product requirements (PRD)](docs/PRD.md)**. It explains the idea, who it is for and what success looks like, in plain words.
 
+The product is called Prophit. The ENS parent name stays `prophecy.eth`, and the contracts keep their `Prophecy*` names.
+
+## Live
+
+- **Site:** <https://prism-toggle-ai.github.io/Prophit/>
+- **Network:** Ethereum Sepolia (chain id `11155111`)
+- **Launchpad:** [`0x0b4BF5C6f73A1204CCe07f2522db9142d2BcB4Aa`](https://sepolia.etherscan.io/address/0x0b4BF5C6f73A1204CCe07f2522db9142d2BcB4Aa)
+- **Status:** prototype on Sepolia. The contracts are deployed and read back, but the full loop below has not run on the live Launchpad yet.
+
+### On-chain proof
+
+One full loop on the deployed Launchpad. Each cell gets a Sepolia Etherscan link once that step has run; until then it reads TBD.
+
+| Step | What it shows | ENS name | Transaction |
+|------|---------------|----------|-------------|
+| `registerProphet` | A World ID-checked prophet name points to the prophet's wallet | TBD | TBD |
+| `launch` | The prophecy name points to a new token; the sentence is written to ENS and the CCA auction opens | TBD | TBD |
+| `bid` | Someone bids ETH in the auction | TBD | TBD |
+| `migrate` | The auction ends and liquidity moves into a locked Uniswap V4 pool | TBD | TBD |
+| `swap` | Trading on the V4 pool | TBD | TBD |
+
 ## How it works
 
 ```text
-1. Verify    World ID, once per person      → ringo.prophecy.eth points to your wallet
-2. Issue     one sentence                   → badges-2028.ringo.prophecy.eth points to a new token
+1. Verify    World ID, once per person      → alice.prophecy.eth points to your wallet
+2. Issue     one sentence                   → badges-2028.alice.prophecy.eth points to a new token
                                               launch writes the sentence only to ENS, opens the CCA auction
 3. Bid       anyone bids ETH by name        → the auction clears at the price that sells the auction supply
                                               runs for a fixed number of blocks (10 on the live deployment)
@@ -31,7 +52,7 @@ As of 2026-09-26. Deployed to Sepolia (CCA path, commit `58514dd`) — see addre
 
 | Part | Built | Not yet |
 |------|-------|---------|
-| `contracts/` | `Launchpad`: World ID prophet names (`registerProphet`), ENS names on `launch`, CCA auction via the official LBPStrategy v3.3.0, memos, fee claims. `migrate` opens a Uniswap V4 pool through `ProphecyHook`, locked in `LiquidityLocker` (fees 24 : 76, no withdraw). `ProphecyToken`, ENS adapter. Deployed and read back on Sepolia; fork suite green (95 tests) | A live launch, bid, claim, and migrate on the deployed contract |
+| `contracts/` | `Launchpad`: World ID prophet names (`registerProphet`), ENS names on `launch`, CCA auction via the official LBPStrategy v3.3.0. `migrate` opens a Uniswap V4 pool through `ProphecyHook`, locked in `LiquidityLocker` (fees 24 : 76, no withdraw). `ProphecyToken`, ENS adapter. Deployed and read back on Sepolia; fork suite green (95 tests) | A live launch, bid, claim, and migrate on the deployed contract |
 | `web/` | The four screens. Wallet connect on Sepolia. Issue screen: World ID check, then a real `registerProphet` transaction. Auction bid / claim UI reading `auctionBlocks()` on-chain, `migrate`, and a pool price chart once the market opens. Helpers to read names and sentences from ENS (`src/lib/ens.ts`) | List, detail and prophet page fall back to prototype rows until a real prophecy is launched and picked up from a `Launched` log |
 | `world/` | World ID verification server: `GET /rp-context`, `POST /verify`, `GET /health`. Signs the result for the Launchpad | Hosting (planned on Render, see [`infra/README.md`](infra/README.md)) |
 | `infra/` | Sepolia deploy scripts, `deployments/sepolia.json` record, GitHub Pages preview for `web/`, Render blueprint for `world/` | Hosting the World server for a live demo |
@@ -61,6 +82,88 @@ Official Uniswap contracts this deployment points at (not ours — pinned and ci
 | Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
 
 ENSv2 addresses are separate — see [`docs/ENSV2.md`](docs/ENSV2.md) section 0.
+
+## Built at ETHGlobal Tokyo 2026
+
+- Repository history starts at [`622b60d`](https://github.com/prism-toggle-ai/Prophit/commit/622b60d538a40709d86de39c04c2c7b17c958ea3) (2026-09-26 09:13 JST), the initial commit.
+- [`272d03a`](https://github.com/prism-toggle-ai/Prophit/commit/272d03a6377f1c0b4b63ade62e69296cb2e84e22) (2026-09-26 09:23 JST) imported a web prototype and contracts skeleton that the team created earlier in this same hackathon (design and prototype work done after the event started). No code or assets from before the hackathon were used.
+- The curve-based prototype was then replaced by the Uniswap CCA / LBPStrategy path during the event: [`4e388db`](https://github.com/prism-toggle-ai/Prophit/commit/4e388db) (contracts, 17:30 JST), [`1e494cf`](https://github.com/prism-toggle-ai/Prophit/commit/1e494cf) (web, 18:21 JST), then later PRs such as the Sepolia deploy script ([#46](https://github.com/prism-toggle-ai/Prophit/pull/46)) and the CCA merge into `main` ([#53](https://github.com/prism-toggle-ai/Prophit/pull/53)).
+
+## Third-party code & attribution
+
+### Submodules (`contracts/lib/`)
+
+| Library | Pinned commit | License | What we use it for |
+|---------|---------------|---------|--------------------|
+| [forge-std](https://github.com/foundry-rs/forge-std) | [`bf647bd`](https://github.com/foundry-rs/forge-std/tree/bf647bd6046f2f7da30d0c2bf435e5c76a780c1b) | MIT or Apache-2.0 | Foundry tests and deploy scripts |
+| [ENS contracts-v2](https://github.com/ensdomains/contracts-v2) | [`71a3b73`](https://github.com/ensdomains/contracts-v2/tree/71a3b7339dbc55ab47667abdfe8303bac4f4c24e) | MIT | Reference for the ENSv2 types and roles we mirror (see below). Its nested OpenZeppelin Contracts (MIT) supplies the one `IERC165` interface we import |
+| [Uniswap v4-core](https://github.com/Uniswap/v4-core) | [`e50237c`](https://github.com/Uniswap/v4-core/tree/e50237c43811bd9b526eff40f26772152a42daba) (v4.0.0) | BUSL-1.1 or MIT, per file | Pool types, hook flags, math libraries and `IPoolManager`; a local `PoolManager` in unit tests |
+
+### Copied or adapted files
+
+| Our file | Source | What we took |
+|----------|--------|--------------|
+| `contracts/src/uniswap/CurrencySettler.sol` | v4-core [`test/utils/CurrencySettler.sol`](https://github.com/Uniswap/v4-core/blob/e50237c43811bd9b526eff40f26772152a42daba/test/utils/CurrencySettler.sol) at `e50237c` (MIT) | Copied as is. The current locker no longer uses it |
+| `contracts/src/uniswap/ProphecyHook.sol`, `contracts/src/uniswap/IInitializerHook.sol` | liquidity-launcher [`InitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/periphery/hooks/InitializerHook.sol) and [`IInitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IInitializerHook.sol) at `1c59049` (MIT) | The InitializerHook pattern that lets LBPStrategy initialize the V4 pool, rewritten without v4-periphery's `BaseHook` |
+| `contracts/src/cca/CcaTypes.sol`, `contracts/src/cca/ICca.sol` | continuous-clearing-auction [`IContinuousClearingAuction.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuction.sol) at `7d7602d`; liquidity-launcher [`MigratorParams.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/libraries/MigratorParams.sol) and [`IStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IStrategy.sol) at `1c59049` (both MIT) | Struct field order and function signatures, mirrored so our calls match the deployed contracts |
+| `contracts/src/ens/EnsV2.sol` | ENS contracts-v2 at `71a3b73` (MIT) | Struct layout, role bits and function signatures, mirrored so our calls match the deployed ENSv2 contracts |
+| `contracts/src/cca/I*.sol` (other minimal interfaces), `web/src/lib/cca/abi/` | The official CCA, LBPStrategy, V4 and Universal Router contracts linked in each file | Function signatures and ABI fragments only |
+
+### Official deployed contracts and services we call (not ours)
+
+- Uniswap on Sepolia: LBPStrategy v3.3.0, CCA factory v2.1.0, V4 PoolManager and PositionManager, Universal Router 2.1.2, Permit2. Addresses are in [Deployed addresses](#deployed-addresses-sepolia).
+- ENSv2 (beta) on Sepolia: the registries and resolvers listed in [`docs/ENSV2.md`](docs/ENSV2.md) section 0.
+- World ID: IDKit in the browser, and the World Developer Portal API from the `world/` server.
+
+### Packages
+
+- `web/`: React 19, react-router-dom 7, wagmi 3, viem 2, @tanstack/react-query 5, @worldcoin/idkit 4.3.0, Vite 6, Vitest 5 (plus Testing Library and jsdom for tests). Exact versions are in [`web/bun.lock`](web/bun.lock).
+- `world/`: @worldcoin/idkit-core 4.3.0 and viem 2, run on Bun.
+
+### License
+
+Our code is MIT ([`LICENSE`](LICENSE)); everything above keeps its own license. forge-std, ENS contracts-v2, OpenZeppelin, liquidity-launcher and continuous-clearing-auction are MIT (forge-std also Apache-2.0), so there is no conflict. **Uniswap v4-core is dual-licensed per file (BUSL-1.1 or MIT):** nothing in `contracts/src/` imports a BUSL-1.1 file. Its BUSL-1.1 `PoolManager.sol` is compiled only in local unit tests (non-production use, which BUSL-1.1 allows); on Sepolia we call Uniswap's own deployed PoolManager. One more v4-core file, the test helper `LiquidityAmounts.sol` (header `UNLICENSED`), is imported by one test and by `Graduation.fullRangeLiquidity`, which nothing calls, so none of it ships in deployed bytecode.
+
+## AI tools used
+
+Counted on `main` at [`c383e8e`](https://github.com/prism-toggle-ai/Prophit/commit/c383e8e) (2026-09-26): 377 commits, 252 of them not merge commits. The commit author and the `Co-Authored-By` trailer say which tool wrote each one.
+
+| Who | Non-merge commits | Share | Main areas |
+|-----|------------------:|------:|------------|
+| Cursor Agent | 206 | 82% | Contracts: the CCA Launchpad, `LiquidityLocker`, `ProphecyHook`, the ENS adapter and lock tests, Foundry unit tests and Sepolia fork tests, deploy scripts. Web: the CCA library (`web/src/lib/cca/`) and UI wiring for bid, claim, migrate and swap. The `world/` server. Infra scripts, CI and the Pages workflow |
+| Claude Code | 30 | 12% | Repo setup, docs (PRD, README, `PRODUCTION.md`, DECISIONS and PLAN updates), agent settings (`AGENTS.md`, `CLAUDE.md`, `.claude/`). Web features: follow prophets, prophet profile, the Following page, wallet balances, pool price chart, Sepolia RPC budget, World ID widget fix |
+| Humans only (no AI trailer) | 16 | 6% | The initial commit, the Sepolia deployment record, and edits made in the GitHub editor (merge-conflict fixes, doc citations) |
+
+- **Cursor Agent:** 203 commits it authored, plus 3 squash-merged PRs ([#7](https://github.com/prism-toggle-ai/Prophit/pull/7), [#10](https://github.com/prism-toggle-ai/Prophit/pull/10), [#16](https://github.com/prism-toggle-ai/Prophit/pull/16)) that carry its co-author trailer.
+- **Claude Code:** 10 commits it authored, plus 20 committed by akyung123 with a Claude co-author trailer.
+- **Merge commits (125):** 63 PR merges, all by akyung123, and 62 merges of `main` into feature branches (48 by Cursor Agent, 9 by akyung123, 5 by Claude Code).
+- **Humans (akyung123 and team):** product spec, design direction, decisions, reviewing and merging every PR, live testing on Sepolia and in World App.
+- **Spec and planning artifacts in the repo:** [`AGENTS.md`](AGENTS.md), [`CLAUDE.md`](CLAUDE.md), [`.claude/`](.claude/) (settings, hooks, skills, the `contract-reviewer` agent), [`docs/PRD.md`](docs/PRD.md), [`docs/SPEC.md`](docs/SPEC.md), [`docs/PLAN.md`](docs/PLAN.md), [`docs/DECISIONS.md`](docs/DECISIONS.md), [`docs/INTERFACE.md`](docs/INTERFACE.md), [`docs/INTERFACE_CCA.md`](docs/INTERFACE_CCA.md).
+
+To recount on a newer `main`:
+
+```bash
+git rev-list --count main                   # all commits
+git rev-list --count --no-merges main       # non-merge commits
+git log --no-merges --format='%an | %(trailers:key=Co-Authored-By,valueonly,separator=; )' main | sort | uniq -c
+```
+
+## What we built vs reused
+
+**Built during the event:**
+
+- `contracts/src/Launchpad.sol`: World ID prophet names (`registerProphet`), and on `launch` the token, its ENS name and sentence, and the CCA auction through LBPStrategy
+- `contracts/src/ProphecyToken.sol`
+- The ENS adapter: `contracts/src/ens/`
+- `contracts/src/uniswap/LiquidityLocker.sol`: holds the V4 position with no withdraw path and splits fees 24 : 76 on `collect`
+- The `ProphecyHook` wiring: hook salt mining (`HookMiner.sol`), `setUniswap` and `setCca` on the Launchpad
+- `contracts/src/cca/CcaLib.sol`: LBPStrategy config encoding and the auction step schedule
+- All Foundry tests in `contracts/test/`, including the Sepolia fork E2E tests in `contracts/test/fork/`, and the deploy scripts in `contracts/script/`
+- The web app in `web/`: CCA, World ID and ENS flows, and every page
+- The World ID verification server in `world/`
+- `infra/`: deploy scripts, the deployment record, World signer helpers, the Render blueprint
+
+**Reused:** only the libraries and files listed in [Third-party code & attribution](#third-party-code--attribution), and the official Uniswap contracts deployed on Sepolia (plus ENSv2 and World ID as services we call).
 
 ## Start here
 
@@ -110,3 +213,4 @@ Environment variables: copy [`.env.example`](.env.example) and see [`infra/READM
 | `docs/` | PRD, spec, decisions, interface (curve and CCA), plan, ENSv2 notes |
 | `.claude/` | Agent settings, skills, reviewer |
 | `.github/` | CI, Pages preview, PR template |
+| `LICENSE` | MIT, for our code. Third-party code keeps its own license: see [License](#license) |
