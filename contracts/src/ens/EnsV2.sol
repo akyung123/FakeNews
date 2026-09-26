@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-/// Thin ENSv2 types matching contracts-v2 `71a3b73` (DECISIONS #4).
-/// Launchpad talks to ProphecyEns; this file is not a second copy of sentence data.
+// Thin ENSv2 types matching contracts-v2 `71a3b73` (DECISIONS #4).
+// Launchpad talks to ProphecyEns; this file is not a second copy of sentence data.
 
 struct Grant {
     address account;
@@ -11,7 +11,7 @@ struct Grant {
 
 uint256 constant ROOT_RESOURCE = 0;
 
-/// Registry roles (`RegistryRolesLib` at `71a3b73`).
+// Registry roles (`RegistryRolesLib` at `71a3b73`).
 uint256 constant ROLE_REGISTRAR = 1 << 0;
 uint256 constant ROLE_SET_PARENT = 1 << 8;
 uint256 constant ROLE_SET_PARENT_ADMIN = ROLE_SET_PARENT << 128;
@@ -21,7 +21,7 @@ uint256 constant ROLE_SET_RESOLVER = 1 << 24;
 uint256 constant ROLE_CAN_TRANSFER_ADMIN = (1 << 28) << 128;
 uint256 constant ROLE_UPGRADE = 1 << 124;
 
-/// Resolver roles (`PermissionedResolverLib` at `71a3b73`).
+// Resolver roles (`PermissionedResolverLib` at `71a3b73`).
 uint256 constant ROLE_SET_ADDRESS = 1 << 0;
 uint256 constant ROLE_SET_TEXT = 1 << 4;
 uint256 constant ROLE_SET_TEXT_ADMIN = ROLE_SET_TEXT << 128;
@@ -72,7 +72,6 @@ interface IPermissionedRegistry is IRegistry {
     function getTokenId(uint256 anyId) external view returns (uint256);
     function hasAssignees(uint256 resource, uint256 roleBitmap) external view returns (bool);
     function isEmancipated() external view returns (bool);
-    function ROOT_RESOURCE() external view returns (uint256);
 
     function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes calldata data)
         external;

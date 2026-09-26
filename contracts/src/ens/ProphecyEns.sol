@@ -90,15 +90,15 @@ contract ProphecyEns is IProphecyEns {
 
         IPermissionedRegistry prophetRegistry = IPermissionedRegistry(registry);
         prophetRegistry.setParent(parentRegistry, label);
-        prophetRegistry.revokeRootRoles(ROLE_SET_PARENT | ROLE_SET_PARENT_ADMIN, address(this));
+        require(prophetRegistry.revokeRootRoles(ROLE_SET_PARENT | ROLE_SET_PARENT_ADMIN, address(this)));
 
         resolver = _deployLockedResolver(
             wallet, prophetDns, _addressCall(prophetDns, wallet), _resolverSalt(wallet, prophetDns)
         );
 
-        parentRegistry.register(
-            label, wallet, IRegistry(registry), resolver, 0, type(uint64).max
-        );
+        uint256 prophetTokenId =
+            parentRegistry.register(label, wallet, IRegistry(registry), resolver, 0, type(uint64).max);
+        if (prophetTokenId == 0) revert InvalidLabel();
 
         emit ProphetNameCreated(wallet, label, registry, resolver);
     }
@@ -132,9 +132,10 @@ contract ProphecyEns is IProphecyEns {
         resolver =
             _deployLockedResolver(wallet, prophecyDns, calls, _resolverSalt(token, prophecyDns));
 
-        IPermissionedRegistry(registry).register(
+        uint256 slugTokenId = IPermissionedRegistry(registry).register(
             slug, wallet, IRegistry(address(0)), resolver, 0, type(uint64).max
         );
+        if (slugTokenId == 0) revert InvalidSlug();
 
         emit ProphecyNameCreated(token, prophetLabel, slug, resolver);
     }
@@ -154,9 +155,9 @@ contract ProphecyEns is IProphecyEns {
         );
 
         IPermissionedResolver r = IPermissionedResolver(resolver);
-        r.grantSetterRoles(_textSetter("avatar"), prophet);
-        r.grantSetterRoles(_textSetter("description"), prophet);
-        r.revokeRootRoles(ROLE_SET_TEXT_ADMIN, address(this));
+        require(r.grantSetterRoles(_textSetter("avatar"), prophet));
+        require(r.grantSetterRoles(_textSetter("description"), prophet));
+        require(r.revokeRootRoles(ROLE_SET_TEXT_ADMIN, address(this)));
     }
 
     function _deployLockedResolver(

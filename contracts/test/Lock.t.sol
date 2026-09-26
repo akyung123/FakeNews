@@ -2,7 +2,17 @@
 pragma solidity ^0.8.24;
 
 import {DnsCodec} from "../src/ens/DnsCodec.sol";
-import {IPermissionedRegistry, IPermissionedResolver, ROLE_UNREGISTER, ROOT_RESOURCE} from "../src/ens/EnsV2.sol";
+import {
+    IPermissionedRegistry,
+    IPermissionedResolver,
+    IVerifiableFactory,
+    ROLE_LINK,
+    ROLE_RESOLVER_UPGRADE,
+    ROLE_SET_TEXT,
+    ROLE_SET_TEXT_ADMIN,
+    ROLE_UNREGISTER,
+    ROOT_RESOURCE
+} from "../src/ens/EnsV2.sol";
 import {ProphecyEns} from "../src/ens/ProphecyEns.sol";
 import {Grant, ROLE_REGISTRAR} from "../src/ens/EnsV2.sol";
 import {LockActor, LockFactory, LockRegistry, LockResolver} from "./LockMock.sol";
@@ -33,7 +43,7 @@ contract LockTest {
             address(this),
             IPermissionedRegistry(address(parent)),
             parentDns,
-            factory,
+            IVerifiableFactory(address(factory)),
             address(registryKind),
             address(resolverKind)
         );
@@ -53,6 +63,38 @@ contract LockTest {
                 "EACUnauthorizedAccountRoles"
             );
         }
+        try prophet.setText(prophecyResolver, name, "deadline", "1") {
+            revert("deadline edit should revert");
+        } catch (bytes memory err) {
+            require(
+                bytes4(err) == IPermissionedResolver.EACUnauthorizedAccountRoles.selector,
+                "deadline EAC"
+            );
+        }
+        require(
+            !IPermissionedResolver(prophecyResolver).hasAssignees(
+                uint256(keccak256(bytes("prophecy"))), ROLE_SET_TEXT
+            ),
+            "prophecy key"
+        );
+        require(
+            !IPermissionedResolver(prophecyResolver).hasAssignees(
+                uint256(keccak256(bytes("deadline"))), ROLE_SET_TEXT
+            ),
+            "deadline key"
+        );
+        require(
+            !IPermissionedResolver(prophecyResolver).hasAssignees(
+                ROOT_RESOURCE, ROLE_SET_TEXT | ROLE_SET_TEXT_ADMIN | ROLE_LINK | ROLE_RESOLVER_UPGRADE
+            ),
+            "resolver root writers"
+        );
+        require(
+            !IPermissionedResolver(prophecyResolver).hasRoles(
+                ROOT_RESOURCE, ROLE_SET_TEXT_ADMIN, address(ens)
+            ),
+            "adapter text admin"
+        );
     }
 
     function test_transferNameReverts() public {
@@ -95,6 +137,15 @@ contract LockTest {
                 "slug setResolver"
             );
         }
+
+        try prophet.setSubregistry(address(parent), prophetId, address(0xB0B)) {
+            revert("setSubregistry should revert");
+        } catch (bytes memory err) {
+            require(
+                bytes4(err) == IPermissionedRegistry.EACUnauthorizedAccountRoles.selector,
+                "setSubregistry"
+            );
+        }
     }
 
     function test_hasAssigneesRootUnregisterFalse() public {
@@ -103,6 +154,12 @@ contract LockTest {
         LockRegistry prophetRegistry = LockRegistry(address(parent.getSubregistry(PROPHET)));
         require(!prophetRegistry.hasAssignees(ROOT_RESOURCE, ROLE_UNREGISTER), "prophet UNREGISTER");
         require(prophetRegistry.isEmancipated(), "prophet emancipated");
+        uint256 prophetId = uint256(keccak256(bytes(PROPHET)));
+        require(parent.getState(prophetId).expiry == type(uint64).max, "prophet expiry");
+        require(parent.ownerRoles(prophetId) == 0, "prophet owner roles");
+        uint256 slugId = uint256(keccak256(bytes(SLUG)));
+        require(prophetRegistry.getState(slugId).expiry == type(uint64).max, "slug expiry");
+        require(prophetRegistry.ownerRoles(slugId) == 0, "slug owner roles");
     }
 
     function test_slugResolvesToToken() public {

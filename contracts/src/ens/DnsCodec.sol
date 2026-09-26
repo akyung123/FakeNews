@@ -31,7 +31,7 @@ library DnsCodec {
     function toDecimal(uint64 value) internal pure returns (string memory) {
         if (value == 0) return "0";
         uint64 tmp = value;
-        uint256 digits;
+        uint256 digits = 0;
         while (tmp != 0) {
             digits++;
             tmp /= 10;
@@ -49,8 +49,8 @@ library DnsCodec {
     function _namehashFromLabels(bytes memory dns) private pure returns (bytes32 node) {
         uint256 n = _labelCount(dns);
         bytes32[] memory labels = new bytes32[](n);
-        uint256 i;
-        uint256 idx;
+        uint256 i = 0;
+        uint256 idx = 0;
         while (i < dns.length) {
             uint256 len = uint8(dns[i]);
             if (len == 0) break;
@@ -70,7 +70,7 @@ library DnsCodec {
     }
 
     function _labelCount(bytes memory dns) private pure returns (uint256 n) {
-        uint256 i;
+        uint256 i = 0;
         while (i < dns.length) {
             uint256 len = uint8(dns[i]);
             if (len == 0) return n;
