@@ -5,7 +5,7 @@ import { UserRejectedRequestError } from "viem";
 import { describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "../lib/issue";
 import type { RegisterProphetInput } from "../lib/launchpad";
-import { LaunchedParseError, WRITE_COPY, type LaunchInput } from "../lib/writes";
+import { LaunchedParseError, WRITE_COPY, ZERO_QUOTE_COPY, type LaunchInput } from "../lib/writes";
 import { MOCK_ISSUE_SESSION, MOCK_RETURNING_SESSION, MOCK_WORLD_HEALTH, MOCK_RP_CONTEXT_RESPONSE, MOCK_WORLD_VERIFY } from "../lib/mock";
 import { WorldClientError, createWorldClient, type WorldClient } from "../lib/world";
 import { IssueScreen } from "./CreatePage";
@@ -421,6 +421,28 @@ describe("Screen 2 button gating", () => {
     expect(screen.queryByTestId("memo-left")).toBeNull();
     expect(screen.queryByLabelText(/^Memo$/i)).toBeNull();
     expect(document.body.textContent).not.toContain("140 left");
+  });
+
+  it("disables Issue and shows the exact too-small line when the first-buy quote is 0", async () => {
+    const user = userEvent.setup();
+    const launched: LaunchInput[] = [];
+    renderIssue(MOCK_RETURNING_SESSION, {
+      launchProphecy: async (input) => {
+        launched.push(input);
+        return null;
+      },
+    });
+    await fillReturningForm(user);
+    expect(launchButton()).toBeEnabled();
+    const firstBuy = screen.getByLabelText(/First buy/i);
+    await user.clear(firstBuy);
+    await user.click(firstBuy);
+    await user.paste("0.000000000000000001");
+    expect(screen.getByRole("alert")).toHaveTextContent("Amount too small to trade. Try a larger amount.");
+    expect(screen.getByRole("alert")).toHaveTextContent(ZERO_QUOTE_COPY);
+    expect(launchButton()).toBeDisabled();
+    await user.click(launchButton());
+    expect(launched).toEqual([]);
   });
 
   it("skips World ID for a returning prophet and enables Issue once the form is valid", async () => {
