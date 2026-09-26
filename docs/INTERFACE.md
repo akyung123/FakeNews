@@ -69,7 +69,7 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 - Rounding:
   - Buy: fee rounds up, tokens out round down. A buy that would take more than the remaining curve supply fills only that remainder and refunds leftover ETH.
   - Sell: fee rounds up, ETH out rounds down.
-- `quoteBuy` / `quoteSell` match `buy` / `sell` exactly, including the last-fill refund path (fee is taken on the ETH actually used).
+- `quoteBuy` / `quoteSell` match `buy` / `sell` exactly, including the last-fill refund path (fee is taken on the ETH actually used). `quoteBuy` returns tokens the buyer receives. `quoteSell` returns ETH the seller receives (after fee).
 
 ### `ProphecyToken`
 
