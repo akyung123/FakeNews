@@ -2,14 +2,16 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
+import { SampleBadge } from "../components/SampleBadge";
 import { graduated, progress, quoteBuy, quoteSell, TOTAL_SUPPLY } from "../lib/curve";
-import { ago, eth, tokens } from "../lib/format";
+import { ago, eth, gwei, tokens } from "../lib/format";
+import { isMockMode } from "../lib/mode";
 import { GRADUATION_ETH } from "../lib/mock";
 import { prototypeCoinFromName } from "../lib/prophetData";
 import {
   actions,
-  holderCount,
   myPosition,
+  price,
   useStore,
   type Coin,
 } from "../lib/store";
@@ -18,7 +20,8 @@ export function CoinPage() {
   const { id = "", name = "" } = useParams();
   const s = useStore();
   const lookup = id || name;
-  const coin = s.coins.find((c) => c.id === lookup) ?? prototypeCoinFromName(lookup);
+  const mock = isMockMode();
+  const coin = (mock ? s.coins.find((c) => c.id === lookup) : undefined) ?? prototypeCoinFromName(lookup);
   if (!coin) {
     return (
       <main className="narrow">
@@ -30,8 +33,9 @@ export function CoinPage() {
     );
   }
 
-  const pos = myPosition(s, coin.id);
-  const talk = s.comments.filter((c) => c.coinId === coin.id).sort((a, b) => b.at - a.at);
+  const pos = mock ? myPosition(s, coin.id) : null;
+  const talk = mock ? s.comments.filter((c) => c.coinId === coin.id).sort((a, b) => b.at - a.at) : [];
+  const closed = graduated(coin);
 
   return (
     <main className="coin-page">
@@ -40,21 +44,22 @@ export function CoinPage() {
           <div className="coin-id">
             <div>
               <p className="coin-name">
-                {coin.name} <span className="faint">${coin.ticker}</span>
+                {coin.name} <span className="faint">${coin.ticker}</span> <SampleBadge />
               </p>
               <p className="faint small">
-                by {coin.creator} · {ago(coin.createdAt)} · {holderCount(s, coin.id)} holders
+                by {coin.creator} · {ago(coin.createdAt)}
               </p>
             </div>
           </div>
           <h1 className="prophecy-title">{coin.prophecy}</h1>
+          <p className="price-now">{gwei(price(coin))}</p>
           <p className="big-num">{curveProgressHeader(coin)}</p>
-          {graduated(coin) ? (
+          {closed ? (
             <p className="up">Graduated to Uniswap V4</p>
           ) : (
             <p className="faint">Curve progress</p>
           )}
-          <Sparkline coin={coin} />
+          {closed ? null : <Sparkline coin={coin} />}
           <Bar value={progress(coin)} labelled />
         </section>
 
@@ -63,7 +68,7 @@ export function CoinPage() {
             <h2>Trade memos</h2>
             <span className="faint">{talk.length} memos</span>
           </div>
-          <PostBox coinId={coin.id} holds={Boolean(pos)} />
+          {mock ? <PostBox coinId={coin.id} holds={Boolean(pos)} /> : null}
           <ul className="posts">
             {talk.length === 0 ? <li className="empty">No trades yet. The first memo shows up here.</li> : null}
             {talk.map((c) => (
@@ -74,7 +79,12 @@ export function CoinPage() {
       </div>
 
       <aside className="stack side">
-        <TradeBox coin={coin} balance={s.balance} held={pos?.tokens ?? 0} />
+        <TradeBox
+          coin={coin}
+          balance={mock ? s.balance : 0}
+          held={pos?.tokens ?? 0}
+          mock={mock}
+        />
         {pos ? (
           <section className="block you-hold">
             <p className="faint small">You hold</p>
@@ -88,17 +98,28 @@ export function CoinPage() {
   );
 }
 
-function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: number }) {
+function TradeBox({
+  coin,
+  balance,
+  held,
+  mock,
+}: {
+  coin: Coin;
+  balance: number;
+  held: number;
+  mock: boolean;
+}) {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("0.001");
   const value = Number(amount) || 0;
   const closed = graduated(coin);
 
-  const buyQuote = quoteBuy(coin, Math.min(value, balance));
+  const buyQuote = quoteBuy(coin, Math.min(value, mock ? balance : value));
   const sellTokens = Math.min(held, (held * Math.min(value, 100)) / 100);
   const sellQuote = quoteSell(coin, sellTokens).eth;
 
   function submit() {
+    if (!mock) return;
     if (side === "buy") actions.buy(coin.id, value);
     else actions.sell(coin.id, sellTokens);
   }
@@ -132,12 +153,12 @@ function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: 
       <button
         type="button"
         className={`btn ${side === "buy" ? "primary" : "sell"} full`}
-        disabled={closed || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
+        disabled={closed || !mock || (side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0)}
         onClick={submit}
       >
         {closed ? "Curve sold out" : side === "buy" ? `Buy $${coin.ticker}` : `Sell $${coin.ticker}`}
       </button>
-      <p className="faint small">Cash {eth(balance)}</p>
+      {mock ? <p className="faint small">Cash {eth(balance)}</p> : null}
     </section>
   );
 }
@@ -184,9 +205,8 @@ function Sparkline({ coin }: { coin: Coin }) {
   const d = points
     .map((v, i) => `${i === 0 ? "M" : "L"}${((i / (points.length - 1)) * w).toFixed(1)},${(h - ((v - min) / span) * (h - 8) - 4).toFixed(1)}`)
     .join(" ");
-  const up = points[points.length - 1] >= points[0];
   return (
-    <svg className={`spark ${up ? "up" : "down"}`} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-label="Price over time">
+    <svg className="spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-label="Price over time">
       <path d={d} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke" />
     </svg>
   );
