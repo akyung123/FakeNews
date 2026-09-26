@@ -41,7 +41,8 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [x] Graduation: fill only the remaining supply and refund, `complete`, V4 pool, `LiquidityLocker` @cursor-agent
 - [x] `ProphecyHook`: `beforeInitialize` allows only the Launchpad. Mine the CREATE2 salt @cursor-agent
 - [x] `LiquidityLocker.collect`: 24 : 76 @cursor-agent
-- [ ] `memo` on `buy` / `sell`, emitted in `Trade`, reverts above 140 bytes
+- [ ] ~~`memo` on `buy` / `sell`, emitted in `Trade`, reverts above 140 bytes~~ → CCA has no `buy` / `sell` (DECISIONS #19)
+- [ ] Trade memos on pool swaps after graduation: `afterSwap` hook reads the memo from `hookData` and emits it. New hook address, so a redeploy (DECISIONS #19)
 - [ ] Tests
   - [x] Lock tests: editing the sentence reverts, transfer reverts, swapping the resolver reverts, `hasAssignees(ROOT, UNREGISTER) == false` @cursor
   - [x] Three fuzz tests: solvency (done @cursor-agent), a round trip never gains (done @cursor-agent), graduation vs pool start price gap < 0.0068% @cursor-agent
@@ -68,6 +69,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - no True / False
   - optional one-line memo on buy and sell; recent trades listed with their memos
   - [x] replace the prototype's holder talk with trade memos @cursor
+  - [x] with a Launchpad set, hide the memo block and say memos are not on-chain yet; demo mode keeps it (DECISIONS #19) @claude
   - [x] hide Buy/Sell after graduation; Uniswap V4 panel @cursor-agent
 - [x] Screen 4: prophet page. Every prophecy under the name, claimable fees @cursor
 - [x] Following page (`/following`): feed of followed prophets' prophecies, prophet list with filter and Unfollow, chips on narrow screens @claude
