@@ -49,6 +49,9 @@ export function HomePage({ loadLaunched }: HomePageProps = {}) {
           <h1>Prophecies</h1>
           <SampleBadge />
         </div>
+        <p className="home-hero faint">
+          Write one line. Launch it as a token. Your name keeps it on ENS forever.
+        </p>
 
         {featured ? (
           <Link className="featured launch" to={`/coin/${featured.id}`}>
@@ -82,9 +85,12 @@ export function HomePage({ loadLaunched }: HomePageProps = {}) {
             <span className="faint">newest first</span>
           </div>
           {grid.length === 0 && !featured ? (
-            <p className="empty">
-              {chain ? "No on-chain prophecies to show yet." : "No prophecies yet."}
-            </p>
+            <div className="empty">
+              <p>No prophecies yet. Be the first.</p>
+              <Link to="/create" className="btn primary">
+                Launch a prophecy
+              </Link>
+            </div>
           ) : (
             <div className="token-grid">
               {grid.map((coin) => (

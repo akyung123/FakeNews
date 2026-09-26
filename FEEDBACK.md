@@ -1,8 +1,8 @@
 # Uniswap Foundation — developer feedback (Prophecy)
 
-Prize-submission notes for Uniswap. Facts only, from this repo and official Uniswap source / docs. Do not invent findings. `TODO(team)` means the result is not in yet.
+Prize-submission notes for Uniswap. Facts only, from this repo and official Uniswap source / docs. Do not invent findings.
 
-Sources: [`docs/INTERFACE_CCA.md`](docs/INTERFACE_CCA.md) (CCA path), [`docs/INTERFACE.md`](docs/INTERFACE.md) (curve fallback on `main`), [`docs/DECISIONS.md`](docs/DECISIONS.md) #1, #18–#22, [PR #38 `CCA_RESEARCH.md`](https://github.com/prism-toggle-ai/FakeNews/blob/a45aecb37f7e1fdc64bed17b1391bb2f603a8ea3/docs/CCA_RESEARCH.md) (`a45aecb`), official pins in INTERFACE_CCA section 0.
+Sources: [`docs/INTERFACE_CCA.md`](docs/INTERFACE_CCA.md) (CCA path), [`docs/INTERFACE.md`](docs/INTERFACE.md) (curve path), [`docs/DECISIONS.md`](docs/DECISIONS.md) #1, #18–#22, [PR #38 `CCA_RESEARCH.md`](https://github.com/prism-toggle-ai/FakeNews/blob/a45aecb37f7e1fdc64bed17b1391bb2f603a8ea3/docs/CCA_RESEARCH.md) (`a45aecb`), official pins in INTERFACE_CCA section 0.
 
 Gates (KST): 22:00 INTERFACE + contract skeleton; 02:00 Sepolia-fork 4 steps; 03:30 web + deploy script. Miss any gate → submit the bonding-curve Launchpad already on `main`.
 
@@ -28,7 +28,7 @@ On `main`, people buy and sell on a bonding curve; when that supply sells out, l
 
 Sepolia-fork outcome (CI run [36235288329](https://github.com/prism-toggle-ai/FakeNews/actions/runs/36235288329) on the deploy-record PR, merged as `c0a8cc4`): **95 tests passed, 0 failed, 0 skipped**. That includes `CcaSepoliaForkTest` (11) and `CcaLaunchpadForkTest.test_launchpadHookLockerMigrateRegisterCollect` (launch, bid, `exitBid`, `claimTokens`, `migrate`, `register`, Universal Router buy, `collect`). Same run: web 49 tests, world 23 tests.
 
-Live deploy gas, receipts in block 11785558 (deployer `0x9Fb765ba848ec78616ECC277A5a61Fdc380eCA6F`): ProphecyEns CREATE 1,357,055; Launchpad CREATE 2,702,158; Hook CREATE2 279,022; Locker CREATE 1,135,409; `setUniswap` 91,115; `setCca` 85,506. `setAuctionBlocks(10)` used 28,040. `TODO(team):` per-call gas for `initializeDistribution`, `submitBid`, `checkpoint`, `exitBid`, `claimTokens`, `migrate`, and the v4 swap — the fork suite does not record those costs, and no live auction has run them.
+Live deploy gas, receipts in block 11785558 (deployer `0x9Fb765ba848ec78616ECC277A5a61Fdc380eCA6F`): ProphecyEns CREATE 1,357,055; Launchpad CREATE 2,702,158; Hook CREATE2 279,022; Locker CREATE 1,135,409; `setUniswap` 91,115; `setCca` 85,506. `setAuctionBlocks(10)` used 28,040. Per-call gas for `initializeDistribution`, `submitBid`, `checkpoint`, `exitBid`, `claimTokens`, `migrate`, and the v4 swap is not yet measured — the fork suite does not record those costs, and no live auction has run them.
 
 ## What worked (verified in source, on the CCA fork, and on the Sepolia deployment)
 
@@ -100,7 +100,7 @@ cd contracts && forge build && forge test
 - Round trip never gains: pass (`testFuzz_roundTripNeverGains`)
 - Graduation vs pool start price: pass (`testFuzz_priceGapUnderLimit`, gap < 68 ppm)
 
-CCA fork result: 95 passed, 0 failed, 0 skipped on CI run 36235288329 (`cca` deploy-record PR). See the status section for the four steps and the live deploy gas. Per-step auction gas is still `TODO(team)`.
+CCA fork result: 95 passed, 0 failed, 0 skipped on CI run 36235288329 (`cca` deploy-record PR). See the status section for the four steps and the live deploy gas. Per-step auction gas is not yet measured.
 
 ## Suggestions (concrete)
 
@@ -112,4 +112,4 @@ CCA fork result: 95 passed, 0 failed, 0 skipped on CI run 36235288329 (`cca` dep
 
 ## 09-26 note — switching from curve graduation to official migrate
 
-The hard part of the curve-era hook was the address and the caller, not the hook body. Official LBP makes that stricter: the caller **must** be the strategy, the hook **must** speak ERC165, and the lock **must** be an NFT. That is a product fit (we still want a locked pool and a 24 : 76 fee split) but it is not a drop-in. The rewrite is on `cca` and the Sepolia addresses above are live. `INTERFACE.md` on `main` stays the curve contract. The only open measurement is per-step auction gas (`TODO(team)`).
+The hard part of the curve-era hook was the address and the caller, not the hook body. Official LBP makes that stricter: the caller **must** be the strategy, the hook **must** speak ERC165, and the lock **must** be an NFT. That is a product fit (we still want a locked pool and a 24 : 76 fee split) but it is not a drop-in. The rewrite is on `cca` and the Sepolia addresses above are live. `INTERFACE.md` documents the earlier curve contract. Per-step auction gas is not yet measured.

@@ -141,9 +141,9 @@ describe("DECISIONS #1 copy — new strings", () => {
     assertRemoved(home);
   });
 
-  test("Sidebar wordmark is prophecy with no pump", () => {
+  test("Sidebar wordmark is prophit with no pump", () => {
     const home = renderApp("/");
-    expect(home).toContain(">prophecy<");
+    expect(home).toContain(">prophit<");
     expect(home).not.toContain(".pump");
     expect(home).toContain("Contracts not connected yet.");
     expect(home).toContain("Sample data");
@@ -180,7 +180,7 @@ describe("DECISIONS #1 copy — new strings", () => {
     const create = renderApp("/create");
     expect(create).toContain("Issue a prophecy");
     expect(create).not.toContain("140 left");
-    expect(create).toContain("It becomes a token.");
+    expect(create).toContain("opens with a short auction");
     expect(create).not.toContain("Confirm the prophet name in your wallet.");
     expect(create).not.toContain("Prophet name is on Sepolia.");
     assertRemoved(create);
@@ -203,7 +203,7 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(text.toLowerCase()).not.toMatch(/coin|profit|yield|prediction|outlook/);
     expect(text).not.toContain("%");
     const create = renderApp("/create");
-    expect(create).toContain("It becomes a token.");
+    expect(create).toContain("opens with a short auction");
     expect(create).not.toContain(WRITE_COPY.failed);
     expect(create).not.toContain(ZERO_QUOTE_COPY);
     assertRemoved(create);

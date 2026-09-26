@@ -13,6 +13,15 @@ function routerBasename(baseUrl: string): string {
 
 const basename = routerBasename(import.meta.env.BASE_URL);
 
+// Wake the World server on app load so the first verification is faster.
+// Fire-and-forget: failures are silently ignored.
+{
+  const worldUrl = (import.meta.env.VITE_WORLD_SERVER_URL || "").replace(/\/+$/, "");
+  if (worldUrl) {
+    void fetch(`${worldUrl}/health`).catch(() => {});
+  }
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Web3Provider>

@@ -151,7 +151,7 @@ describe("designer World copy mapping", () => {
   });
 
   it("does not use the retry sentence while a check is still running", () => {
-    expect(ISSUE_COPY.pending).toBe("Still checking. This can take a minute the first time.");
+    expect(ISSUE_COPY.pending).toBe("Still checking. The first check can take up to a minute.");
     expect(ISSUE_COPY.pending).not.toBe(ISSUE_COPY.checkFailed);
     expect(worldUserMessage("network")).toBe(ISSUE_COPY.checkFailed);
   });

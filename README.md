@@ -1,4 +1,4 @@
-# Prophecy
+# Prophit
 
 Launch a prophecy. It starts trading the moment you say it.
 
@@ -90,6 +90,14 @@ cd world && bun start                     # http://localhost:8787
 ```
 
 Environment variables: copy [`.env.example`](.env.example) and see [`infra/README.md`](infra/README.md) for who provides each value. Never commit a `.env` file.
+
+## Invariants & trust assumptions
+
+- **LP principal cannot be withdrawn.** The `LiquidityLocker` holds the PositionManager NFT and has no path to remove liquidity — only `collect` (fees 24 : 76).
+- **Fee recipient is fixed at launch.** The prophet and protocol addresses are set when `launch` writes the ENS record and opens the auction; they cannot be changed afterwards.
+- **One name per person (World nullifier).** `registerProphet` stores the World ID nullifier on-chain. A second registration with the same nullifier reverts.
+- **World signature is scoped.** The server signs `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))`. A signature for one chain, contract, or wallet cannot be replayed elsewhere.
+- **`worldSigner` is a single trusted key.** If this key leaks, anyone can forge a World verification and the one-name-per-person rule breaks. The deployer sets `worldSigner` once (`setWorldSigner` is deployer-only, single-use).
 
 ## Layout
 

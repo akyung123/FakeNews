@@ -1,7 +1,11 @@
+// @vitest-environment node
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { readSepoliaDeployment, sepoliaDeploymentDefine } from "./sepoliaDeployment";
 
-const WEB_DIR = new URL("..", import.meta.url).pathname;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const WEB_DIR = resolve(__dirname, "..");
 
 describe("bundled Sepolia deployment", () => {
   /// The record is outside the Vite project, so this is the only wiring that

@@ -1,7 +1,11 @@
+import { useEffect, useState } from "react";
 import { Link, NavLink, Route, Routes } from "react-router-dom";
+import { useAccount } from "wagmi";
 import { WalletButton } from "./components/WalletButton";
 import { SampleBadge } from "./components/SampleBadge";
+import { webEnv } from "./lib/env";
 import { eth } from "./lib/format";
+import { createReadProphetOf } from "./lib/launchpad";
 import { isMockMode } from "./lib/mode";
 import { YOU, actions, useStore } from "./lib/store";
 import { CoinPage } from "./pages/CoinPage";
@@ -11,15 +15,37 @@ import { MyPage } from "./pages/MyPage";
 import { NamePage } from "./pages/NamePage";
 import { ProphetPage } from "./pages/ProphetPage";
 
+const readProphetOf = createReadProphetOf();
+
 export function App() {
   const mock = isMockMode();
   const s = useStore();
+  const { address, isConnected } = useAccount();
+  const [prophetLabel, setProphetLabel] = useState<string | null>(null);
   const held = mock ? Object.values(s.positions[YOU] ?? {}).filter((p) => p.tokens > 1e-6).length : 0;
+
+  useEffect(() => {
+    if (!isConnected || !address) {
+      setProphetLabel(null);
+      return;
+    }
+    let cancelled = false;
+    void readProphetOf(address).then((label) => {
+      if (!cancelled) setProphetLabel(label || null);
+    }).catch(() => {
+      if (!cancelled) setProphetLabel(null);
+    });
+    return () => { cancelled = true; };
+  }, [address, isConnected]);
+
+  const parentName = webEnv.parentName;
+  const prophetEns = prophetLabel ? `${prophetLabel}.${parentName}` : null;
+
   return (
     <div className="shell">
       <aside className="sidebar">
         <Link to="/" className="logo">
-          <span>prophecy</span>
+          <span>prophit</span>
         </Link>
         <SampleBadge />
 
@@ -27,9 +53,11 @@ export function App() {
           <NavLink to="/" end>
             Home
           </NavLink>
-          <NavLink to="/p/ringo">
-            ringo.prophecy.eth
-          </NavLink>
+          {prophetEns ? (
+            <NavLink to={`/p/${prophetLabel}`}>
+              {prophetEns}
+            </NavLink>
+          ) : null}
           <NavLink to="/name">
             Claim your name
           </NavLink>

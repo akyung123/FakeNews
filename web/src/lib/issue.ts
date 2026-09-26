@@ -10,7 +10,7 @@ export type IssueSession = {
 
 export const ISSUE_COPY = {
   title: "Issue a prophecy",
-  lead: "Write one sentence. It becomes a token. Buying raises the price and selling lowers it.",
+  lead: "Your prophecy opens with a short auction. Each block clears at a single price, then the market opens on Uniswap.",
   immutable:
     "This sentence is written once. Nobody can edit it after you issue it — not you, not us.",
   worldHelp: "World ID is required only when you create a prophet name. One human, one name.",
@@ -20,7 +20,7 @@ export const ISSUE_COPY = {
   fail: "Simulate failure",
   launch: "Issue prophecy",
   disabledLaunch: "Verify with World ID to launch",
-  pending: "Still checking. This can take a minute the first time.",
+  pending: "Still checking. The first check can take up to a minute.",
   pendingSlow: "Taking longer than expected — the World server or the network may be slow right now.",
   retry: "Retry",
   registerPending: "Confirm your name in your wallet.",
