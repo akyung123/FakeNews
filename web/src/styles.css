@@ -350,6 +350,32 @@ input:focus, textarea:focus { outline: none; border-color: var(--gold-300); }
 .spark { display: block; width: 100%; height: 220px; margin: 16px 0 8px; }
 .spark path { stroke: var(--gold-500); }
 
+.chart { display: flex; flex-direction: column; gap: 4px; margin: 12px 0 4px; }
+.chart-head { display: flex; align-items: center; justify-content: space-between; }
+.chart-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--success); }
+.chart-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: chart-blink 2s ease-in-out infinite; }
+.chart-readout { display: flex; align-items: baseline; gap: 10px; }
+.chart-value { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--gold-300); }
+.chart-svg { display: block; width: 100%; height: 160px; cursor: crosshair; }
+.chart-grid { stroke: var(--line); stroke-width: 1; }
+.chart-line { stroke: var(--gold-500); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-cursor { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-fill-top { stop-color: var(--gold-500); stop-opacity: 0.22; }
+.chart-fill-bottom { stop-color: var(--gold-500); stop-opacity: 0; }
+.chart-head-dot { fill: var(--gold-300); }
+.chart-head-dot.pulsing { animation: chart-blink 2s ease-in-out infinite; }
+.chart-axis { display: flex; align-items: center; justify-content: space-between; }
+.chart-empty { min-height: 60px; }
+
+@keyframes chart-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-dot, .chart-head-dot.pulsing { animation: none; }
+}
+
 .trade { display: flex; flex-direction: column; gap: 12px; }
 .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--soft); padding: 4px; border-radius: var(--radius-1); }
 .tabs button { border: 0; background: none; color: var(--faint); padding: 7px; border-radius: var(--radius-1); font-weight: 700; }
