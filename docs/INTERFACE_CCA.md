@@ -61,7 +61,7 @@ Verified on a Sepolia fork at block **11_784_960** in [PR #41](https://github.co
 | Graduation threshold | **0.02 ETH** (`20000000000000000` wei) | `AuctionParameters.requiredCurrencyRaised` | **#41** |
 | Pool fee | **1% = `10000` pips** | `PoolParameters.fee` | **#41** |
 | Pool tickSpacing | **200** | `PoolParameters.tickSpacing` | **#41** |
-| First bid id | **0** | `submitBid` return / `BidSubmitted.id` | official CCA [`BidStorage.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/BidStorage.sol) L11 (`uint256 private $_nextBidId` defaults to 0), L49–L51 (`bidId = $_nextBidId; $_nextBidId++`). **Not** asserted in #41 |
+| First bid id | **0** | `submitBid` return / `BidSubmitted.id` | official CCA [`BidStorage.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/BidStorage.sol) L10 (`uint256 private $_nextBidId` defaults to 0), L47–L49 (`bidId = $_nextBidId; $_nextBidId++`). **Not** asserted in #41 |
 | `fundsRecipient` | **LBPStrategy** (`0x9543…2000`) | official `InvalidFundsRecipient` if anything else | **#41** |
 | `tokensRecipient` | **protocol** (`protocolFeeRecipient`) — **never the prophet**, never LBPStrategy | unsold auction tokens via `sweepUnsoldTokens` | **#41** |
 | `recipient` | **protocol** (`protocolFeeRecipient`) — **never the prophet** | unused currency / recover-on-fail | **#41** |
@@ -477,7 +477,7 @@ function submitBid(uint256 maxPriceQ96, uint128 amount, address owner, bytes cal
 | `owner` | bidder (receives tokens and leftover ETH) |
 | `prevTickPriceQ96` | hint; #41 uses `floor + (n-1) * tick` with `maxPrice = floor + n * tick` |
 
-First `submitBid` return / `BidSubmitted.id` is **0**. Official CCA [`BidStorage.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/BidStorage.sol) L11 and L49–L51 (`$_nextBidId` starts at 0; `_createBid` assigns then increments). **Not** fork-asserted in #41.
+First `submitBid` return / `BidSubmitted.id` is **0**. Official CCA [`BidStorage.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/BidStorage.sol) L10 and L47–L49 (`$_nextBidId` starts at 0; `_createBid` assigns then increments). **Not** fork-asserted in #41.
 
 ```solidity
 event BidSubmitted(uint256 indexed id, address indexed owner, uint256 priceQ96, uint128 amount);
