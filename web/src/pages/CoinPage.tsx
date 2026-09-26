@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { parseEther } from "viem";
+import { formatEther, parseEther } from "viem";
 import { CcaTrade } from "../components/CcaTrade";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
+import { PriceChart } from "../components/PriceChart";
 import { SampleBadge } from "../components/SampleBadge";
 import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { CCA_COPY, raisedProgressCopy } from "../lib/cca";
-import { hasLaunchpad } from "../lib/contracts";
+import { usePoolPrice } from "../lib/cca/usePoolPrice";
+import { contracts, hasLaunchpad } from "../lib/contracts";
 import { graduated, progress, TOTAL_SUPPLY } from "../lib/curve";
 import { ago, gwei, tokens } from "../lib/format";
 import {
@@ -69,6 +71,9 @@ export function CoinPage({
 
   const fromStore = s.coins.find((c) => c.id === lookup || c.token === lookup || c.name === lookup);
   const coin = chain ? (fromStore ?? chainCoin) : (fromStore ?? prototypeCoinFromName(lookup));
+  // Once migrate opens the pool, slot0 is the live price; before that the
+  // auction's clearing price is, and the hook stays closed.
+  const poolPrice = usePoolPrice(coin?.token, contracts.hook);
   if (!coin) {
     if (chain && !chainReady) {
       return <main className="coin-page" />;
@@ -86,6 +91,10 @@ export function CoinPage({
   const pos = myPosition(s, coin.id);
   const talk = s.comments.filter((c) => c.coinId === coin.id).sort((a, b) => b.at - a.at);
   const closed = graduated(coin) || Boolean(coin.complete);
+  const poolPriceEth = Number(formatEther(poolPrice.priceWei));
+  const chartPoints = poolPrice.open
+    ? poolPrice.history.map((p) => ({ at: p.at, value: Number(formatEther(p.wei)) }))
+    : coin.history.map((h) => ({ at: h.at / 1000, value: h.mcap / TOTAL_SUPPLY }));
 
   return (
     <main className="coin-page">
@@ -104,10 +113,22 @@ export function CoinPage({
             </div>
           </div>
           <h1 className="prophecy-title">{coin.prophecy}</h1>
-          <p className="price-now">{gwei(price(coin))}</p>
+          <p className="price-now">{gwei(poolPrice.open ? poolPriceEth : price(coin))}</p>
           <p className="big-num">{auctionProgressHeader(coin)}</p>
-          <p className="faint">{closed ? CCA_COPY.finalClearingPrice : CCA_COPY.currentClearingPrice}</p>
-          <Sparkline coin={coin} />
+          <p className="faint">
+            {poolPrice.open
+              ? CCA_COPY.poolOpen
+              : closed
+                ? CCA_COPY.finalClearingPrice
+                : CCA_COPY.currentClearingPrice}
+          </p>
+          <PriceChart
+            points={chartPoints}
+            label={poolPrice.open ? "Pool price (ETH)" : "Price (ETH)"}
+            live={poolPrice.open}
+            format={(value) => gwei(value)}
+            emptyText="No trades yet. The chart starts with the first trade."
+          />
           <Bar value={progress(coin)} labelled />
         </section>
 
@@ -208,23 +229,4 @@ function PostBox({ coinId, holds }: { coinId: string; holds: boolean }) {
 function auctionProgressHeader(coin: Coin): string {
   const raisedWei = parseEther(Math.max(0, coin.ethRaised).toFixed(18));
   return raisedProgressCopy(raisedWei);
-}
-
-function Sparkline({ coin }: { coin: Coin }) {
-  const points = coin.history.map((h) => h.mcap / TOTAL_SUPPLY);
-  if (points.length < 2) return null;
-  const w = 600;
-  const h = 120;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const span = max - min || 1;
-  const d = points
-    .map((v, i) => `${i === 0 ? "M" : "L"}${((i / (points.length - 1)) * w).toFixed(1)},${(h - ((v - min) / span) * (h - 8) - 4).toFixed(1)}`)
-    .join(" ");
-  const up = points[points.length - 1] >= points[0];
-  return (
-    <svg className={`spark ${up ? "up" : "down"}`} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-label="Price over time">
-      <path d={d} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
 }
