@@ -1,0 +1,11 @@
+{
+  "name": "prophecy-infra",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "ens-lookup": "bun ens-lookup.ts"
+  },
+  "dependencies": {
+    "viem": "^2.56.3"
+  }
+}
