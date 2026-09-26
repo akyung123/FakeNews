@@ -122,6 +122,48 @@ contract CcaSepoliaForkTest is CcaSepoliaForkBase {
         assertGt(filled, 0);
     }
 
+    /// Demo path with no separate checkpoint: 0.021 ETH at 2× floor.
+    function test_demo_noExternalCheckpoint_budget021_twiceFloor() public onFork {
+        (ICcaFork auction, ProphecyToken token) = _createAuction(10, "nocheck-021");
+        uint256 maxPrice = CcaLib.FLOOR_PRICE_Q96 * 2;
+        assertEq(maxPrice, 6338253001141147200);
+        uint256 id = _bid(auction, 0.021 ether, maxPrice);
+        _rollTo(auction.endBlock());
+        assertEq(auction.lastCheckpointedBlock(), auction.startBlock(), "no external checkpoint");
+
+        uint256 ethBefore = bidder.balance;
+        uint256 tokBefore = token.balanceOf(bidder);
+        vm.prank(bidder);
+        auction.exitBid(id);
+        assertEq(bidder.balance - ethBefore, 0, "whole budget used");
+        _rollTo(auction.claimBlock());
+        auction.claimTokens(id);
+        assertGt(token.balanceOf(bidder), tokBefore, "tokens received");
+        assertTrue(auction.isGraduated());
+    }
+
+    /// maxPrice == clearing ⇒ official `CannotExitBid()` (0x0ba98457).
+    function test_exitBidRevertsWhenMaxPriceEqualsClearing() public onFork {
+        (ICcaFork auction,) = _createAuction(10, "eq-clear");
+        uint256 maxPrice = CcaLib.FLOOR_PRICE_Q96 + CcaLib.AUCTION_TICK_SPACING_Q96;
+        uint256 id = _bid(auction, 0.021 ether, maxPrice);
+        _rollTo(auction.endBlock());
+        auction.checkpoint();
+        assertTrue(auction.isGraduated());
+        assertEq(auction.clearingPrice(), maxPrice, "maxPrice lands on clearing");
+        vm.prank(bidder);
+        vm.expectRevert(ICcaFork.CannotExitBid.selector);
+        auction.exitBid(id);
+    }
+
+    /// Floor graduation leftover ETH swept to protocol is 171 wei.
+    function test_floorGraduateLeftoverEthIs171() public onFork {
+        DemoOut memory demo = _runDemo(
+            10, 0.02 ether, CcaLib.FLOOR_PRICE_Q96 + CcaLib.AUCTION_TICK_SPACING_Q96, "left171", true
+        );
+        assertEq(demo.leftoverEth, 171);
+    }
+
     /// B) After endBlock, no external checkpoint: exitBid / claimTokens.
     function test_exitClaimWithoutExternalCheckpoint() public onFork {
         (ICcaFork auction, ProphecyToken token) = _createAuction(10, "nocheck");
