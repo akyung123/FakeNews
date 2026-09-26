@@ -160,12 +160,20 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 | `VITE_WORLD_SERVER_URL` | web (world/ base URL; unused while mock) |
 | `VITE_WALLETCONNECT_PROJECT_ID` | web (optional; injected wallets work without it) |
 | `SEPOLIA_RPC_URL`, `DEPLOYER_PRIVATE_KEY` | contract deployment (people only) |
-| `ENS_ADAPTER_ADDRESS` | deploy script (Launchpad `ens` constructor arg) |
+| `TEAM_WALLET` | deploy scripts (optional; defaults to the deployer). If set, must equal the deployer — one wallet |
+| `PARENT_USER_REGISTRY` | deploy script (`deployUserRegistry` output; required when the script creates `ProphecyEns`) |
+| `ENS_ADAPTER_ADDRESS` | deploy script **output** (logged `ProphecyEns`). Optional override: if set, skip adapter CREATE |
+| `PARENT_LABEL`, `ENS_REGISTRATION_SECRET`, `ENS_DURATION_SECONDS` | parent `.eth` register (`infra/scripts/deploy-sepolia.sh`) |
+| `MOCK_USDC_MINT_AMOUNT` | optional MockUSDC `mint` amount (6 decimals). Empty = script mints enough for the fee |
 | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |
 
 Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0.
 
-`ENS_ADAPTER_ADDRESS` is the already-deployed ENS adapter. Off anvil (`chainid != 31337`) it must be set and cannot be `address(0)` or placeholder `0xe05` — the same guard as `PROTOCOL_FEE_RECIPIENT` / `0xfee` and `worldSigner` / `0x51e`. Anvil dry-run fills `0xe05` when unset. Infra adds this name to `.env.example`.
+`ENS_ADAPTER_ADDRESS` is the `ProphecyEns` address. **Default: output.** `Deploy.s.sol` creates the adapter (predicted Launchpad CREATE address) and the Launchpad in one broadcast, then logs `ENS_ADAPTER_ADDRESS`. **Optional input override:** if the env var is set, the script does not CREATE an adapter and passes that address as Launchpad `ens`. Off anvil, a set value cannot be `address(0)` or placeholder `0xe05` — the same `#24` guard as `PROTOCOL_FEE_RECIPIENT` / `0xfee` and `worldSigner` / `0x51e`. Anvil dry-run (`chainid == 31337`) fills `0xe05` when unset (Launchpad reverts on zero).
+
+`TEAM_WALLET` defaults to the address of `DEPLOYER_PRIVATE_KEY`. A different `TEAM_WALLET` reverts: `setSubregistry` and `ROLE_REGISTRAR` grants need the same key that registered the parent name.
+
+Parent lock (revoke `SET_SUBREGISTRY` on `.eth` for `prophecy`) is not part of this deploy. A later PR adds that irreversible step after a person confirms.
 
 ## 6. Curve quote vectors
 
