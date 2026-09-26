@@ -60,6 +60,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [x] Screen 2: issue @cursor
   - the issue button turns on only after World verification
   - cancelling or failing disables it
+  - [x] Issue and name screens use the connected wallet for the World step, `prophetOf` and `registerProphet`; mock wallets only in mock mode @claude
 - [x] Screen 3: prophecy detail @cursor
   - find the token by name
   - [x] buy and sell @cursor-agent

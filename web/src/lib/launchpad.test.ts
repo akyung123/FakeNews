@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readLaunchpadDeployBlock, webEnv } from "./env";
-import { MOCK_WORLD_LAUNCHPAD, MOCK_WORLD_VERIFY } from "./mock";
+import { MOCK_WORLD_LAUNCHPAD, MOCK_WORLD_VERIFY, MOCK_WORLD_WALLET } from "./mock";
 import {
   assertSuccessfulReceipt,
   createReadCreatorFee,
@@ -68,6 +68,7 @@ describe("prophetOf lookup", () => {
 
 describe("registerProphet write shape", () => {
   const input: RegisterProphetInput = {
+    wallet: MOCK_WORLD_WALLET,
     label: "ringo",
     nullifier: MOCK_WORLD_VERIFY.nullifier,
     serverSig: MOCK_WORLD_VERIFY.serverSig,
@@ -84,6 +85,7 @@ describe("registerProphet write shape", () => {
     expect(request.abi).toBe(launchpadAbi);
     expect(request.functionName).toBe("registerProphet");
     expect(request.args[0]).toBe("ringo");
+    expect(request.account).toBe(MOCK_WORLD_WALLET);
     expect(MOCK_WORLD_VERIFY).not.toHaveProperty("label");
   });
 
@@ -93,6 +95,7 @@ describe("registerProphet write shape", () => {
       called = true;
     });
     await run({
+      wallet: MOCK_WORLD_WALLET,
       label: "mina",
       nullifier: MOCK_WORLD_VERIFY.nullifier,
       serverSig: MOCK_WORLD_VERIFY.serverSig,
@@ -122,6 +125,8 @@ describe("registerProphet write shape", () => {
     expect(written.address).toBe(MOCK_WORLD_LAUNCHPAD);
     expect(written.abi).toBe(launchpadAbi);
     expect(written.functionName).toBe("registerProphet");
+    // Sent from the wallet the World server signed for (msg.sender in the digest).
+    expect(written.account).toBe(MOCK_WORLD_WALLET);
     expect(written.args).toEqual([
       "ringo",
       BigInt(MOCK_WORLD_VERIFY.nullifier),

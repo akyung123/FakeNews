@@ -335,6 +335,7 @@ describe("Screen 2 button gating", () => {
     await user.click(launchButton());
     await waitFor(() => expect(seen).toEqual([
       {
+        wallet: MOCK_ISSUE_SESSION.wallet,
         label: "mina",
         nullifier: MOCK_WORLD_VERIFY.nullifier,
         serverSig: MOCK_WORLD_VERIFY.serverSig,
@@ -498,7 +499,7 @@ describe("Screen 2 button gating", () => {
     renderIssue();
 
     expect(launchButton()).toHaveTextContent(ISSUE_COPY.disabledLaunch);
-    await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
+    await user.click(await screen.findByRole("button", { name: ISSUE_COPY.prove }));
     await waitFor(() => expect(screen.getByText(/Verified/)).toBeInTheDocument());
     expect(launchButton()).toBeDisabled();
   });
