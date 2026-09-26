@@ -29,9 +29,9 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 ## 2. Contracts (`contracts/`)
 
-- [ ] `forge install ensdomains/contracts-v2`, remappings
-- [ ] `ProphecyToken`
-- [ ] `Launchpad` curve
+- [x] `forge install ensdomains/contracts-v2`, remappings @cursor
+- [x] `ProphecyToken` @cursor-agent
+- [x] `Launchpad` curve @cursor-agent
   - SPEC constants exactly
   - reserves in a struct
   - a separate fee ledger
@@ -43,8 +43,8 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] `LiquidityLocker.collect`: 24 : 76
 - [ ] `memo` on `buy` / `sell`, emitted in `Trade`, reverts above 140 bytes
 - [ ] Tests
-  - [ ] Lock tests: editing the sentence reverts, transfer reverts, swapping the resolver reverts, `hasAssignees(ROOT, UNREGISTER) == false`
-  - [ ] Three fuzz tests: solvency, a round trip never gains, graduation vs pool start price gap < 0.0068%
+  - [x] Lock tests: editing the sentence reverts, transfer reverts, swapping the resolver reverts, `hasAssignees(ROOT, UNREGISTER) == false` @cursor
+  - [ ] Three fuzz tests: solvency (done @cursor-agent), a round trip never gains (done @cursor-agent), graduation vs pool start price gap < 0.0068%
   - [ ] World: reusing a nullifier reverts, a bad signature reverts
 - [ ] Sepolia deploy script (skill `deploy-sepolia`)
 
@@ -53,7 +53,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [x] Replace the prototype curve constants with SPEC values (`src/lib/curve.ts`) @cursor
 - [x] wagmi + viem, Sepolia only @cursor
 - [ ] Screen 1: prophecy list (name, sentence, price, Departed count)
-- [ ] Screen 2: issue
+- [x] Screen 2: issue @cursor
   - the issue button turns on only after World verification
   - cancelling or failing disables it
 - [ ] Screen 3: prophecy detail
