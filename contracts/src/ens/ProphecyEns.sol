@@ -19,7 +19,7 @@ import {
 
 /// ENSv2 adapter. Separate from Launchpad so name lock lives in one place.
 /// `name.parent` → prophet wallet; `slug.name.parent` → token.
-/// Sentence and deadline are written once in the prophecy resolver's initialize calls.
+/// The sentence is written once in the prophecy resolver's initialize calls.
 contract ProphecyEns is IProphecyEns {
     error NotLaunchpad();
     error ZeroAddress();
@@ -108,7 +108,6 @@ contract ProphecyEns is IProphecyEns {
         string calldata prophetLabel,
         string calldata slug,
         string calldata prophecy,
-        uint64 deadline,
         address token
     ) external onlyLaunchpad returns (address resolver) {
         if (token == address(0)) revert ZeroAddress();
@@ -122,12 +121,9 @@ contract ProphecyEns is IProphecyEns {
 
         bytes memory prophecyDns = DnsCodec.join(slug, DnsCodec.join(prophetLabel, parentDnsName));
 
-        bytes[] memory calls = new bytes[](3);
+        bytes[] memory calls = new bytes[](2);
         calls[0] = abi.encodeCall(IPermissionedResolver.setText, (prophecyDns, "prophecy", prophecy));
-        calls[1] = abi.encodeCall(
-            IPermissionedResolver.setText, (prophecyDns, "deadline", DnsCodec.toDecimal(deadline))
-        );
-        calls[2] = _addressCall(prophecyDns, token);
+        calls[1] = _addressCall(prophecyDns, token);
 
         resolver =
             _deployLockedResolver(wallet, prophecyDns, calls, _resolverSalt(token, prophecyDns));

@@ -6,7 +6,7 @@ People and agents both start here. The human-oriented guide is [`CONTRIBUTING.md
 
 A launchpad that turns a one-line prophecy into a token. Buying raises the price and selling lowers it. When the curve supply sells out, liquidity moves into a Uniswap V4 pool and is locked.
 
-- **No judging.** No oracle, no True / False. The only status on screen is Departed (deadline passed).
+- **No judging.** No oracle, no True / False. No deadline either: once issued, a prophecy keeps trading.
 - **The address book is the core feature.**
   - `ringo.prophecy.eth` → the prophet's wallet
   - `lingo-2028.ringo.prophecy.eth` → that prophecy's token
@@ -27,9 +27,9 @@ A launchpad that turns a one-line prophecy into a token. Buying raises the price
    - Only the repo owner (@akyung123) merges into `main`.
    - Agents push to a branch and open a PR. That is the end of the job.
    - Forbidden: `gh pr merge`, `git push origin main`, any force-push to `main`.
-2. **A prophecy's sentence and deadline live only in that prophecy's own ENS resolver.**
-   - Never store them again in contract storage, events or a server.
-   - The UI reads them from ENS. Never hardcode them.
+2. **A prophecy's sentence lives only in that prophecy's own ENS resolver.**
+   - Never store it again in contract storage, events or a server.
+   - The UI reads it from ENS. Never hardcode it.
 3. **For ENSv2, the official docs (beta) are the source of truth.**
    - Take addresses only from section 0 of [`docs/ENSV2.md`](docs/ENSV2.md).
    - Do not use the older addresses on the contracts-v2 main branch.

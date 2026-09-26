@@ -10,10 +10,10 @@ description: Checklist for any change that touches ENSv2 — registries, resolve
    - Take addresses and ABIs only from `docs/ENSV2.md` section 0 (contracts-v2 `71a3b73`).
    - If the docs and anything else disagree, follow the docs and note it in the PR.
 2. **Data placement**
-   - The sentence (`prophecy`) and `deadline` are written once, in the prophecy resolver's `initialize(grants, calls)`.
+   - The sentence (`prophecy`) is written once, in the prophecy resolver's `initialize(grants, calls)`. There is no `deadline` record (DECISIONS #16).
    - They are never stored anywhere else (DECISIONS #5).
 3. **Roles**
-   - Nobody gets `ROLE_SET_TEXT` for `prophecy` / `deadline`.
+   - Nobody gets `ROLE_SET_TEXT` for `prophecy`.
    - Only display keys (`avatar`, `description`) are granted to the prophet via `grantSetterRoles`.
    - No `ROLE_UNREGISTER`, `ROLE_SET_SUBREGISTRY`, root `ROLE_SET_RESOLVER`, `ROLE_LINK`, `ROLE_UPGRADE` or `ROLE_CAN_TRANSFER_ADMIN` for anyone.
    - Temporary roles are revoked in the same transaction, admin included.
@@ -28,5 +28,5 @@ description: Checklist for any change that touches ENSv2 — registries, resolve
    - `setResolver` / `setSubregistry` revert
    - `hasAssignees(ROOT_RESOURCE, ROLE_UNREGISTER) == false`
    - `isEmancipated() == true` for prophet registries
-7. **Web:** nothing hardcoded. Every sentence and deadline on screen comes from ENS.
+7. **Web:** nothing hardcoded. Every sentence on screen comes from ENS.
 8. **Docs:** if a name, key or role changes, update `docs/INTERFACE.md` in the same PR. If a decision changes, add a row to `docs/DECISIONS.md`.

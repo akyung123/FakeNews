@@ -189,7 +189,7 @@ contract LockRealTest {
 
     function _launch() internal returns (address prophetResolver, address prophecyResolver) {
         (, prophetResolver) = ens.registerProphet(PROPHET, address(prophet));
-        prophecyResolver = ens.registerProphecy(PROPHET, SLUG, SENTENCE, 1893456000, token);
+        prophecyResolver = ens.registerProphecy(PROPHET, SLUG, SENTENCE, token);
     }
 
     function _prophecyDns() internal view returns (bytes memory) {

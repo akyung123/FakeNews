@@ -14,7 +14,6 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 |---|---|---|---|
 | `<prophet>.prophecy.eth` | prophet wallet | `avatar`, `description` | prophet only (per-key role) |
 | `<slug>.<prophet>.prophecy.eth` | prophecy token | `prophecy` = sentence (1–140 chars) | **nobody** (written at init only) |
-| | | `deadline` = unix seconds, decimal string | **nobody** |
 | | | `avatar`, `description` | prophet only |
 
 - **Label rules** `(draft)`
@@ -22,7 +21,7 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
   - Prophecy: 3–32 chars, `[a-z0-9-]`, no leading or trailing hyphen
 - **Expiry:** `type(uint64).max` for every name, so names never expire (DECISIONS #14).
 - **Transfer:** not allowed. The owner's role bitmap is 0.
-- **Departed:** `now >= deadline`. Computed by the UI; there is no on-chain status.
+- **No deadline:** a prophecy has no end date and no status record (DECISIONS #16).
 
 ## 2. Contracts
 
@@ -35,7 +34,7 @@ constructor(address protocolFeeRecipient, address worldSigner);
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
 
 // Issue a prophecy. Caller must own a prophet name. If msg.value > 0, also makes the first buy.
-function launch(string slug, string prophecy, uint64 deadline, uint256 minTokensOut)
+function launch(string slug, string prophecy, uint256 minTokensOut)
     external payable returns (address token);
 
 // memo: optional one-line note shown next to the trade. Empty string for none. At most 140 bytes.
@@ -56,7 +55,7 @@ function worldSigner() external view returns (address);
 
 ```solidity
 event ProphetRegistered(address indexed wallet, string label, uint256 nullifier);
-event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug, uint64 deadline);
+event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
 event Trade(address indexed token, address indexed trader, bool isBuy,
             uint256 ethAmount, uint256 tokenAmount, uint256 fee, uint256 vEthAfter, uint256 vTokenAfter, string memo);
 event Graduated(address indexed token, uint256 ethToPool, uint256 tokensToPool);
@@ -137,7 +136,6 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 2. Names, resolved through the Universal Resolver (`VITE_UNIVERSAL_RESOLVER`):
    - token: `getEnsAddress(name)`
    - sentence: `getEnsText(name, "prophecy")`
-   - deadline: `getEnsText(name, "deadline")`
 3. Price and progress: `curve(token)`.
 4. Chart and trade memos: `Trade` logs.
 5. Name next to a wallet: reverse lookup, falling back to `prophetOf(wallet)`.

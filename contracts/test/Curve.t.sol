@@ -22,7 +22,7 @@ contract CurveTest is Test {
 
     function _launch() internal returns (address token) {
         vm.prank(prophet);
-        token = launchpad.launch("lingo-2028", "", 0, 0);
+        token = launchpad.launch("lingo-2028", "", 0);
     }
 
     function test_constantsMatchSpec() public view {
@@ -66,18 +66,17 @@ contract CurveTest is Test {
         assertEq(bytes(launchpad.prophetOf(prophet)), bytes(""));
     }
 
-    function test_launchDoesNotStoreSentenceOrDeadline() public {
+    function test_launchDoesNotStoreSentence() public {
         string memory sentence = "a sentence that must not be stored";
         vm.recordLogs();
         vm.prank(prophet);
-        address token = launchpad.launch("lingo-2028", sentence, 1_800_000_000, 0);
+        address token = launchpad.launch("lingo-2028", sentence, 0);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes memory needle = bytes(sentence);
         for (uint256 i; i < logs.length; ++i) {
             assertFalse(_containsBytes(logs[i].data, needle), "sentence leaked into an event");
-            assertFalse(_containsWord(logs[i].data, bytes32(uint256(1_800_000_000))), "deadline leaked into an event");
         }
-        // Reserves exist; sentence/deadline are not in the curve struct.
+        // Reserves exist; the sentence is not in the curve struct.
         (uint256 vEth,,,,) = launchpad.curve(token);
         assertEq(vEth, launchpad.VIRTUAL_ETH());
     }
@@ -233,7 +232,7 @@ contract CurveTest is Test {
 
         address clean = address(new Launchpad(protocol, signer));
         vm.prank(prophet);
-        address tokenB = Launchpad(clean).launch("eth-10k", "", 0, 0);
+        address tokenB = Launchpad(clean).launch("eth-10k", "", 0);
         (uint256 tokensB, uint256 feeB) = Launchpad(clean).quoteBuy(tokenB, 0.001 ether);
         assertEq(tokensA, tokensB);
         assertEq(feeA, feeB);
@@ -241,7 +240,7 @@ contract CurveTest is Test {
 
     function test_launchWithValueBuys() public {
         vm.prank(prophet);
-        address token = launchpad.launch{value: 0.001 ether}("lingo-2028", "", 0, 0);
+        address token = launchpad.launch{value: 0.001 ether}("lingo-2028", "", 0);
         (, , uint256 realEth, uint256 sold,) = launchpad.curve(token);
         assertGt(sold, 0);
         assertGt(realEth, 0);
@@ -256,24 +255,12 @@ contract CurveTest is Test {
     function test_badSlugReverts() public {
         vm.prank(prophet);
         vm.expectRevert(Launchpad.BadSlug.selector);
-        launchpad.launch("ab", "", 0, 0);
+        launchpad.launch("ab", "", 0);
     }
 
     function _assertSolvent(address token) internal view {
         (,, uint256 realEth,,) = launchpad.curve(token);
         assertGe(address(launchpad).balance, realEth + launchpad.protocolFees() + launchpad.creatorFeeOf(prophet));
-    }
-
-    function _containsWord(bytes memory data, bytes32 word) internal pure returns (bool) {
-        if (data.length < 32) return false;
-        for (uint256 i; i + 32 <= data.length; ++i) {
-            bytes32 slice;
-            assembly {
-                slice := mload(add(add(data, 32), i))
-            }
-            if (slice == word) return true;
-        }
-        return false;
     }
 
     function _containsBytes(bytes memory data, bytes memory needle) internal pure returns (bool) {

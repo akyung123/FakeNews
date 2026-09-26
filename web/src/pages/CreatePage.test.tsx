@@ -7,8 +7,6 @@ import { MOCK_ISSUE_SESSION, MOCK_RETURNING_SESSION, MOCK_WORLD_HEALTH, MOCK_RP_
 import { WorldClientError, createWorldClient, type WorldClient } from "../lib/world";
 import { IssueScreen } from "./CreatePage";
 
-const NOW = Date.parse("2026-09-26T00:00:00Z");
-
 function renderIssue(
   session = MOCK_ISSUE_SESSION,
   extras: { world?: WorldClient; registerProphet?: IssueScreenProps["registerProphet"] } = {},
@@ -18,7 +16,6 @@ function renderIssue(
       <IssueScreen
         session={session}
         world={extras.world ?? createWorldClient({ mock: true })}
-        now={NOW}
         registerProphet={extras.registerProphet}
       />
     </MemoryRouter>,

@@ -37,7 +37,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - a separate fee ledger
   - rounding rules
 - [ ] `Launchpad.registerProphet`: server signature and nullifier checks, then prophet name + prophet registry + prophet resolver
-- [ ] `Launchpad.launch`: initialize the prophecy resolver (sentence, deadline, address), register the name, mint the token
+- [ ] `Launchpad.launch`: initialize the prophecy resolver (sentence, address), register the name, mint the token
 - [ ] Graduation: fill only the remaining supply and refund, `complete`, V4 pool, `LiquidityLocker`
 - [ ] `ProphecyHook`: `beforeInitialize` allows only the Launchpad. Mine the CREATE2 salt
 - [ ] `LiquidityLocker.collect`: 24 : 76
@@ -52,7 +52,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 - [x] Replace the prototype curve constants with SPEC values (`src/lib/curve.ts`) @cursor
 - [x] wagmi + viem, Sepolia only @cursor
-- [ ] Screen 1: prophecy list (name, sentence, price, Departed count)
+- [ ] Screen 1: prophecy list (name, sentence, price)
 - [x] Screen 2: issue @cursor
   - the issue button turns on only after World verification
   - cancelling or failing disables it
@@ -62,7 +62,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - no True / False
   - optional one-line memo on buy and sell; recent trades listed with their memos
   - replace the prototype's holder talk with trade memos
-- [x] Screen 4: prophet page. Departed prophecies next to the next buy, claimable fees, sell button @cursor
+- [x] Screen 4: prophet page. Wallet, the prophecies under the name, claimable fees @cursor
 - [ ] Every sentence is read from ENS. Nothing hardcoded
 - [ ] Republish the demo page (skill `demo-publish`)
 
@@ -77,7 +77,6 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] Record scene 1 on Sepolia (register `ringo.prophecy.eth`).
   - If it fails: record it again with another person's World ID and a different name.
   - Redeploying the contracts is the last resort only.
-- [ ] Right after scene 1, off camera: issue a prophecy under `ringo` with a 2-minute deadline so it is already Departed for the later scenes.
 - [ ] Record the remaining scenes in SPEC "Demo" (total 2–4 minutes, success and failure paths).
 - [ ] If the ENS app cannot read Sepolia ENSv2 names: use the viem lookup script in `infra/` (`getEnsAddress` and text record) output as the external lookup evidence for scenes 1 and 2.
 - [ ] `FEEDBACK.md` (Uniswap): keep notes of blockers during development; it is the fallback deliverable if Uniswap graduation is cut.

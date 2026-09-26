@@ -25,7 +25,7 @@ contract CurveFuzzTest is Test {
 
     function _launch() internal returns (address token) {
         vm.prank(prophet);
-        token = launchpad.launch("lingo-2028", "", 0, 0);
+        token = launchpad.launch("lingo-2028", "", 0);
     }
 
     function _assertSolvent(address token) internal view {

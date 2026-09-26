@@ -6,7 +6,7 @@ A launchpad where every token is a one-line prophecy. Buying raises the price an
 
 - **An address book first.** `ringo.prophecy.eth` points to the prophet's wallet, `lingo-2028.ringo.prophecy.eth` to that prophecy's token (ENSv2 on Sepolia).
 - **Written once, never edited.** The sentence lives in the prophecy's own ENS resolver, and nobody holds the role to change it.
-- **No judging.** No oracle, no True or False. After its deadline a prophecy is simply *Departed*.
+- **No judging.** No oracle, no True or False, no deadline. Once issued, a prophecy keeps trading.
 - **One prophet name per person**, checked with World ID when you first issue.
 
 ## Status

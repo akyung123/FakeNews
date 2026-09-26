@@ -3,7 +3,7 @@
  *
  * Today this is a mock. Later, swap the body of `getProphetPage` for:
  *   - prophet wallet: Universal Resolver getEnsAddress(name)
- *   - sentence / deadline: getEnsText(name, "prophecy" | "deadline")
+ *   - sentence: getEnsText(name, "prophecy")
  *   - token: getEnsAddress(slug.name.prophecy.eth)
  *   - curve + fees: Launchpad.curve(token) and creatorFeeOf(wallet) via viem
  *
@@ -27,8 +27,6 @@ export type ProphetProphecy = {
   slug: string;
   ensName: string;
   sentence: string;
-  deadline: number;
-  departed: boolean;
   token: Address;
   sold: bigint;
   complete: boolean;
@@ -39,7 +37,6 @@ export type ProphetProphecy = {
 export type ProphetPageData = {
   prophet: ProphetIdentity;
   prophecies: ProphetProphecy[];
-  departedCount: number;
   claimableFeeWei: bigint;
 };
 
@@ -72,7 +69,7 @@ function decodeName(name: string): string {
 }
 
 /** Look up one prophecy by full ENS name or slug. */
-export function getProphecyByName(name: string, nowSec = Math.floor(Date.now() / 1000)): ProphetProphecy | null {
+export function getProphecyByName(name: string): ProphetProphecy | null {
   const key = decodeName(name);
   if (!key) return null;
   const row = MOCK_PROPHECIES.find((item) => {
@@ -80,7 +77,7 @@ export function getProphecyByName(name: string, nowSec = Math.floor(Date.now() /
     return ens === key || item.slug === key;
   });
   if (!row) return null;
-  return toProphetProphecy(row, nowSec);
+  return toProphetProphecy(row);
 }
 
 /**
@@ -88,7 +85,7 @@ export function getProphecyByName(name: string, nowSec = Math.floor(Date.now() /
  * Map a name from this read interface onto that shape so `/n/:name` is not blank.
  */
 export function prototypeCoinFromName(name: string, nowSec?: number): Coin | null {
-  const p = getProphecyByName(name, nowSec);
+  const p = getProphecyByName(name);
   if (!p) return null;
   const sold = Number(p.sold / 10n ** 18n);
   const createdAt = (nowSec ?? Math.floor(Date.now() / 1000)) * 1000;
@@ -108,15 +105,6 @@ export function prototypeCoinFromName(name: string, nowSec?: number): Coin | nul
     { at: createdAt, mcap: marketCap(coin) },
   ];
   return coin;
-}
-
-export function isDeparted(deadline: number, nowSec: number): boolean {
-  return nowSec >= deadline;
-}
-
-/** Open rows buy; Departed (and later, held) rows sell. SPEC Screen 4. */
-export function prophecyTradeLabel(row: { departed: boolean }): "Buy" | "Sell" {
-  return row.departed ? "Sell" : "Buy";
 }
 
 export function curveProgress(sold: bigint, complete: boolean): number {
@@ -144,15 +132,13 @@ export function normalizeProphetLabel(input: string, parent = MOCK_PARENT_NAME):
 /**
  * Load a prophet page. Mock implementation — replace with ENS + contract reads.
  */
-export function getProphetPage(name: string, nowSec = Math.floor(Date.now() / 1000)): ProphetPageData | null {
+export function getProphetPage(name: string): ProphetPageData | null {
   const label = normalizeProphetLabel(name);
   if (!label) return null;
   const prophet = MOCK_PROPHETS.find((p) => p.label === label);
   if (!prophet) return null;
 
-  const prophecies = MOCK_PROPHECIES.filter((row) => row.prophetLabel === label)
-    .map((row) => toProphetProphecy(row, nowSec))
-    .sort(byDeadlineThenSlug);
+  const prophecies = MOCK_PROPHECIES.filter((row) => row.prophetLabel === label).map(toProphetProphecy);
 
   return {
     prophet: {
@@ -161,29 +147,18 @@ export function getProphetPage(name: string, nowSec = Math.floor(Date.now() / 10
       wallet: prophet.wallet,
     },
     prophecies,
-    departedCount: prophecies.filter((p) => p.departed).length,
     claimableFeeWei: prophet.claimableFeeWei,
   };
 }
 
-function toProphetProphecy(
-  row: (typeof MOCK_PROPHECIES)[number],
-  nowSec: number,
-): ProphetProphecy {
+function toProphetProphecy(row: (typeof MOCK_PROPHECIES)[number]): ProphetProphecy {
   return {
     slug: row.slug,
     ensName: prophecyEnsName(row.slug, row.prophetLabel),
     sentence: row.sentence,
-    deadline: row.deadline,
-    departed: isDeparted(row.deadline, nowSec),
     token: row.token,
     sold: row.sold,
     complete: row.complete,
     curveProgress: curveProgress(row.sold, row.complete),
   };
-}
-
-function byDeadlineThenSlug(a: ProphetProphecy, b: ProphetProphecy): number {
-  if (a.deadline !== b.deadline) return a.deadline - b.deadline;
-  return a.slug.localeCompare(b.slug);
 }

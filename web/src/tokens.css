@@ -30,10 +30,9 @@
   --paper-50: #F1ECE4;  /* brightest paper, headline on dark */
   --paper-100: #EEEAE1; /* Live card; also --text */
   --paper-200: #E4DCCF; /* pressed */
-  --paper-faded: #DDD8CE; /* Departed card */
   --paper-ink: #1A1A1A; /* text on paper */
   --paper-muted: #5E574C; /* secondary text on paper */
-  --paper-faded-ink: #4A453D; /* prophecy line on Departed card */
+  --paper-faded-ink: #4A453D; /* muted text on paper */
 
   /* Text on dark */
   --text: #EEEAE1;       /* primary text on dark (= paper-100) */

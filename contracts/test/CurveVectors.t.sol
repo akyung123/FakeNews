@@ -19,7 +19,7 @@ contract CurveVectorsTest is Test {
     function setUp() public {
         launchpad = new Launchpad(address(0xFEE), address(0x51C));
         vm.deal(address(this), 10 ether);
-        token = launchpad.launch("lingo-2028", "", 0, 0);
+        token = launchpad.launch("lingo-2028", "", 0);
         vectors = vm.readFile(string.concat(vm.projectRoot(), "/test/Curve.vectors.json"));
     }
 

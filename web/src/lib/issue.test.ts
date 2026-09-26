@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  fromDatetimeLocalValue,
   isIssueFormValid,
   isLaunchEnabled,
-  isValidDeadline,
   isValidFirstBuy,
   isValidProphetLabel,
   isValidProphecy,
@@ -11,7 +9,6 @@ import {
   ISSUE_COPY,
   launchButtonLabel,
   prophecyName,
-  toDatetimeLocalValue,
   worldErrorKindFromRegisterProphet,
   worldErrorMessage,
   worldUserMessage,
@@ -39,11 +36,6 @@ describe("issue field rules", () => {
     expect(isValidProphecy("x".repeat(141))).toBe(false);
   });
 
-  it("requires a deadline in the future", () => {
-    expect(isValidDeadline(100, 99)).toBe(true);
-    expect(isValidDeadline(100, 100)).toBe(false);
-  });
-
   it("treats first buy as optional and non-negative", () => {
     expect(isValidFirstBuy("")).toBe(true);
     expect(isValidFirstBuy("0")).toBe(true);
@@ -53,11 +45,6 @@ describe("issue field rules", () => {
   it("builds the nested prophecy name", () => {
     expect(prophecyName("lingo-2028", "ringo", "prophecy.eth")).toBe("lingo-2028.ringo.prophecy.eth");
   });
-
-  it("round-trips datetime-local values", () => {
-    const ms = Date.parse("2026-09-26T12:30:00");
-    expect(fromDatetimeLocalValue(toDatetimeLocalValue(ms))).toBe(Math.floor(ms / 1000));
-  });
 });
 
 describe("launch button gating", () => {
@@ -65,9 +52,7 @@ describe("launch button gating", () => {
     prophetLabel: "ringo",
     prophecy: "The projector survives the demo",
     slug: "lingo-2028",
-    deadlineUnix: 200,
     firstBuy: "0",
-    nowSeconds: 100,
   };
 
   it("stays off for a first-time prophet until World succeeds", () => {

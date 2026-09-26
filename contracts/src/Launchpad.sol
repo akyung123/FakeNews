@@ -133,9 +133,9 @@ contract Launchpad {
         revert NotImplemented();
     }
 
-    /// Opens a curve and mints the token. `prophecy` and `deadline` are not
-    /// stored or emitted; they belong on the prophecy's ENS resolver.
-    function launch(string calldata slug, string calldata, uint64, uint256 minTokensOut)
+    /// Opens a curve and mints the token. `prophecy` is not stored or emitted;
+    /// it belongs on the prophecy's ENS resolver.
+    function launch(string calldata slug, string calldata, uint256 minTokensOut)
         external
         payable
         nonReentrant

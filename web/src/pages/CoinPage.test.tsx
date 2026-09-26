@@ -24,7 +24,7 @@ describe("Screen 3 name route", () => {
     try {
       const ens = "badges-2028.ringo.prophecy.eth";
       const html = renderName(ens);
-      const row = getProphecyByName(ens, NOW)!;
+      const row = getProphecyByName(ens)!;
       expect(html).toContain(row.sentence);
       expect(html).toContain(row.ensName);
       expect(html).toContain("Buy");

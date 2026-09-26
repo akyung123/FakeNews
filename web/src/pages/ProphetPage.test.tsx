@@ -5,11 +5,9 @@ import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { MOCK_PROPHECIES } from "../lib/mock";
-import { getProphetPage, prophecyDetailPath, prophecyTradeLabel } from "../lib/prophetData";
+import { getProphetPage, prophecyDetailPath } from "../lib/prophetData";
 import { ProphetPage } from "./ProphetPage";
 
-const NOW = 1_750_000_000;
-const realNow = Date.now;
 const screenPath = join(dirname(fileURLToPath(import.meta.url)), "ProphetPage.tsx");
 
 function renderProphet(name: string): string {
@@ -23,42 +21,31 @@ function renderProphet(name: string): string {
 }
 
 describe("ProphetPage", () => {
-  test("renders the mock prophet with sentences, Departed, fees, and Screen 3 links", () => {
-    Date.now = () => NOW * 1000;
-    try {
-      const html = renderProphet("ringo");
-      const data = getProphetPage("ringo", NOW)!;
+  test("renders the mock prophet with sentences, fees, and Screen 3 links", () => {
+    const html = renderProphet("ringo");
+    const data = getProphetPage("ringo")!;
 
-      expect(html).toContain(data.prophet.ensName);
-      expect(html).toContain(data.prophet.wallet);
-      expect(html).toContain("Claimable fees");
-      expect(html).toContain("0.0012 ETH");
-      expect(html).toContain("Departed");
-      expect(html).toContain("Graduated");
-      expect(html).toContain("Next buy");
-      expect(html).toContain("Sell");
-      expect(html).toContain("Buy");
+    expect(html).toContain(data.prophet.ensName);
+    expect(html).toContain(data.prophet.wallet);
+    expect(html).toContain("Claimable fees");
+    expect(html).toContain("0.0012 ETH");
+    expect(html).toContain("Graduated");
+    expect(html).toContain(">Trade</span>");
 
-      for (const row of data.prophecies) {
-        expect(html).toContain(row.sentence);
-        expect(html).toContain(row.ensName);
-        expect(html).toContain(prophecyDetailPath(row.ensName));
-        expect(html).toContain(row.token.slice(0, 6));
-        expect(prophecyTradeLabel(row)).toBe(row.departed ? "Sell" : "Buy");
-      }
-      expect((html.match(/class="btn sell"/g) ?? []).length).toBe(data.departedCount);
-      expect(html).toContain("prophet-row-sell");
-      expect(html).toContain(">Buy</span>");
-      expect(html).toContain(">Sell</span>");
-
-      expect(html).not.toContain("True");
-      expect(html).not.toContain("False");
-      expect(html).not.toContain("yield");
-      expect(html).not.toContain("profit");
-      expect(html).not.toContain("prediction market");
-    } finally {
-      Date.now = realNow;
+    for (const row of data.prophecies) {
+      expect(html).toContain(row.sentence);
+      expect(html).toContain(row.ensName);
+      expect(html).toContain(prophecyDetailPath(row.ensName));
+      expect(html).toContain(row.token.slice(0, 6));
     }
+
+    expect(html).not.toContain("Departed");
+    expect(html).not.toContain("Deadline");
+    expect(html).not.toContain("True");
+    expect(html).not.toContain("False");
+    expect(html).not.toContain("yield");
+    expect(html).not.toContain("profit");
+    expect(html).not.toContain("prediction market");
   });
 
   test("shows a not-found state for an unknown name", () => {

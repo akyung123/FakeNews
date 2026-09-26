@@ -6,7 +6,7 @@ Sources: [`docs/SPEC.md`](docs/SPEC.md), [`docs/DECISIONS.md`](docs/DECISIONS.md
 
 ## Project context
 
-Prophecy is a Sepolia launchpad that turns one sentence into a token. Buying raises the price and selling lowers it. When the curve supply sells out, liquidity moves into a Uniswap V4 pool and is locked so later traders still have a market. The address book is the core feature (`ringo.prophecy.eth` → wallet, `lingo-2028.ringo.prophecy.eth` → token). There is no oracle and no True / False; after the deadline the only on-screen status is Departed.
+Prophecy is a Sepolia launchpad that turns one sentence into a token. Buying raises the price and selling lowers it. When the curve supply sells out, liquidity moves into a Uniswap V4 pool and is locked so later traders still have a market. The address book is the core feature (`ringo.prophecy.eth` → wallet, `lingo-2028.ringo.prophecy.eth` → token). There is no oracle, no True / False and no deadline.
 
 ## What we built / planned with Uniswap V4
 
