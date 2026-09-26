@@ -65,7 +65,6 @@ import { migrateOutcomeFromReceipt, openMarket, openMarketResult, openMarketWrit
 import {
   MaxPriceBelowFloorError,
   ethPerTokenToQ96,
-  prevTickHintQ96,
   q96ToWeiPerToken,
   snapMaxPriceToTick,
   weiPerTokenToQ96,
@@ -308,8 +307,6 @@ describe("Q96 price encoding", () => {
     expect(snapMaxPriceToTick(FLOOR_PRICE_Q96)).toBe(FLOOR_PRICE_Q96);
     const mid = FLOOR_PRICE_Q96 + TICK_SPACING_Q96 * 5n + TICK_SPACING_Q96 / 2n;
     expect(snapMaxPriceToTick(mid)).toBe(FLOOR_PRICE_Q96 + TICK_SPACING_Q96 * 5n);
-    expect(prevTickHintQ96(FLOOR_PRICE_Q96 + TICK_SPACING_Q96)).toBe(FLOOR_PRICE_Q96);
-    expect(prevTickHintQ96(FLOOR_PRICE_Q96)).toBe(FLOOR_PRICE_Q96);
     expect(() => snapMaxPriceToTick(FLOOR_PRICE_Q96 - 1n)).toThrow(MaxPriceBelowFloorError);
   });
 });
@@ -478,7 +475,7 @@ describe("bid encoding", () => {
     expect(request.address).toBe(AUCTION);
     expect(request.abi).toBe(ccaAbi);
     expect(request.functionName).toBe("submitBid");
-    expect(args.prevTickPriceQ96).toBe(prevTickHintQ96(args.maxPriceQ96));
+    expect(args.prevTickPriceQ96).toBe(FLOOR_PRICE_Q96);
     expect(request.args).toEqual([
       args.maxPriceQ96,
       args.amount,
@@ -488,6 +485,30 @@ describe("bid encoding", () => {
     ]);
     expect(request.value).toBe(args.amount);
     expect(request.args).toHaveLength(5);
+  });
+
+  it("hints the floor tick for the UI default max price, not an unopened tick below it", () => {
+    const args = placeBidArgs({
+      auction: AUCTION,
+      owner: OWNER,
+      budgetEth: "0.03",
+      maxPricePerTokenEth: "1100",
+    });
+    expect(args.maxPriceQ96).toBeGreaterThan(FLOOR_PRICE_Q96 + TICK_SPACING_Q96);
+    expect(args.prevTickPriceQ96).toBe(FLOOR_PRICE_Q96);
+  });
+
+  it("hints the auction's own floor when the floor is read from chain", () => {
+    const floor = FLOOR_PRICE_Q96 * 2n;
+    const args = placeBidArgs({
+      auction: AUCTION,
+      owner: OWNER,
+      budgetEth: "0.01",
+      maxPricePerTokenEth: "1150",
+      floorPriceQ96: floor,
+      tickSpacingQ96: TICK_SPACING_Q96,
+    });
+    expect(args.prevTickPriceQ96).toBe(floor);
   });
 
   it("keeps a max price that already sits on a valid tick", () => {

@@ -202,7 +202,6 @@ export {
   bidAmountQ96ToWei,
   budgetEthToAmount,
   ethPerTokenToQ96,
-  prevTickHintQ96,
   q96ToEthPerToken,
   q96ToWeiPerToken,
   snapMaxPriceToTick,
