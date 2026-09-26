@@ -233,7 +233,8 @@ Also needed from a person (not World Portal):
 | Env name | What it is |
 |----------|------------|
 | `TEAM_WALLET` | Optional; defaults to the deployer. If set, must be that same address |
-| `SEPOLIA_RPC_URL` | Private Sepolia RPC for deploy scripts and PR #19 fork tests (Actions secret). Do not ship this to the web app |
+| `SEPOLIA_RPC_URL` | Private Sepolia RPC for deploy scripts and PR #19 fork tests (Actions secret). CI uses it only on PRs that touch `contracts/` and on pushes to the default branch. Do not ship this to the web app |
+| `SEPOLIA_FORK_BLOCK` | Optional Actions variable. The block fork tests pin to, so Foundry's RPC cache answers reruns. Unset = the default in `ci.yml`. Raise it when a fork test needs newer chain state |
 | `VITE_RPC_URL` | Public / rate-limited Sepolia RPC shipped to browsers (Actions variable) |
 | `VITE_WALLETCONNECT_PROJECT_ID` | Optional, public WalletConnect project id |
 | `DEPLOYER_PRIVATE_KEY` | Deploy key (local only) |

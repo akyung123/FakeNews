@@ -25,7 +25,9 @@ interface Vm {
         external
         view
         returns (string memory);
+    function envOr(string calldata name, uint256 defaultValue) external view returns (uint256);
     function createSelectFork(string calldata url) external returns (uint256);
+    function createSelectFork(string calldata url, uint256 blockNumber) external returns (uint256);
     function skip(bool skipTest) external;
 }
 
@@ -69,6 +71,7 @@ contract LockRealActor {
 }
 
 /// Lock proof on the official Sepolia impls. Skips when `SEPOLIA_RPC_URL` is unset.
+/// Forks at `SEPOLIA_FORK_BLOCK` when set, so reruns read from Foundry's RPC cache.
 contract LockRealTest {
     Vm private constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
@@ -101,10 +104,26 @@ contract LockRealTest {
         return this.onERC1155BatchReceived.selector;
     }
 
+    function _forkAt(string memory rpc, uint256 pin) external {
+        vm.createSelectFork(rpc, pin);
+    }
+
+    /// Pinned when possible. An RPC without that block's state, or a pin from before
+    /// the impls existed, falls back to latest instead of failing the suite.
+    function _fork(string memory rpc) internal {
+        uint256 pin = vm.envOr("SEPOLIA_FORK_BLOCK", uint256(0));
+        if (pin != 0) {
+            try this._forkAt(rpc, pin) {
+                if (SEPOLIA_USER_REGISTRY_IMPL.code.length > 0 && SEPOLIA_RESOLVER_IMPL.code.length > 0) return;
+            } catch {}
+        }
+        vm.createSelectFork(rpc);
+    }
+
     function setUp() public {
         string memory rpc = vm.envOr("SEPOLIA_RPC_URL", string(""));
         if (bytes(rpc).length == 0) return;
-        vm.createSelectFork(rpc);
+        _fork(rpc);
         forked = true;
 
         parentDns = abi.encodePacked(uint8(8), bytes("prophecy"), uint8(3), bytes("eth"), bytes1(0));
