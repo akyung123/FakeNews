@@ -26,7 +26,13 @@ After the service is up, set `VITE_WORLD_SERVER_URL` to the `https://….onrende
 
 Render's free plan sleeps when idle. A cold start takes tens of seconds.
 
-1. Right before recording, call `GET <world-url>/health` once to wake the server:
+1. Before recording, confirm the local `WORLD_SIGNER_KEY` matches on-chain `Launchpad.worldSigner()` (exits non-zero if they differ):
+
+```bash
+./infra/check-world-signer.sh
+```
+
+2. Right before recording, call `GET <world-url>/health` once to wake the server:
 
 ```bash
 curl -sS https://<world-url>/health
@@ -76,14 +82,19 @@ Sending is opt-in and needs `DEPLOYER_PRIVATE_KEY` in the environment, never on 
 
 Adapter wiring (`ProphecyEns` constructor) is TODO until #17 and #8 merge.
 
-The script prints two paste-ready lines: `WORLD_CHAIN_ID=11155111` and `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`.
+The script prints paste-ready lines for a visual check: `WORLD_CHAIN_ID=11155111`, `WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>`, and `worldSigner address: 0x…` (address only, never the private key).
 
-**Mandatory after Launchpad deploy.** Set these on Render and restart the world service. If either is empty, the server-side context check is off (PR #16).
+**Mandatory after Launchpad deploy.** Set these on Render and restart the world service. Empty `WORLD_CHAIN_ID` / `WORLD_LAUNCHPAD_ADDRESS` turns the server-side context check off (PR #16).
+
+The key whose address becomes Launchpad `worldSigner` **must** be the same key the world server signs with.
 
 ```
 WORLD_CHAIN_ID=11155111
 WORLD_LAUNCHPAD_ADDRESS=<deployed Launchpad>
+WORLD_SIGNER_KEY=<paste from the local infra/new-world-signer.sh output only>
 ```
+
+Never commit `WORLD_SIGNER_KEY`. Never print it in CI logs. A person pastes it from the local generation output onto Render as a secret.
 
 ## Human-input checklist (names only)
 
@@ -114,14 +125,15 @@ Also needed from a person (not World Portal):
 | `WORLD_SIGNER_KEY` | `infra/new-world-signer.sh` (`cast wallet new`) |
 | `WORLD_SIGNER_ADDRESS` | Printed by that helper; deploy also derives it from the key |
 
-### Mandatory after Launchpad deploy (script prints them; paste onto Render and restart)
+### Mandatory after Launchpad deploy (paste onto Render and restart)
 
-Empty values turn the server-side context check **off** (PR #16).
+Empty `WORLD_CHAIN_ID` / `WORLD_LAUNCHPAD_ADDRESS` turns the server-side context check **off** (PR #16). The deploy script prints the first two lines and the `worldSigner` **address**. Paste `WORLD_SIGNER_KEY` from the local `new-world-signer.sh` output only — never from CI.
 
 | Env name | Value |
 |----------|--------|
 | `WORLD_CHAIN_ID` | `11155111` |
 | `WORLD_LAUNCHPAD_ADDRESS` | Deployed Launchpad (today: factory stub address) |
+| `WORLD_SIGNER_KEY` | Same private key used as Launchpad `worldSigner` (Render secret) |
 
 ### Optional world server
 

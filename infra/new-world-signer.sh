@@ -27,6 +27,7 @@ echo "  WORLD_SIGNER_KEY=<the private key printed by cast — not shown again>"
 echo
 echo "cast Address: $addr"
 echo "The deploy script derives worldSigner from WORLD_SIGNER_KEY (PR #8)."
+echo "Paste WORLD_SIGNER_KEY onto Render from this local output only. Never commit it or print it in CI."
 echo "Re-print the private key? It is only in the cast output above this script's capture."
 # Show the key once so a person can copy it. Agents must not commit this output.
 echo "  WORLD_SIGNER_KEY=$key"
