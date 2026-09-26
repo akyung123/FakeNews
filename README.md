@@ -31,8 +31,8 @@ As of 2026-09-26. Nothing is deployed to Sepolia yet.
 
 | Part | Built | Not yet |
 |------|-------|---------|
-| `contracts/` | `Launchpad` bonding curve: buy, sell, fees, memos, fee claims, last-buy fill and refund. `ProphecyToken`. ENS adapter (`ProphecyEns`). Curve, fuzz, vector and ENS lock tests | `registerProphet` (World ID) reverts for now. `launch` does not create the ENS name yet. Uniswap V4 pool, `ProphecyHook`, `LiquidityLocker` |
-| `web/` | The four screens as a clickable prototype (data in `localStorage`). Wallet connect on Sepolia. World ID issue flow (mock by default) | Reading prophecies from the chain and ENS. Sending real trades |
+| `contracts/` | `Launchpad`: World ID prophet names (`registerProphet`), ENS names on `launch`, bonding curve buy and sell, fees, memos, fee claims. Graduation into a Uniswap V4 pool with `ProphecyHook` and `LiquidityLocker` (fees 24 : 76, no withdraw). `ProphecyToken`, ENS adapter. Curve, fuzz, vector, lock, World, graduation, hook and locker tests | Deploying to Sepolia (a person runs it) |
+| `web/` | The four screens as a clickable prototype. Wallet connect on Sepolia. Issue screen: World ID check, then a real `registerProphet` transaction. Helpers to read names, sentences and deadlines from ENS (`src/lib/ens.ts`) | List, detail and prophet page still use prototype data in `localStorage`, not ENS or the chain. Real buy, sell and launch transactions |
 | `world/` | World ID verification server: `GET /rp-context`, `POST /verify`, `GET /health`. Signs the result for the Launchpad | Hosting (planned on Render, see [`infra/README.md`](infra/README.md)) |
 | `infra/` | Sepolia deploy scripts (dry run), GitHub Pages preview for `web/`, Render blueprint for `world/` | A person runs the real deployment |
 
@@ -70,7 +70,7 @@ Environment variables: copy [`.env.example`](.env.example) and see [`infra/READM
 
 | Path | Role |
 |------|------|
-| `contracts/` | Foundry: `Launchpad`, `ProphecyToken`, ENS adapter. Next: `ProphecyHook`, `LiquidityLocker` |
+| `contracts/` | Foundry: `Launchpad`, `ProphecyToken`, ENS adapter, `ProphecyHook`, `LiquidityLocker` |
 | `web/` | Vite + React 19 + wagmi + viem |
 | `world/` | World ID verification server |
 | `infra/` | Deploy notes, World signer helpers, Render blueprint |
