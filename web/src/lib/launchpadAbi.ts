@@ -8,6 +8,12 @@
  * `launch(slug, prophecy, deadline)` is 3 args and not payable — no first
  * buy — and `Launched` carries `auction` as a third indexed topic.
  */
+
+/**
+ * `deadline` is a legacy argument on the deployed Launchpad. The web app
+ * always sends 0 and never reads or shows it (DECISIONS #18).
+ */
+export const LAUNCH_DEADLINE = 0n;
 export const launchpadAbi = [
   {
     type: "constructor",

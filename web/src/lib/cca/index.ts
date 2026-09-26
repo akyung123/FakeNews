@@ -74,7 +74,6 @@ export {
   blocksToMmSs,
   ccaErrorCopy,
   claimBlockedCopy,
-  departedReplacesAuctionStatus,
   exitCtaCopy,
   exitDoneCopy,
   exitHelpCopy,

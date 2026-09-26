@@ -5,12 +5,10 @@ import { UserRejectedRequestError } from "viem";
 import { describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "../lib/issue";
 import type { RegisterProphetInput } from "../lib/launchpad";
-import { LaunchedParseError, WRITE_COPY, type LaunchInput } from "../lib/writes";
+import { LaunchedParseError, WRITE_COPY, launchWrite, type LaunchInput } from "../lib/writes";
 import { MOCK_ISSUE_SESSION, MOCK_RETURNING_SESSION, MOCK_WORLD_HEALTH, MOCK_RP_CONTEXT_RESPONSE, MOCK_WORLD_VERIFY } from "../lib/mock";
 import { WorldClientError, createWorldClient, type WorldClient } from "../lib/world";
 import { IssueScreen } from "./CreatePage";
-
-const NOW = Date.parse("2026-09-26T00:00:00Z");
 
 function renderIssue(
   session = MOCK_ISSUE_SESSION,
@@ -27,7 +25,6 @@ function renderIssue(
       <IssueScreen
         session={session}
         world={extras.world ?? createWorldClient({ mock: true })}
-        now={NOW}
         registerProphet={extras.registerProphet}
         launchProphecy={extras.launchProphecy}
         lookupProphet={extras.lookupProphet}
@@ -404,7 +401,9 @@ describe("Screen 2 button gating", () => {
     await waitFor(() => expect(issued).toEqual([token]));
     expect(seen?.slug).toBe("coffee-last");
     expect(seen?.prophecy).toBe("Coffee lasts until the last pitch");
-    expect(seen?.deadline).toBeGreaterThan(0n);
+    expect(seen).toEqual({ slug: "coffee-last", prophecy: "Coffee lasts until the last pitch" });
+    // The deployed launch still takes a legacy deadline; the Issue screen always sends 0.
+    expect(launchWrite(seen!, token).args[2]).toBe(0n);
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByTestId("write-success")).toHaveTextContent(WRITE_COPY.launchSuccess);
   });

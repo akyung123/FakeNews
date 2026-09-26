@@ -1,18 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  fromDatetimeLocalValue,
   isIssueFormValid,
   isIssueSubmitEnabled,
   isLaunchEnabled,
   isRegisterSubmitEnabled,
-  isValidDeadline,
   isValidProphetLabel,
   isValidProphecy,
   isValidSlug,
   ISSUE_COPY,
   launchButtonLabel,
   prophecyName,
-  toDatetimeLocalValue,
   worldErrorKindFromRegisterProphet,
   worldErrorMessage,
   worldUserMessage,
@@ -42,18 +39,8 @@ describe("issue field rules", () => {
     expect(isValidProphecy("한".repeat(47))).toBe(false);
   });
 
-  it("requires a deadline in the future", () => {
-    expect(isValidDeadline(100, 99)).toBe(true);
-    expect(isValidDeadline(100, 100)).toBe(false);
-  });
-
   it("builds the nested prophecy name", () => {
     expect(prophecyName("lingo-2028", "ringo", "prophecy.eth")).toBe("lingo-2028.ringo.prophecy.eth");
-  });
-
-  it("round-trips datetime-local values", () => {
-    const ms = Date.parse("2026-09-26T12:30:00");
-    expect(fromDatetimeLocalValue(toDatetimeLocalValue(ms))).toBe(Math.floor(ms / 1000));
   });
 });
 
@@ -62,8 +49,6 @@ describe("launch button gating", () => {
     prophetLabel: "ringo",
     prophecy: "The projector survives the demo",
     slug: "lingo-2028",
-    deadlineUnix: 200,
-    nowSeconds: 100,
   };
 
   it("stays off for a first-time prophet until World succeeds", () => {
