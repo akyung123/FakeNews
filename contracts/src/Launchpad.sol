@@ -17,9 +17,9 @@ contract Launchpad is ReentrancyGuard {
     uint256 public constant LP_SUPPLY = 206_900_000e18;
     uint256 public constant VIRTUAL_TOKEN = 1_073_000_000e18;
     uint256 public constant VIRTUAL_ETH = 7_058_378_514_689_194;
-    uint256 public constant FEE_BPS = 125;
-    uint256 public constant CREATOR_BPS = 30;
-    uint256 public constant PROTOCOL_BPS = 95;
+    uint256 public constant FEE_BPS = CurveMath.FEE_BPS;
+    uint256 public constant CREATOR_BPS = CurveMath.CREATOR_BPS;
+    uint256 public constant PROTOCOL_BPS = CurveMath.PROTOCOL_BPS;
 
     uint256 internal constant MAX_MEMO = 140;
 

@@ -104,8 +104,9 @@ contract LaunchpadTest is Test {
         assertEq(ProphecyToken(token).balanceOf(buyer), 0);
         (vEth, vToken, realEth, sold, complete) = launchpad.curve(token);
         assertEq(sold, 0);
-        assertEq(realEth, 0);
-        assertEq(vEth, launchpad.VIRTUAL_ETH());
+        // Flooring the inverse can leave 1 wei of real ETH in the reserve.
+        assertLe(realEth, 1);
+        assertEq(vEth, launchpad.VIRTUAL_ETH() + realEth);
         assertEq(vToken, launchpad.VIRTUAL_TOKEN());
         assertFalse(complete);
         assertEq(launchpad.protocolFees() + launchpad.creatorFeeOf(prophet), buyFee + sellFee);

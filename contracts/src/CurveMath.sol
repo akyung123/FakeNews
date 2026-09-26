@@ -6,9 +6,9 @@ pragma solidity ^0.8.24;
 /// a buy cost rounds up so the protocol keeps the spare wei.
 library CurveMath {
     uint256 internal constant BPS = 10_000;
-    uint256 internal constant FEE_BPS = 125;
-    uint256 internal constant CREATOR_BPS = 30;
-    uint256 internal constant PROTOCOL_BPS = 95;
+    uint256 public constant FEE_BPS = 125;
+    uint256 public constant CREATOR_BPS = 30;
+    uint256 public constant PROTOCOL_BPS = 95;
 
     function ceilMulDiv(uint256 a, uint256 b, uint256 denominator) internal pure returns (uint256) {
         return (a * b + (denominator - 1)) / denominator;

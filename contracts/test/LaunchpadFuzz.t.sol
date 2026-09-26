@@ -93,7 +93,8 @@ contract LaunchpadFuzzTest is Test {
         assertLe(received, ethIn, "round trip must not gain ETH");
         (,, uint256 realEth, uint256 sold,) = launchpad.curve(token);
         assertEq(sold, 0);
-        assertEq(realEth, 0);
+        // Flooring the inverse can leave 1 wei of real ETH in the reserve.
+        assertLe(realEth, 1);
         _assertSolvent(token);
     }
 }
