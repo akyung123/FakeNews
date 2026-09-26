@@ -12,7 +12,7 @@ export const ISSUE_COPY = {
   lead: "Write one sentence. It becomes a token. Buying raises the price and selling lowers it.",
   immutable:
     "This sentence is written once. Nobody can edit it after you issue it — not you, not us.",
-  worldHelp: "World ID is required only when you create a prophet name. One person, one name.",
+  worldHelp: "World ID is required only when you create a prophet name. One human, one name.",
   returning: "You already have a prophet name. World ID is not asked again.",
   prove: "Prove you are human",
   cancel: "Cancel verification",
