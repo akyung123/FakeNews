@@ -22,6 +22,7 @@ import {
   sendCcaWrite,
   tokenIdFromMigrateReceipt,
   swapExactInSingle,
+  swapStepCopy,
   swapTokenLine,
   tokenApprovePermit2Write,
   permit2ApproveRouterWrite,
@@ -37,6 +38,7 @@ import { loadCcaAuction, type CcaAuctionSnapshot } from "../lib/cca/loadAuction"
 import { SEPOLIA_CHAIN_ID } from "../lib/env";
 import { isTxHash } from "../lib/explorer";
 import { graduated, quoteBuy as curveQuoteBuy, quoteSell as curveQuoteSell } from "../lib/curve";
+import { readSellApprovals, sellStep, SELL_STEPS, type SellApprovals } from "../lib/cca/approvals";
 import {
   parseSwapAmount,
   quoteExactIn,
@@ -64,6 +66,8 @@ export type CcaTradeProps = {
   writes?: CcaWriteOptions;
   /** V4 Quoter amountOut. Default: quoteExactInputSingle through the shared client. */
   quoteSwap?: (input: SwapQuoteInput) => Promise<bigint>;
+  /** ERC20 → Permit2 and Permit2 → router allowances. Default: read from Sepolia. */
+  readApprovals?: (owner: Address, token: Address) => Promise<SellApprovals>;
 };
 
 export const QUOTE_UNAVAILABLE = "Quote unavailable";
@@ -80,6 +84,7 @@ export function CcaTrade({
   loadAuction = loadCcaAuction,
   writes,
   quoteSwap = quoteExactIn,
+  readApprovals = readSellApprovals,
 }: CcaTradeProps) {
   const demo = demoOverride ?? isCcaDemoMode();
   const flags = features ?? ccaFeatureFlags();
@@ -190,6 +195,40 @@ export function CcaTrade({
     // swapAmountIn is derived from swapAmount; coin only matters for the demo curve.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSwap, swapSide, swapAmount, mockSwap, token, snap?.hook, quoteSwap]);
+
+  // Sell approvals, read from the chain. null while unknown.
+  const sellOnChain = showSwap && swapSide === "sell" && chain && writeTarget && !mockSwap;
+  let approvalOwner: Address | undefined = snap?.owner;
+  if (!approvalOwner && sellOnChain) {
+    try {
+      approvalOwner = getAccount(wagmiConfig).address;
+    } catch {
+      approvalOwner = undefined;
+    }
+  }
+  const [approvals, setApprovals] = useState<SellApprovals | null>(null);
+  const [approvalsFailed, setApprovalsFailed] = useState(false);
+
+  async function refreshApprovals(): Promise<void> {
+    if (!approvalOwner || !token) return;
+    try {
+      setApprovals(await readApprovals(approvalOwner, token));
+      setApprovalsFailed(false);
+    } catch {
+      setApprovalsFailed(true);
+    }
+  }
+
+  useEffect(() => {
+    if (!sellOnChain) return;
+    setApprovals(null);
+    void refreshApprovals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sellOnChain, approvalOwner, token, readApprovals]);
+
+  const step = approvals ? sellStep(approvals, swapAmountIn ?? 1n) : null;
+  const stepTitle = (n: 1 | 2 | 3) =>
+    n === 1 ? "Allow Uniswap" : n === 2 ? "Confirm for this sale" : swapTokenLine(SWAP_SECTION_COPY.sellSymbol, symbol);
 
   const quoteAmount = (wei: bigint) => (swapSide === "buy" ? formatTokenAmount(wei) : formatEthAmount(wei));
   const openBids = (snap?.bids ?? []).filter((row) => row.bid.exitedBlock === 0n);
@@ -435,42 +474,85 @@ export function CcaTrade({
           ) : quote.status === "unavailable" ? (
             <p className="faint" data-testid="swap-quote">{QUOTE_UNAVAILABLE}</p>
           ) : null}
-          {swapSide === "sell" && chain && writeTarget ? (
+          {sellOnChain ? (
             <>
-              <p className="faint small">{swapTokenLine(SWAP_SECTION_COPY.allowHelper, symbol)}</p>
-              <button
-                type="button"
-                className="btn full"
-                disabled={writesBlocked || !token}
-                onClick={() => {
-                  if (!token) return;
-                  void run(
-                    SWAP_SECTION_COPY.allowing,
-                    () => sendCcaWrite(tokenApprovePermit2Write(token), "approve", writes),
-                    swapTokenLine(SWAP_SECTION_COPY.allowed, symbol),
-                  );
-                }}
-              >
-                {swapTokenLine(SWAP_SECTION_COPY.allowUniswap, symbol)}
-              </button>
-              <p className="faint small">{swapTokenLine(SWAP_SECTION_COPY.confirmHelper, symbol)}</p>
-              <button
-                type="button"
-                className="btn full"
-                disabled={writesBlocked || !token}
-                onClick={() => {
-                  if (!token) return;
-                  void run(
-                    SWAP_SECTION_COPY.confirming,
-                    () => sendCcaWrite(permit2ApproveRouterWrite(token), "permit2.approve", writes),
-                    SWAP_SECTION_COPY.readyToSell,
-                  );
-                }}
-              >
-                {swapTokenLine(SWAP_SECTION_COPY.confirmSale, symbol)}
-              </button>
+              <ol className="sell-steps" aria-label="Steps to sell">
+                {([1, 2, 3] as const).map((n) => (
+                  <li
+                    key={n}
+                    className={step != null && n < step ? "done" : step === n ? "on" : undefined}
+                    aria-current={step === n ? "step" : undefined}
+                  >
+                    {step != null && n < step ? "✓ " : ""}
+                    {swapStepCopy(n, SELL_STEPS)} · {stepTitle(n)}
+                  </li>
+                ))}
+              </ol>
+              {approvalsFailed ? (
+                <p className="faint small">
+                  Couldn't read your approvals.{" "}
+                  <button type="button" className="link" onClick={() => void refreshApprovals()}>
+                    Check again
+                  </button>
+                </p>
+              ) : step == null ? (
+                <p className="faint small">Checking your approvals…</p>
+              ) : null}
+              {step === 1 ? (
+                <>
+                  <p className="faint small">{swapTokenLine(SWAP_SECTION_COPY.allowHelper, symbol)}</p>
+                  <button
+                    type="button"
+                    className="btn full"
+                    disabled={writesBlocked || !token}
+                    onClick={() => {
+                      if (!token) return;
+                      void run(
+                        SWAP_SECTION_COPY.allowing,
+                        async () => {
+                          const hash = await sendCcaWrite(tokenApprovePermit2Write(token), "approve", writes);
+                          // Receipt is in: read the allowances again so the next step shows.
+                          await refreshApprovals();
+                          return hash;
+                        },
+                        swapTokenLine(SWAP_SECTION_COPY.allowed, symbol),
+                      );
+                    }}
+                  >
+                    {pending === SWAP_SECTION_COPY.allowing
+                      ? SWAP_SECTION_COPY.allowing
+                      : `${swapStepCopy(1, SELL_STEPS)} · ${stepTitle(1)}`}
+                  </button>
+                </>
+              ) : step === 2 ? (
+                <>
+                  <p className="faint small">{swapTokenLine(SWAP_SECTION_COPY.confirmHelper, symbol)}</p>
+                  <button
+                    type="button"
+                    className="btn full"
+                    disabled={writesBlocked || !token}
+                    onClick={() => {
+                      if (!token) return;
+                      void run(
+                        SWAP_SECTION_COPY.confirming,
+                        async () => {
+                          const hash = await sendCcaWrite(permit2ApproveRouterWrite(token), "permit2.approve", writes);
+                          await refreshApprovals();
+                          return hash;
+                        },
+                        SWAP_SECTION_COPY.readyToSell,
+                      );
+                    }}
+                  >
+                    {pending === SWAP_SECTION_COPY.confirming
+                      ? SWAP_SECTION_COPY.confirming
+                      : `${swapStepCopy(2, SELL_STEPS)} · ${stepTitle(2)}`}
+                  </button>
+                </>
+              ) : null}
             </>
           ) : null}
+          {sellOnChain && step !== 3 ? null : (
           <button
             type="button"
             className={`btn ${swapSide === "buy" ? "primary" : "sell"} full`}
@@ -508,8 +590,13 @@ export function CcaTrade({
           >
             {swapSide === "buy"
               ? (pending === SWAP_SECTION_COPY.buying ? SWAP_SECTION_COPY.buying : swapTokenLine(SWAP_SECTION_COPY.buySymbol, symbol))
-              : (pending === SWAP_SECTION_COPY.selling ? SWAP_SECTION_COPY.selling : swapTokenLine(SWAP_SECTION_COPY.sellSymbol, symbol))}
+              : pending === SWAP_SECTION_COPY.selling
+                ? SWAP_SECTION_COPY.selling
+                : sellOnChain
+                  ? `${swapStepCopy(3, SELL_STEPS)} · ${stepTitle(3)}`
+                  : swapTokenLine(SWAP_SECTION_COPY.sellSymbol, symbol)}
           </button>
+          )}
         </>
       ) : showSwapHint ? (
         <p className="faint small">{SWAP_SECTION_COPY.beforeOpen}</p>

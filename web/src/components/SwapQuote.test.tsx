@@ -68,6 +68,7 @@ function renderSwap(quoteSwap: (input: { zeroForOne: boolean; amountIn: bigint }
       loadAuction={async () => snap}
       quoteSwap={quoteSwap as never}
       writes={writes}
+      readApprovals={async () => ({ erc20: 2n ** 200n, permit2Amount: 2n ** 159n, permit2Expiration: 2 ** 47 })}
     />,
   );
 }
