@@ -90,10 +90,10 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 Team decision B2: replace the bonding curve with official Uniswap LBPStrategy. The curve on `main` stays the fallback.
 
-- [ ] `Launchpad`: drop curve `buy`/`sell`/`graduate`; `launch` mints and calls `LBPStrategy.initializeDistribution`; `auctionOf(token)` @cursor
-- [ ] `ProphecyHook`: official `InitializerHook` pattern so LBP can initialize the v4 pool (`authorized` = LBPStrategy); 24:76 stays on the locker @cursor
-- [ ] `LiquidityLocker`: hold the v4 PositionManager LP NFT; no withdraw; `collect` splits prophet 24 : protocol 76 @cursor
-- [ ] Unit tests with mocks; `forge build && forge test` green @cursor
+- [x] `Launchpad`: drop curve `buy`/`sell`/`graduate`; `launch` mints and calls `LBPStrategy.initializeDistribution`; `auctionOf(token)` @cursor
+- [x] `ProphecyHook`: official `InitializerHook` pattern so LBP can initialize the v4 pool (`authorized` = LBPStrategy); 24:76 stays on the locker @cursor
+- [x] `LiquidityLocker`: hold the v4 PositionManager LP NFT; no withdraw; `collect` splits prophet 24 : protocol 76 @cursor
+- [x] Unit tests with mocks; `forge build && forge test` green @cursor
 
 ## If there is time
 
