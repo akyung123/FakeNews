@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Write deployments/sepolia.json or deployments/anvil.json after a Launchpad send.
-# No secrets. Web copies `launchpad` into VITE_LAUNCHPAD_ADDRESS and uses
-# `launchpadBlock` as fromBlock for Launched logs — no new VITE_* names.
+# No secrets. Web copies `launchpad` into VITE_LAUNCHPAD_ADDRESS and
+# `launchpadBlock` into VITE_LAUNCHPAD_DEPLOY_BLOCK (Launched fromBlock).
 #
 # Env: LAUNCHPAD_ADDRESS, ENS_ADAPTER_ADDRESS, PARENT_USER_REGISTRY,
 #      DEPLOYER (optional), LAUNCHPAD_BLOCK (optional), SEPOLIA_RPC_URL,
@@ -159,7 +159,7 @@ with open(out, "w") as f:
     f.write("\n")
 PY
 
-# Machine-readable stdout. Existing web env names only — no new VITE_*.
+# Machine-readable stdout. Paste VITE_* into Actions variables / web/.env.
 echo "--- deployment ---"
 echo "chainId=$chain_id"
 echo "launchpad=$launchpad"
@@ -169,5 +169,6 @@ echo "parentUserRegistry=${parent:-}"
 echo "deployer=${deployer:-}"
 echo "commit=${commit:-}"
 echo "VITE_LAUNCHPAD_ADDRESS=$launchpad"
+echo "VITE_LAUNCHPAD_DEPLOY_BLOCK=${block:-}"
 echo "VITE_CHAIN_ID=$chain_id"
 echo "wrote $out"

@@ -130,15 +130,15 @@ JSON values are hex addresses or numbers — the ellipses above are documentatio
 
 `launchpadBlock` is the receipt block of the Launchpad CREATE (from Foundry `broadcast/Deploy.s.sol/<chainId>/run-latest.json`). Addresses are checksummed when Foundry logs them.
 
-**Web** (existing INTERFACE §5 names only):
+**Web** (INTERFACE §5):
 
 | JSON field | Web |
 |---|---|
 | `launchpad` | `VITE_LAUNCHPAD_ADDRESS` (Actions variable / `web/.env`) |
-| `launchpadBlock` | `fromBlock` for `Launched` event queries. Read from this file — **no new `VITE_*`.** |
+| `launchpadBlock` | `VITE_LAUNCHPAD_DEPLOY_BLOCK` — `fromBlock` for `Launched`. Optional; empty = recent block range |
 | `chainId` | `VITE_CHAIN_ID` is already `11155111` on Sepolia |
 
-Stdout after a send (same keys, plus the two existing web env lines):
+Stdout after a send (same keys, plus the web env lines to paste):
 
 ```
 --- deployment ---
@@ -150,6 +150,7 @@ parentUserRegistry=0x…
 deployer=0x…
 commit=7c075cd…
 VITE_LAUNCHPAD_ADDRESS=0x…
+VITE_LAUNCHPAD_DEPLOY_BLOCK=11783750
 VITE_CHAIN_ID=11155111
 wrote /…/deployments/sepolia.json
 ```
@@ -172,6 +173,7 @@ Never commit `WORLD_SIGNER_KEY`. Never print it in CI logs. A person pastes it f
 |----------|--------|
 | `VITE_WORLD_SERVER_URL` | Render `https://….onrender.com` origin |
 | `VITE_LAUNCHPAD_ADDRESS` | `launchpad` from `deployments/sepolia.json` |
+| `VITE_LAUNCHPAD_DEPLOY_BLOCK` | `launchpadBlock` from that file. Optional; empty is allowed |
 | `VITE_CHAIN_ID` | `11155111` |
 | `VITE_RPC_URL` | Public / rate-limited Sepolia RPC (not the `SEPOLIA_RPC_URL` secret) |
 | `VITE_PARENT_NAME` | `prophecy.eth` |

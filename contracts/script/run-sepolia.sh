@@ -87,7 +87,7 @@ if [[ "${args[0]}" == *Deploy.s.sol* ]]; then
   echo "  ENS_ADAPTER_ADDRESS=<logged ProphecyEns>" >&2
   echo "  worldSigner address: <from the log — address only>" >&2
   echo "  WORLD_SIGNER_KEY: paste from local new-world-signer.sh only. Never print it here or in CI." >&2
-  echo "  Web: VITE_LAUNCHPAD_ADDRESS from the log; launchpadBlock is in deployments/*.json (fromBlock)." >&2
+  echo "  Web: VITE_LAUNCHPAD_ADDRESS and VITE_LAUNCHPAD_DEPLOY_BLOCK from the deployment record." >&2
 fi
 
 if [[ "$send" -eq 1 && "${args[0]}" == *Deploy.s.sol* ]]; then

@@ -58,6 +58,8 @@ jobs:
           VITE_WORLD_MOCK: "0"
           VITE_RPC_URL: ${{ vars.VITE_RPC_URL }}
           VITE_LAUNCHPAD_ADDRESS: ${{ vars.VITE_LAUNCHPAD_ADDRESS }}
+          # Optional. Empty = web uses a recent block range for Launched logs.
+          VITE_LAUNCHPAD_DEPLOY_BLOCK: ${{ vars.VITE_LAUNCHPAD_DEPLOY_BLOCK }}
           VITE_CHAIN_ID: ${{ vars.VITE_CHAIN_ID }}
           VITE_PARENT_NAME: ${{ vars.VITE_PARENT_NAME }}
           VITE_UNIVERSAL_RESOLVER: ${{ vars.VITE_UNIVERSAL_RESOLVER }}
