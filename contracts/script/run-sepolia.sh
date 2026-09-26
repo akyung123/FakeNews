@@ -2,7 +2,7 @@
 # Dry-run a Sepolia Foundry script. Sending a transaction is opt-in and person-only.
 #
 # Order after prophecy.eth is registered (or use infra/scripts/deploy-sepolia.sh):
-#   deployUserRegistry → Deploy.s.sol (adapter, Launchpad, Hook, Locker, setUniswap)
+#   deployUserRegistry → Deploy.s.sol (adapter, Launchpad, Hook, Locker, setUniswap, setCca)
 #   → linkParent → grantAdapterRegistrar
 # Do not lock the parent name.
 #
@@ -110,6 +110,16 @@ if [[ "$send" -eq 1 && "${args[0]}" == *Deploy.s.sol* ]]; then
     [[ -n "$val" ]] && export LOCKER_ADDRESS="$val"
     val="$(grep -oE 'POOL_MANAGER=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
     [[ -n "$val" ]] && export POOL_MANAGER="$val"
+    val="$(grep -oE 'LBP_STRATEGY=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export LBP_STRATEGY="$val"
+    val="$(grep -oE 'POSITION_MANAGER=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export POSITION_MANAGER="$val"
+    val="$(grep -oE 'CCA_FACTORY=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export CCA_FACTORY="$val"
+    val="$(grep -oE 'INITIALIZER_HOOK=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export INITIALIZER_HOOK="$val"
+    val="$(grep -oE 'HOOK_SALT=0x[0-9a-fA-F]{64}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export HOOK_SALT="$val"
     if [[ "$SEPOLIA_RPC_URL" == *"127.0.0.1"* || "$SEPOLIA_RPC_URL" == *"localhost"* ]]; then
       export DEPLOY_RECORD_LOCAL=1
     fi

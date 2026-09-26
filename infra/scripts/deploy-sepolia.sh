@@ -191,7 +191,7 @@ run_step "registerName" script/RegisterParent.s.sol --sig "registerName()"
 # 2. parent UserRegistry
 run_step "deployUserRegistry" script/SetupParent.s.sol --sig "deployUserRegistry()"
 
-# 3+4. ProphecyEns then Launchpad, then CREATE2 Hook + Locker + setUniswap (one broadcast)
+# 3+4. ProphecyEns then Launchpad, then CREATE2 Hook + Locker + setUniswap + setCca (one broadcast)
 # PARENT_USER_REGISTRY must be in the environment from the previous step.
 if [[ -z "${PARENT_USER_REGISTRY:-}" && "$send" -eq 1 ]]; then
   echo "PARENT_USER_REGISTRY missing after deployUserRegistry." >&2

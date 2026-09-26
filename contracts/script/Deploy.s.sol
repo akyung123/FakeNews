@@ -14,9 +14,9 @@ import {EnsDeploy} from "./EnsDeploy.sol";
 import {SepoliaConfig} from "./SepoliaConfig.sol";
 import {ScriptVm} from "./ScriptVm.sol";
 
-/// Sepolia Launchpad + ProphecyEns + Hook + Locker deploy.
+/// Sepolia Launchpad + ProphecyEns + Hook + Locker + CCA wiring.
 ///
-/// Constructor (contracts/src/Launchpad.sol):
+/// Constructor (contracts/src/Launchpad.sol at b71c64e):
 ///   constructor(address protocolFeeRecipient_, address worldSigner_, IProphecyEns ens_)
 /// All three public immutable. Zero address reverts. No setter on those.
 ///
@@ -28,19 +28,22 @@ import {ScriptVm} from "./ScriptVm.sol";
 ///   new Launchpad(protocolFeeRecipient, worldSigner, adapter)
 ///   require(address(launchpad) == predictedPad)
 ///
-/// Then, still as the deployer (INTERFACE §2 / LaunchpadStack._wireUniswap):
+/// Then, still as the deployer (Launchpad.sol: setUniswap then setCca):
 ///   1. mine a CREATE2 salt (CREATE2_FACTORY = Nick's / Foundry factory) so
 ///      the hook address low bits match HookMiner.prophecyFlags()
-///      (BEFORE_INITIALIZE_FLAG), using the Launchpad address as constructor input
-///   2. new ProphecyHook{salt}(poolManager, launchpad)
+///      (BEFORE_INITIALIZE_FLAG). Constructor stores authorized = LBPStrategy
+///      (not the Launchpad).
+///   2. new ProphecyHook{salt}(poolManager, lbpStrategy)
 ///   3. new LiquidityLocker(poolManager, launchpad, hook)
 ///   4. launchpad.setUniswap(poolManager, hook, locker) exactly once
-///   5. require hook() / locker() / poolManager() match
+///   5. launchpad.setCca(lbpStrategy, positionManager) exactly once
+///      (also calls locker.setPositionManager)
+///   6. require every getter matches
 ///
-/// PoolManager is the official Uniswap v4 Sepolia deployment
-/// (https://docs.uniswap.org/contracts/v4/deployments — same address as
-/// SepoliaConfig.POOL_MANAGER). Override with UNISWAP_V4_POOL_MANAGER.
-/// Optional HOOK_SALT skips the miner; the salt must still produce the flags.
+/// Official Sepolia addresses live in SepoliaConfig. Overrides:
+///   UNISWAP_V4_POOL_MANAGER, LBP_STRATEGY, POSITION_MANAGER,
+///   CCA_FACTORY, INITIALIZER_HOOK. Optional HOOK_SALT skips the miner;
+///   the salt must still produce the flags.
 ///
 /// ENS_ADAPTER_ADDRESS is logged as an output. Optional override: if set, skip
 /// the adapter CREATE and pass that address as Launchpad `ens`. Off anvil a set
@@ -79,7 +82,11 @@ contract Deploy is ScriptVm {
         string memory label = vm.envOr("PARENT_LABEL", string("prophecy"));
         address deployer = _deployer();
         _teamWallet();
-        IPoolManager poolManager = _poolManager();
+        IPoolManager poolManager = IPoolManager(_officialOrEnv("UNISWAP_V4_POOL_MANAGER", SepoliaConfig.POOL_MANAGER));
+        address lbpStrategy = _officialOrEnv("LBP_STRATEGY", SepoliaConfig.LBP_STRATEGY);
+        address positionManager = _officialOrEnv("POSITION_MANAGER", SepoliaConfig.POSITION_MANAGER);
+        address ccaFactory = _officialOrEnv("CCA_FACTORY", SepoliaConfig.CCA_FACTORY);
+        address initializerHook = _officialOrEnv("INITIALIZER_HOOK", SepoliaConfig.INITIALIZER_HOOK);
 
         if (chainId != 31337) {
             require(vm.envExists("DEPLOYER_PRIVATE_KEY"), "set DEPLOYER_PRIVATE_KEY");
@@ -103,6 +110,9 @@ contract Deploy is ScriptVm {
                 );
             }
             require(address(poolManager).code.length > 0, "poolManager has no code");
+            require(lbpStrategy.code.length > 0, "lbpStrategy has no code");
+            require(positionManager.code.length > 0, "positionManager has no code");
+            require(ccaFactory.code.length > 0, "ccaFactory has no code");
         } else if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
             require(protocolFeeRecipient != address(0), "set PROTOCOL_FEE_RECIPIENT");
             require(worldSigner != address(0), "set WORLD_SIGNER_KEY or WORLD_SIGNER_ADDRESS");
@@ -145,10 +155,10 @@ contract Deploy is ScriptVm {
         require(launchpad.worldSigner() == worldSigner);
         require(launchpad.protocolFeeRecipient() == protocolFeeRecipient);
 
-        (address hookAddr, address lockerAddr, bytes32 hookSalt) = _wireUniswap(launchpad, poolManager);
-        require(address(launchpad.hook()) == hookAddr, "launchpad.hook");
-        require(address(launchpad.locker()) == lockerAddr, "launchpad.locker");
-        require(address(launchpad.poolManager()) == address(poolManager), "launchpad.poolManager");
+        (address hookAddr, address lockerAddr, bytes32 hookSalt) =
+            _wireCca(launchpad, poolManager, lbpStrategy, positionManager);
+        _requireWired(launchpad, poolManager, hookAddr, lockerAddr, lbpStrategy, positionManager);
+        uint256 deployBlock = block.number;
         vm.stopBroadcast();
 
         address deployed = address(launchpad);
@@ -157,6 +167,12 @@ contract Deploy is ScriptVm {
         emit Deployed("ProphecyHook", hookAddr);
         emit Deployed("LiquidityLocker", lockerAddr);
         emit Deployed("PoolManager", address(poolManager));
+        emit Deployed("LBPStrategy", lbpStrategy);
+        emit Deployed("PositionManager", positionManager);
+        emit Deployed("CcaFactory", ccaFactory);
+        emit Deployed("InitializerHook", initializerHook);
+        emit Deployed("UniversalRouter", SepoliaConfig.UNIVERSAL_ROUTER);
+        emit Deployed("Permit2", SepoliaConfig.PERMIT2);
         emit Deployed("protocolFeeRecipient", protocolFeeRecipient);
         emit Deployed("worldSigner", worldSigner);
         emit CopyChainId("WORLD_CHAIN_ID", SepoliaConfig.CHAIN_ID);
@@ -177,6 +193,7 @@ contract Deploy is ScriptVm {
         _pasteLine(adapterLine);
         _pasteLine(string.concat("LAUNCHPAD_ADDRESS=", vm.toString(deployed)));
         _pasteLine(string.concat("VITE_LAUNCHPAD_ADDRESS=", vm.toString(deployed)));
+        _pasteLine(string.concat("VITE_LAUNCHPAD_DEPLOY_BLOCK=", vm.toString(deployBlock)));
         _pasteLine(string.concat("VITE_CHAIN_ID=", vm.toString(chainId)));
         _pasteLine(string.concat("HOOK_ADDRESS=", vm.toString(hookAddr)));
         _pasteLine(string.concat("LOCKER_ADDRESS=", vm.toString(lockerAddr)));
@@ -185,26 +202,34 @@ contract Deploy is ScriptVm {
         _pasteLine(string.concat("HOOK_SALT=", vm.toString(hookSalt)));
         _pasteLine(string.concat("VITE_HOOK_ADDRESS=", vm.toString(hookAddr)));
         _pasteLine(string.concat("VITE_LOCKER_ADDRESS=", vm.toString(lockerAddr)));
+        _pasteLine(string.concat("LBP_STRATEGY=", vm.toString(lbpStrategy)));
+        _pasteLine(string.concat("POSITION_MANAGER=", vm.toString(positionManager)));
+        _pasteLine(string.concat("CCA_FACTORY=", vm.toString(ccaFactory)));
+        _pasteLine(string.concat("INITIALIZER_HOOK=", vm.toString(initializerHook)));
+        _pasteLine(string.concat("UNIVERSAL_ROUTER=", vm.toString(SepoliaConfig.UNIVERSAL_ROUTER)));
+        _pasteLine(string.concat("PERMIT2=", vm.toString(SepoliaConfig.PERMIT2)));
         _pasteLine(string.concat("DEPLOYER=", vm.toString(deployer)));
         _pasteLine(signerLine);
     }
 
-    /// Official Uniswap v4 Sepolia PoolManager, or UNISWAP_V4_POOL_MANAGER.
-    function _poolManager() internal view returns (IPoolManager) {
-        address pm = vm.envOr("UNISWAP_V4_POOL_MANAGER", address(0));
-        if (pm == address(0)) pm = SepoliaConfig.POOL_MANAGER;
-        require(pm != address(0), "poolManager");
-        return IPoolManager(pm);
+    /// Official Sepolia address, or a same-name env override when set and non-zero.
+    function _officialOrEnv(string memory name, address fallback_) internal view returns (address value) {
+        value = vm.envOr(name, address(0));
+        if (value == address(0)) value = fallback_;
+        require(value != address(0), name);
     }
 
-    /// CREATE2 Hook (mined flags, Launchpad in the constructor), Locker, then
-    /// deployer-only setUniswap once. Salt is mined for CREATE2_FACTORY because
-    /// forge script `new Hook{salt}` goes through that factory, not the EOA.
-    function _wireUniswap(Launchpad launchpad, IPoolManager poolManager)
-        internal
-        returns (address hookAddr, address lockerAddr, bytes32 salt)
-    {
-        bytes memory ctorArgs = abi.encode(poolManager, address(launchpad));
+    /// CREATE2 Hook (mined flags, LBPStrategy as authorized), Locker, then
+    /// deployer-only setUniswap once and setCca once. Salt is mined for
+    /// CREATE2_FACTORY because forge script `new Hook{salt}` goes through that
+    /// factory, not the EOA.
+    function _wireCca(
+        Launchpad launchpad,
+        IPoolManager poolManager,
+        address lbpStrategy,
+        address positionManager
+    ) internal returns (address hookAddr, address lockerAddr, bytes32 salt) {
+        bytes memory ctorArgs = abi.encode(poolManager, lbpStrategy);
         address predicted;
         salt = vm.envOr("HOOK_SALT", bytes32(0));
         if (salt == bytes32(0)) {
@@ -215,13 +240,37 @@ contract Deploy is ScriptVm {
             predicted = HookMiner.computeAddress(CREATE2_FACTORY, salt, initCodeHash);
             require(uint160(predicted) & HookMiner.FLAG_MASK == HookMiner.prophecyFlags(), "HOOK_SALT flags");
         }
-        ProphecyHook hook = new ProphecyHook{salt: salt}(poolManager, address(launchpad));
+        ProphecyHook hook = new ProphecyHook{salt: salt}(poolManager, lbpStrategy);
         require(address(hook) == predicted, "hook address");
         require(uint160(address(hook)) & HookMiner.FLAG_MASK == HookMiner.prophecyFlags(), "hook flags");
+        require(hook.authorized() == lbpStrategy, "hook.authorized");
+        require(address(hook.poolManager()) == address(poolManager), "hook.poolManager");
         LiquidityLocker locker = new LiquidityLocker(poolManager, address(launchpad), IHooks(address(hook)));
         launchpad.setUniswap(poolManager, address(hook), address(locker));
+        launchpad.setCca(lbpStrategy, positionManager);
         hookAddr = address(hook);
         lockerAddr = address(locker);
+    }
+
+    function _requireWired(
+        Launchpad launchpad,
+        IPoolManager poolManager,
+        address hookAddr,
+        address lockerAddr,
+        address lbpStrategy,
+        address positionManager
+    ) internal view {
+        require(address(launchpad.hook()) == hookAddr, "launchpad.hook");
+        require(address(launchpad.locker()) == lockerAddr, "launchpad.locker");
+        require(address(launchpad.poolManager()) == address(poolManager), "launchpad.poolManager");
+        require(address(launchpad.lbpStrategy()) == lbpStrategy, "launchpad.lbpStrategy");
+        require(launchpad.positionManager() == positionManager, "launchpad.positionManager");
+        LiquidityLocker locker = LiquidityLocker(payable(lockerAddr));
+        require(locker.launchpad() == address(launchpad), "locker.launchpad");
+        require(address(locker.hook()) == hookAddr, "locker.hook");
+        require(address(locker.poolManager()) == address(poolManager), "locker.poolManager");
+        require(address(locker.positionManager()) == positionManager, "locker.positionManager");
+        require(ProphecyHook(hookAddr).authorized() == lbpStrategy, "wired hook.authorized");
     }
 
     /// Source of truth is WORLD_SIGNER_KEY (generated at deploy, never committed).
