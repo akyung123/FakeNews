@@ -112,7 +112,7 @@ contract CcaSepoliaForkTest is CcaSepoliaForkBase {
     function test_rollover_bidFewBlocksAfterStart() public onFork {
         (ICcaFork auction, ProphecyToken token) = _createAuction(25, "roll");
         _rollTo(uint64(block.number + 3));
-        uint256 id = _bid(auction, 0.021 ether, CcaLib.FLOOR_PRICE_Q96 + CcaLib.AUCTION_TICK_SPACING_Q96);
+        uint256 id = _bid(auction, 0.021 ether, CcaLib.FLOOR_PRICE_Q96 * 2);
         _rollTo(auction.endBlock());
         auction.checkpoint();
         assertTrue(auction.isGraduated(), "late bid must still graduate");
@@ -125,7 +125,7 @@ contract CcaSepoliaForkTest is CcaSepoliaForkBase {
     /// B) After endBlock, no external checkpoint: exitBid / claimTokens.
     function test_exitClaimWithoutExternalCheckpoint() public onFork {
         (ICcaFork auction, ProphecyToken token) = _createAuction(10, "nocheck");
-        uint256 id = _bid(auction, 0.021 ether, CcaLib.FLOOR_PRICE_Q96 + CcaLib.AUCTION_TICK_SPACING_Q96);
+        uint256 id = _bid(auction, 0.02 ether, CcaLib.FLOOR_PRICE_Q96 + CcaLib.AUCTION_TICK_SPACING_Q96);
         _rollTo(auction.endBlock());
         assertEq(auction.lastCheckpointedBlock(), auction.startBlock(), "no external checkpoint yet");
 
@@ -146,7 +146,7 @@ contract CcaSepoliaForkTest is CcaSepoliaForkBase {
     /// C) Universal Router 2.1.2 buy + sell after migrate.
     function test_urSwapBuyAndSellAfterMigrate() public onFork {
         DemoOut memory demo =
-            _runDemo(25, 0.021 ether, CcaLib.FLOOR_PRICE_Q96 + CcaLib.AUCTION_TICK_SPACING_Q96, "ur-swap", true);
+            _runDemo(25, 0.02 ether, CcaLib.FLOOR_PRICE_Q96 + CcaLib.AUCTION_TICK_SPACING_Q96, "ur-swap", true);
         PoolKey memory key = _poolKey(address(demo.token));
         (uint160 sqrtP,,,) = IPoolManager(SEPOLIA_POOL_MANAGER).getSlot0(key.toId());
         assertGt(uint256(sqrtP), 0, "pool");
