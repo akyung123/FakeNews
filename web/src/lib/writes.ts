@@ -38,6 +38,9 @@ export const WRITE_COPY = {
   approve: "Approve tokens to sell",
 } as const;
 
+/** Shown when the entered amount quotes to nothing, so a send cannot go out with minOut 0. */
+export const ZERO_QUOTE_COPY = "Amount too small to trade. Try a larger amount.";
+
 export type WritePhase = "wallet" | "waiting" | "approve";
 
 export class TransactionRevertedError extends Error {
@@ -54,8 +57,19 @@ export class LaunchedParseError extends Error {
   }
 }
 
+export class ZeroQuoteError extends Error {
+  constructor() {
+    super(ZERO_QUOTE_COPY);
+    this.name = "ZeroQuoteError";
+  }
+}
+
 export function isLaunchedParseError(error: unknown): boolean {
   return error instanceof LaunchedParseError || (error instanceof Error && error.name === "LaunchedParseError");
+}
+
+export function isZeroQuoteError(error: unknown): boolean {
+  return error instanceof ZeroQuoteError || (error instanceof Error && error.name === "ZeroQuoteError");
 }
 
 export type WriteErrorSource = "registerProphet" | "write";
@@ -63,6 +77,7 @@ export type WriteErrorSource = "registerProphet" | "write";
 /** `null` = wallet rejection: no banner, return the button to idle. */
 export function writeErrorMessage(error: unknown, source: WriteErrorSource = "write"): string | null {
   if (isLaunchedParseError(error)) return WRITE_COPY.launchedMissing;
+  if (isZeroQuoteError(error)) return ZERO_QUOTE_COPY;
   const classified = classifyWriteError(error);
   if (classified.kind === "rejected") return null;
   if (classified.kind === "revert") return classified.message;
@@ -163,6 +178,11 @@ export function minTokensOutForBuy(ethIn: bigint, curve: CurveState = { sold: 0,
 export function minEthOutForSell(tokensIn: bigint, curve: CurveState): bigint {
   if (tokensIn === 0n) return 0n;
   return minOutAfterSlippage(quoteSellWei(toCurveWei(curve), tokensIn).ethPayout);
+}
+
+/** Optional first buy: 0 ETH is allowed. Positive ETH that quotes to 0 tokens is refused. */
+export function isFirstBuyTooSmall(firstBuyWei: bigint): boolean {
+  return firstBuyWei > 0n && minTokensOutForBuy(firstBuyWei) === 0n;
 }
 
 /** Only address-id coins (a just-launched token) go on chain. Mock ids stay local. */
@@ -358,6 +378,7 @@ export function createLaunch(
   const address = resolveAddress(options);
   return async (input) => {
     if (!address) return null;
+    if (isFirstBuyTooSmall(input.firstBuyWei)) throw new ZeroQuoteError();
     const receipt = await sendWrite(launchWrite(input, address) as unknown as Record<string, unknown>, options);
     return tokenFromLaunchedReceipt(receipt);
   };
@@ -369,6 +390,7 @@ export function createBuy(options: WriteOptions = {}): (input: BuyInput) => Prom
     if (!address) return false;
     if (isMockTokenAddress(input.token)) return false;
     const quoted = await readQuoteBuy(input.token, input.ethIn, options, input.curve);
+    if (quoted === 0n) throw new ZeroQuoteError();
     const minTokensOut = minOutAfterSlippage(quoted);
     await sendWrite(
       buyWrite(input, address, minTokensOut) as unknown as Record<string, unknown>,
@@ -390,6 +412,7 @@ export function createSell(options: WriteOptions = {}): (input: SellInput) => Pr
     if (!owner) throw new Error("Connect a wallet");
 
     const quoted = await readQuoteSell(input.token, input.tokensIn, options, input.curve);
+    if (quoted === 0n) throw new ZeroQuoteError();
     const minEthOut = minOutAfterSlippage(quoted);
 
     const allowance = (await read(wagmiConfig, {

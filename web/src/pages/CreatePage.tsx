@@ -25,10 +25,12 @@ import { MAX_PROPHECY_BYTES, utf8ByteLength } from "../lib/limits";
 import {
   createLaunch,
   ethInputToWei,
+  isFirstBuyTooSmall,
   refreshCoinFromChain,
   writeErrorMessage,
   writePhaseCopy,
   WRITE_COPY,
+  ZERO_QUOTE_COPY,
   type LaunchInput,
   type WritePhase,
 } from "../lib/writes";
@@ -119,6 +121,7 @@ export function IssueScreen({
   const canLaunch = isLaunchEnabled(gate);
   const canRegister = isRegisterSubmitEnabled(gate);
   const canSubmit = isIssueSubmitEnabled(gate);
+  const firstBuyTooSmall = isFirstBuyTooSmall(ethInputToWei(firstBuy));
   const registerBusy = registerStatus === "pending";
   const busy = registerBusy || writeBusy;
   const pending = writeBusy
@@ -162,7 +165,7 @@ export function IssueScreen({
         className="block create"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!canSubmit || busy) return;
+          if (!canSubmit || busy || (canLaunch && firstBuyTooSmall)) return;
           void (async () => {
             setWriteError(null);
             if (canRegister) {
@@ -329,12 +332,17 @@ export function IssueScreen({
             {error}
           </p>
         ) : null}
+        {firstBuyTooSmall ? (
+          <p className="banner-error" role="alert">
+            {ZERO_QUOTE_COPY}
+          </p>
+        ) : null}
 
         <button
           type="submit"
           className="btn primary full"
           data-testid={canLaunch ? "launch-submit" : canRegister ? "register-submit" : "issue-submit"}
-          disabled={!canSubmit || busy}
+          disabled={!canSubmit || busy || (canLaunch && firstBuyTooSmall)}
         >
           {submitLabel}
         </button>

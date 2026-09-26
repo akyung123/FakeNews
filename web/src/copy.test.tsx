@@ -6,7 +6,7 @@ import { Web3Provider } from "./providers/Web3Provider";
 import { gwei, mcap } from "./lib/format";
 import { ISSUE_COPY } from "./lib/issue";
 import { SEED_EVENTS } from "./lib/mock";
-import { WRITE_COPY } from "./lib/writes";
+import { WRITE_COPY, ZERO_QUOTE_COPY } from "./lib/writes";
 import { MEMO_COPY } from "./lib/limits";
 import { WRITE_REVERT_COPY } from "./lib/writeErrors";
 
@@ -195,12 +195,15 @@ describe("DECISIONS #1 copy — new strings", () => {
       "Token launched, but we couldn't find its page. Check your wallet activity.",
     );
     expect(WRITE_COPY.approve).toBe("Approve tokens to sell");
+    expect(ZERO_QUOTE_COPY).toBe("Amount too small to trade. Try a larger amount.");
+    expect(Object.values(WRITE_COPY)).not.toContain(ZERO_QUOTE_COPY);
     const text = Object.values(WRITE_COPY).join(" ");
     expect(text.toLowerCase()).not.toMatch(/coin|profit|yield|prediction|outlook/);
     expect(text).not.toContain("%");
     const create = renderApp("/create");
     expect(create).toContain("It becomes a token.");
     expect(create).not.toContain(WRITE_COPY.failed);
+    expect(create).not.toContain(ZERO_QUOTE_COPY);
     assertRemoved(create);
   });
 

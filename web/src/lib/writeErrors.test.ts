@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "./issue";
 import { launchpadAbi } from "./launchpadAbi";
 import { GENERIC_REVERT_NAMES, WRITE_REVERT_COPY, classifyWriteError } from "./writeErrors";
-import { LaunchedParseError, WRITE_COPY, writeErrorMessage } from "./writes";
+import { LaunchedParseError, WRITE_COPY, ZERO_QUOTE_COPY, ZeroQuoteError, writeErrorMessage } from "./writes";
 
 function revertNamed(errorName: string, functionName = "buy") {
   const data = encodeErrorResult({
@@ -111,5 +111,6 @@ describe("writeErrorMessage", () => {
     expect(writeErrorMessage(new Error("boom"))).toBe(WRITE_COPY.failed);
     expect(writeErrorMessage(wrappedRevert("ZeroAmount"))).toBe(WRITE_COPY.failed);
     expect(writeErrorMessage(new LaunchedParseError())).toBe(WRITE_COPY.launchedMissing);
+    expect(writeErrorMessage(new ZeroQuoteError())).toBe(ZERO_QUOTE_COPY);
   });
 });

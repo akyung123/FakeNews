@@ -15,6 +15,7 @@ import {
   createSell,
   ethInputToWei,
   isChainWriteTarget,
+  isFirstBuyTooSmall,
   isMockCoinRecord,
   isMockTokenAddress,
   launchWrite,
@@ -29,6 +30,8 @@ import {
   TransactionRevertedError,
   TX_DEADLINE_SECONDS,
   WRITE_COPY,
+  ZERO_QUOTE_COPY,
+  ZeroQuoteError,
   type LaunchInput,
   type WriteOptions,
   type WriteReceipt,
@@ -144,6 +147,8 @@ describe("slippage and deadline helpers", () => {
       "Token launched, but we couldn't find its page. Check your wallet activity.",
     );
     expect(WRITE_COPY.approve).toBe("Approve tokens to sell");
+    expect(ZERO_QUOTE_COPY).toBe("Amount too small to trade. Try a larger amount.");
+    expect(Object.values(WRITE_COPY)).not.toContain(ZERO_QUOTE_COPY);
   });
 });
 
@@ -202,6 +207,34 @@ describe("launch write", () => {
     expect(token).toBeNull();
     expect(fns.simulateContract).not.toHaveBeenCalled();
     expect(fns.writeContract).not.toHaveBeenCalled();
+  });
+
+  it("refuses a first buy whose quote is 0 before simulate or write", async () => {
+    const fns = mocks();
+    const tiny = { ...launchInput, firstBuyWei: 1n };
+    expect(isFirstBuyTooSmall(tiny.firstBuyWei)).toBe(true);
+    expect(minTokensOutForBuy(tiny.firstBuyWei)).toBe(0n);
+    await expect(createLaunch(fns)(tiny)).rejects.toBeInstanceOf(ZeroQuoteError);
+    await expect(createLaunch(fns)(tiny)).rejects.toThrow(ZERO_QUOTE_COPY);
+    expect(fns.simulateContract).not.toHaveBeenCalled();
+    expect(fns.writeContract).not.toHaveBeenCalled();
+  });
+
+  it("still launches when first buy is 0 ETH (no first-buy minOut)", async () => {
+    const fns = mocks({
+      waitForTransactionReceipt: vi.fn(async () => launchedReceipt()),
+    });
+    const none = { ...launchInput, firstBuyWei: 0n };
+    expect(isFirstBuyTooSmall(none.firstBuyWei)).toBe(false);
+    expect(minTokensOutForBuy(none.firstBuyWei)).toBe(0n);
+    expect(await createLaunch(fns)(none)).toBe(TOKEN);
+    expect(fns.simulateContract).toHaveBeenCalledTimes(1);
+    expect(fns.writeContract).toHaveBeenCalledTimes(1);
+    expect(fns.simulateContract.mock.calls[0][1]).toMatchObject({
+      functionName: "launch",
+      args: [none.slug, none.prophecy, none.deadline, 0n],
+      value: 0n,
+    });
   });
 });
 
@@ -266,6 +299,20 @@ describe("buy write", () => {
     expect(fns.writeContract).not.toHaveBeenCalled();
     expect(fns.readContract).not.toHaveBeenCalled();
   });
+
+  it("refuses a 0 quoteBuy before simulate or write", async () => {
+    const fns = mocks({
+      readContract: vi.fn(async (...args: unknown[]) => {
+        const request = (args[1] ?? args[0]) as { functionName?: string };
+        if (request.functionName === "quoteBuy") return [0n, 0n] as const;
+        return 0n;
+      }),
+    });
+    await expect(createBuy(fns)(input)).rejects.toBeInstanceOf(ZeroQuoteError);
+    await expect(createBuy(fns)({ ...input, ethIn: 1n })).rejects.toThrow(ZERO_QUOTE_COPY);
+    expect(fns.simulateContract).not.toHaveBeenCalled();
+    expect(fns.writeContract).not.toHaveBeenCalled();
+  });
 });
 
 describe("sell write", () => {
@@ -301,6 +348,66 @@ describe("sell write", () => {
       args: sellWrite(input, MOCK_WORLD_LAUNCHPAD, minEthOut).args,
     });
     expect(minEthOutForSell(input.tokensIn, curve)).toBeGreaterThan(0n);
+    expect(fns.waitForTransactionReceipt).toHaveBeenCalledTimes(2);
+    expect(fns.simulateContract.mock.calls[0][0]).toBe(wagmiConfig);
+    expect(fns.writeContract.mock.calls[0][0]).toBe(wagmiConfig);
+    expect(fns.waitForTransactionReceipt.mock.calls[0][0]).toBe(wagmiConfig);
+  });
+
+  it("does not write approve or simulate sell when approve simulate throws", async () => {
+    const fns = mocks({
+      readContract: vi.fn(async (...args: unknown[]) => {
+        const request = (args[1] ?? args[0]) as { functionName?: string };
+        if (request.functionName === "allowance") return 0n;
+        if (request.functionName === "quoteSell") return [50_000n, 1n] as const;
+        return 0n;
+      }),
+      simulateContract: vi.fn(async (_c, request: { functionName?: string }) => {
+        if (request.functionName === "approve") throw new Error("ApproveRevert");
+        return { request, result: undefined };
+      }),
+    });
+    await expect(createSell(fns)(input)).rejects.toThrow(/ApproveRevert/);
+    expect(fns.simulateContract).toHaveBeenCalledTimes(1);
+    expect(fns.simulateContract.mock.calls[0][1]).toMatchObject({ functionName: "approve" });
+    expect(fns.writeContract).not.toHaveBeenCalled();
+    expect(fns.waitForTransactionReceipt).not.toHaveBeenCalled();
+    expect(
+      fns.simulateContract.mock.calls.some((call) => {
+        const req = call[1] as { functionName?: string };
+        return req.functionName === "sell";
+      }),
+    ).toBe(false);
+  });
+
+  it("throws when the approve receipt reverts and never simulates or sends sell", async () => {
+    const fns = mocks({
+      readContract: vi.fn(async (...args: unknown[]) => {
+        const request = (args[1] ?? args[0]) as { functionName?: string };
+        if (request.functionName === "allowance") return 0n;
+        if (request.functionName === "quoteSell") return [50_000n, 1n] as const;
+        return 0n;
+      }),
+      waitForTransactionReceipt: vi.fn(async () => ({ status: "reverted" })),
+    });
+    await expect(createSell(fns)(input)).rejects.toBeInstanceOf(TransactionRevertedError);
+    expect(fns.simulateContract).toHaveBeenCalledTimes(1);
+    expect(fns.simulateContract.mock.calls[0][1]).toMatchObject({ functionName: "approve" });
+    expect(fns.writeContract).toHaveBeenCalledTimes(1);
+    expect(fns.writeContract.mock.calls[0][1]).toMatchObject({ functionName: "approve" });
+    expect(fns.waitForTransactionReceipt).toHaveBeenCalledTimes(1);
+    expect(
+      fns.simulateContract.mock.calls.some((call) => {
+        const req = call[1] as { functionName?: string };
+        return req.functionName === "sell";
+      }),
+    ).toBe(false);
+    expect(
+      fns.writeContract.mock.calls.some((call) => {
+        const req = call[1] as { functionName?: string };
+        return req.functionName === "sell";
+      }),
+    ).toBe(false);
   });
 
   it("skips approve when allowance already covers the sell", async () => {
@@ -360,6 +467,27 @@ describe("sell write", () => {
     expect(fns.simulateContract).not.toHaveBeenCalled();
     expect(fns.writeContract).not.toHaveBeenCalled();
     expect(fns.readContract).not.toHaveBeenCalled();
+  });
+
+  it("refuses a 0 quoteSell before approve, simulate, or write", async () => {
+    const fns = mocks({
+      readContract: vi.fn(async (...args: unknown[]) => {
+        const request = (args[1] ?? args[0]) as { functionName?: string };
+        if (request.functionName === "quoteSell") return [0n, 0n] as const;
+        if (request.functionName === "allowance") return 0n;
+        return 0n;
+      }),
+    });
+    await expect(createSell(fns)(input)).rejects.toBeInstanceOf(ZeroQuoteError);
+    await expect(createSell(fns)(input)).rejects.toThrow(ZERO_QUOTE_COPY);
+    expect(fns.simulateContract).not.toHaveBeenCalled();
+    expect(fns.writeContract).not.toHaveBeenCalled();
+    expect(
+      fns.readContract.mock.calls.some((call) => {
+        const req = (call[1] ?? call[0]) as { functionName?: string };
+        return req.functionName === "allowance";
+      }),
+    ).toBe(false);
   });
 });
 
