@@ -70,7 +70,8 @@ button { font: inherit; cursor: pointer; }
 .side-nav a.active { background: var(--soft); color: var(--text); box-shadow: inset 2px 0 0 var(--blue); }
 .count { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .side-cta { font-size: 14px; }
-.side-wallet { margin-top: auto; padding: 12px 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
+.side-wallet { margin-top: auto; padding: 12px 10px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; font-variant-numeric: tabular-nums; }
+.wallet-box { display: flex; flex-direction: column; gap: 6px; }
 .side-foot { padding: 0 10px; }
 .content { min-width: 0; }
 
