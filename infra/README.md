@@ -56,6 +56,8 @@ If the fallback is used, the ETHGlobal submission README must state:
 
 > The World verification server ran locally and was exposed with a Cloudflare quick tunnel (`cloudflared tunnel --url http://localhost:8787`) for the demo recording.
 
+After a person sets the Actions secret `SEPOLIA_RPC_URL` and re-runs CI on `main`, paste that Actions run URL into the submission README as evidence that the four `LockReal` tests ran without skip.
+
 ## Sepolia (dry-run default)
 
 From `contracts/`, with `contracts/.env` filled:
@@ -114,7 +116,7 @@ Also needed from a person (not World Portal):
 | Env name | What it is |
 |----------|------------|
 | `TEAM_WALLET` | Team address + Sepolia ETH |
-| `SEPOLIA_RPC_URL` / `VITE_RPC_URL` | Sepolia JSON-RPC (no API key in git) |
+| `SEPOLIA_RPC_URL` / `VITE_RPC_URL` | Sepolia JSON-RPC (no API key in git). Deploy scripts and PR #19 fork lock tests read `SEPOLIA_RPC_URL`. Web reads `VITE_RPC_URL`. Same RPC value. |
 | `DEPLOYER_PRIVATE_KEY` | Deploy key (local only) |
 | `PROTOCOL_FEE_RECIPIENT` | TBD wallet |
 
@@ -134,6 +136,14 @@ Empty `WORLD_CHAIN_ID` / `WORLD_LAUNCHPAD_ADDRESS` turns the server-side context
 | `WORLD_CHAIN_ID` | `11155111` |
 | `WORLD_LAUNCHPAD_ADDRESS` | Deployed Launchpad (today: factory stub address) |
 | `WORLD_SIGNER_KEY` | Same private key used as Launchpad `worldSigner` (Render secret) |
+
+### GitHub Actions secret (after the 17:00 bundle)
+
+A person adds repo **Settings → Secrets and variables → Actions** → `SEPOLIA_RPC_URL` with the Sepolia RPC from the 17:00 bundle. Then re-run CI on `main` so the four `LockReal` tests (PR #19) run without skip.
+
+Fork pull requests do not receive Actions secrets. Those runs stay skipped and must still pass.
+
+Link that `main` Actions run in the ETHGlobal submission README as evidence the real-lock tests ran.
 
 ### Optional world server
 
@@ -155,4 +165,4 @@ This repo has one `.env.example`. Do not add `world/.env.example`.
 
 ## CI
 
-`ci.yml`: `forge build` + `forge test`; web `bun install` / `tsc` / `build`; world `bun test` (the only script `world/package.json` defines for checks).
+`ci.yml`: `forge build` + `forge test` with `SEPOLIA_RPC_URL` from the Actions secret (name only). If the secret is missing the PR #19 lock tests skip and CI still passes. Fork PRs do not get secrets. Web: `bun install` / `tsc` / `build`. World: `bun test`.
