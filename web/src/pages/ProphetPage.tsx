@@ -38,7 +38,6 @@ function ProphetView({ data }: { data: ProphetPageData }) {
   return (
     <main className="prophet-page stack">
       <section className="block prophet-hero">
-        <p className="faint small">Prophet</p>
         <h1>{data.prophet.ensName}</h1>
         <p className="prophet-wallet">
           <span className="faint small">Wallet</span>

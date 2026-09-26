@@ -1,9 +1,12 @@
 import { Link } from "react-router-dom";
+import { SampleBadge } from "../components/SampleBadge";
 import { price, quoteSell } from "../lib/curve";
 import { eth, gwei, tokens } from "../lib/format";
+import { isMockMode } from "../lib/mode";
 import { myPosition, useStore, type Coin, type Position } from "../lib/store";
 
 export function MyPage() {
+  const mock = isMockMode();
   const s = useStore();
   const held: { coin: Coin; pos: Position; value: number }[] = [];
   for (const coin of s.coins) {
@@ -13,8 +16,23 @@ export function MyPage() {
   const total = held.reduce((n, h) => n + h.value, 0);
   const cost = held.reduce((n, h) => n + h.pos.cost, 0);
 
+  if (!mock) {
+    return (
+      <main className="stack">
+        <h1>My prophecies</h1>
+        <section className="block">
+          <p className="empty">Holdings show up here once the launchpad is connected.</p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="stack">
+      <div className="home-toolbar">
+        <h1>My prophecies</h1>
+        <SampleBadge />
+      </div>
       <section className="block summary">
         <div>
           <p className="faint small">Sell quote</p>
