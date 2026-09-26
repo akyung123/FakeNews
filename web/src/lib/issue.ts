@@ -1,3 +1,5 @@
+import type { WorldErrorKind } from "./world";
+
 export type WorldStatus = "idle" | "pending" | "success" | "cancelled" | "failed";
 
 export type IssueSession = {
@@ -16,8 +18,11 @@ export const ISSUE_COPY = {
   cancel: "Cancel verification",
   fail: "Simulate failure",
   launch: "Issue prophecy",
-  cancelled: "Verification was cancelled. Prove you are human before issuing. You can still browse.",
-  failed: "Verification failed. Prove you are human before issuing. You can still browse.",
+  disabledLaunch: "Verify with World ID to launch",
+  cancelled: "Verification cancelled. Launching stays locked until you verify.",
+  portalRejected: "World ID couldn't confirm this check. Try again in World App.",
+  checkFailed: "Something went wrong with the check. Please try again.",
+  nullifierReuse: "This human already has a prophet name. One human, one name.",
 } as const;
 
 const PROPHET_LABEL = /^[a-z0-9]{3,16}$/;
@@ -73,10 +78,35 @@ export function isLaunchEnabled(input: {
   return input.worldStatus === "success";
 }
 
+export function launchButtonLabel(input: {
+  returningProphet: boolean;
+  worldStatus: WorldStatus;
+  canLaunch: boolean;
+}): string {
+  if (input.canLaunch) return ISSUE_COPY.launch;
+  if (!input.returningProphet && input.worldStatus !== "success") return ISSUE_COPY.disabledLaunch;
+  return ISSUE_COPY.launch;
+}
+
+/** Designer copy only. Never returns a raw server or revert code. */
+export function worldUserMessage(kind: WorldErrorKind | null | undefined): string | null {
+  if (!kind) return null;
+  if (kind === "cancelled") return ISSUE_COPY.cancelled;
+  if (kind === "portal_rejected") return ISSUE_COPY.portalRejected;
+  if (kind === "nullifier_reuse") return ISSUE_COPY.nullifierReuse;
+  return ISSUE_COPY.checkFailed;
+}
+
+export function worldErrorKindFromRegisterProphet(error: unknown): WorldErrorKind {
+  const text = error instanceof Error ? `${error.name} ${error.message}` : String(error);
+  if (/nullifier/i.test(text)) return "nullifier_reuse";
+  return "network";
+}
+
 export function worldErrorMessage(status: WorldStatus, returningProphet: boolean): string | null {
   if (returningProphet) return null;
-  if (status === "cancelled") return ISSUE_COPY.cancelled;
-  if (status === "failed") return ISSUE_COPY.failed;
+  if (status === "cancelled") return worldUserMessage("cancelled");
+  if (status === "failed") return worldUserMessage("network");
   return null;
 }
 

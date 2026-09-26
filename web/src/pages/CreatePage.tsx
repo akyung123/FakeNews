@@ -6,17 +6,25 @@ import {
   isIssueFormValid,
   isLaunchEnabled,
   ISSUE_COPY,
+  launchButtonLabel,
   prophecyName,
   readStoredProphetLabel,
   storeProphetLabel,
   toDatetimeLocalValue,
-  worldErrorMessage,
+  worldErrorKindFromRegisterProphet,
+  worldUserMessage,
   type IssueSession,
   type WorldStatus,
 } from "../lib/issue";
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_ISSUE_SESSION, MOCK_PARENT_NAME, MOCK_RETURNING_SESSION } from "../lib/mock";
 import { actions } from "../lib/store";
-import { createWorldClient, type WorldClient, type WorldServerSignature } from "../lib/world";
+import {
+  createWorldClient,
+  type Hex,
+  type WorldClient,
+  type WorldErrorKind,
+  type WorldServerSignature,
+} from "../lib/world";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -26,6 +34,7 @@ export type IssueScreenProps = {
   now?: number;
   parentName?: string;
   onIssued?: (id: string) => void;
+  registerProphet?: (input: { label: string; nullifier: Hex; serverSig: Hex }) => Promise<void>;
 };
 
 export function resolveIssueSession(search: URLSearchParams, storedLabel = readStoredProphetLabel()): IssueSession {
@@ -47,6 +56,7 @@ export function IssueScreen({
   now = Date.now(),
   parentName = import.meta.env.VITE_PARENT_NAME || MOCK_PARENT_NAME,
   onIssued,
+  registerProphet,
 }: IssueScreenProps) {
   const navigate = useNavigate();
   const returningProphet = Boolean(session.prophetLabel);
@@ -56,6 +66,7 @@ export function IssueScreen({
   const [deadlineLocal, setDeadlineLocal] = useState(toDatetimeLocalValue(now + WEEK_MS));
   const [firstBuy, setFirstBuy] = useState("0");
   const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
+  const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
 
   const deadlineUnix = fromDatetimeLocalValue(deadlineLocal);
@@ -69,7 +80,8 @@ export function IssueScreen({
     nowSeconds,
   });
   const canLaunch = isLaunchEnabled({ returningProphet, worldStatus, formValid });
-  const error = worldErrorMessage(worldStatus, returningProphet);
+  const error = returningProphet ? null : worldUserMessage(worldError);
+  const submitLabel = launchButtonLabel({ returningProphet, worldStatus, canLaunch });
   const fullName = prophetLabel && slug ? prophecyName(slug, prophetLabel, parentName) : "";
 
   return (
@@ -91,15 +103,31 @@ export function IssueScreen({
           e.preventDefault();
           if (!canLaunch) return;
           if (!returningProphet && !verified) return;
-          const id = actions.create({
-            prophecy: prophecy.trim(),
-            name: slug,
-            ticker: slug.toUpperCase().slice(0, 11),
-            firstBuy: Number(firstBuy) || 0,
-          });
-          if (!returningProphet) storeProphetLabel(prophetLabel);
-          if (onIssued) onIssued(id);
-          else navigate(`/coin/${id}`);
+          void (async () => {
+            if (!returningProphet && verified && registerProphet) {
+              try {
+                await registerProphet({
+                  label: prophetLabel,
+                  nullifier: verified.nullifier,
+                  serverSig: verified.serverSig,
+                });
+              } catch (err) {
+                const kind = worldErrorKindFromRegisterProphet(err);
+                setWorldError(kind);
+                setWorldStatus("failed");
+                return;
+              }
+            }
+            const id = actions.create({
+              prophecy: prophecy.trim(),
+              name: slug,
+              ticker: slug.toUpperCase().slice(0, 11),
+              firstBuy: Number(firstBuy) || 0,
+            });
+            if (!returningProphet) storeProphetLabel(prophetLabel);
+            if (onIssued) onIssued(id);
+            else navigate(`/coin/${id}`);
+          })();
         }}
       >
         <p className="banner-lock">{ISSUE_COPY.immutable}</p>
@@ -173,7 +201,11 @@ export function IssueScreen({
           wallet={session.wallet}
           world={world}
           status={worldStatus}
-          onStatus={setWorldStatus}
+          onStatus={(status) => {
+            setWorldStatus(status);
+            if (status === "pending" || status === "success") setWorldError(null);
+          }}
+          onErrorKind={setWorldError}
           onVerified={setVerified}
         />
 
@@ -184,7 +216,7 @@ export function IssueScreen({
         ) : null}
 
         <button type="submit" className="btn primary full" disabled={!canLaunch}>
-          {ISSUE_COPY.launch}
+          {submitLabel}
         </button>
         {!returningProphet && worldStatus !== "success" ? (
           <p className="faint small">The issue button stays off until World verification succeeds.</p>

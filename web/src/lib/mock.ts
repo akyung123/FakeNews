@@ -86,6 +86,14 @@ export const MOCK_WORLD_VERIFY = {
     "0x30b81b87f692058fe903c62e6658079e5ed5d399b0498408232b8d1fcc6fde907fb7fad72e0b1e482806e53d0b29ec8a2c766251dceef6e448a9772a2c5c0a801c" as const,
 };
 
+/** GET /health. Signer address from the world/ fixture (Anvil account 0). */
+export const MOCK_WORLD_HEALTH = {
+  ok: true as const,
+  signer: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+};
+
+export const DEFAULT_WORLD_SERVER_URL = "http://localhost:8787";
+
 export const MOCK_PARENT_NAME = "prophecy.eth";
 
 export const MOCK_ISSUE_PLACEHOLDER = {

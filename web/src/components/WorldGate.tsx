@@ -3,10 +3,13 @@ import { ISSUE_COPY, type WorldStatus } from "../lib/issue";
 import { MOCK_IDKIT_RESULT } from "../lib/mock";
 import {
   createWorldClient,
-  worldStatusFromIdKitError,
+  WorldClientError,
+  worldErrorKindFromIdKit,
+  worldStatusFromKind,
   type IdKitResultV4,
   type RpContext,
   type WorldClient,
+  type WorldErrorKind,
   type WorldServerSignature,
 } from "../lib/world";
 
@@ -17,6 +20,7 @@ type Props = {
   world?: WorldClient;
   status: WorldStatus;
   onStatus: (status: WorldStatus) => void;
+  onErrorKind: (kind: WorldErrorKind) => void;
   onVerified: (result: WorldServerSignature) => void;
 };
 
@@ -27,6 +31,7 @@ export function WorldGate({
   world = createWorldClient(),
   status,
   onStatus,
+  onErrorKind,
   onVerified,
 }: Props) {
   if (returningProphet) {
@@ -46,6 +51,7 @@ export function WorldGate({
         world={world}
         status={status}
         onStatus={onStatus}
+        onErrorKind={onErrorKind}
         onVerified={onVerified}
       />
     );
@@ -57,6 +63,7 @@ export function WorldGate({
       world={world}
       status={status}
       onStatus={onStatus}
+      onErrorKind={onErrorKind}
       onVerified={onVerified}
     />
   );
@@ -67,12 +74,14 @@ function MockWorldGate({
   world,
   status,
   onStatus,
+  onErrorKind,
   onVerified,
 }: {
   wallet: string;
   world: WorldClient;
   status: WorldStatus;
   onStatus: (status: WorldStatus) => void;
+  onErrorKind: (kind: WorldErrorKind) => void;
   onVerified: (result: WorldServerSignature) => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -88,8 +97,10 @@ function MockWorldGate({
       });
       onVerified(result);
       onStatus("success");
-    } catch {
-      onStatus("failed");
+    } catch (error) {
+      const kind = error instanceof WorldClientError ? error.kind : "network";
+      onErrorKind(kind);
+      onStatus(worldStatusFromKind(kind));
     } finally {
       setBusy(false);
     }
@@ -106,10 +117,26 @@ function MockWorldGate({
           <button type="button" className="btn primary" disabled={busy} onClick={() => void succeed()}>
             {ISSUE_COPY.prove}
           </button>
-          <button type="button" className="btn ghost" disabled={busy} onClick={() => onStatus("cancelled")}>
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={busy}
+            onClick={() => {
+              onErrorKind("cancelled");
+              onStatus("cancelled");
+            }}
+          >
             {ISSUE_COPY.cancel}
           </button>
-          <button type="button" className="btn ghost" disabled={busy} onClick={() => onStatus("failed")}>
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={busy}
+            onClick={() => {
+              onErrorKind("portal_rejected");
+              onStatus("failed");
+            }}
+          >
             {ISSUE_COPY.fail}
           </button>
         </div>
@@ -126,12 +153,14 @@ function LiveWorldGate({
   world,
   status,
   onStatus,
+  onErrorKind,
   onVerified,
 }: {
   wallet: string;
   world: WorldClient;
   status: WorldStatus;
   onStatus: (status: WorldStatus) => void;
+  onErrorKind: (kind: WorldErrorKind) => void;
   onVerified: (result: WorldServerSignature) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -160,10 +189,14 @@ function LiveWorldGate({
           world={world}
           onClose={(next) => {
             setOpen(next);
-            if (!next && status === "pending") onStatus("cancelled");
+            if (!next && status === "pending") {
+              onErrorKind("cancelled");
+              onStatus("cancelled");
+            }
           }}
           onVerified={onVerified}
           onStatus={onStatus}
+          onErrorKind={onErrorKind}
         />
       ) : null}
     </section>
@@ -189,12 +222,14 @@ function IdKitHost({
   onClose,
   onVerified,
   onStatus,
+  onErrorKind,
 }: {
   wallet: string;
   world: WorldClient;
   onClose: (open: boolean) => void;
   onVerified: (result: WorldServerSignature) => void;
   onStatus: (status: WorldStatus) => void;
+  onErrorKind: (kind: WorldErrorKind) => void;
 }) {
   const [Widget, setWidget] = useState<IdKitWidget | null>(null);
   const [preset, setPreset] = useState<unknown>(null);
@@ -210,10 +245,12 @@ function IdKitHost({
         setWidget(() => idkit.IDKitRequestWidget as unknown as IdKitWidget);
         setPreset(idkit.proofOfHuman({ signal: wallet }));
         setRpContext(envelope.rp_context);
-      } catch {
+      } catch (error) {
         if (!cancelled) {
-          setLoadError("Could not start World ID. Check VITE_WORLD_APP_ID and the world server.");
-          onStatus("failed");
+          const kind = error instanceof WorldClientError ? error.kind : "network";
+          setLoadError(ISSUE_COPY.checkFailed);
+          onErrorKind(kind);
+          onStatus(worldStatusFromKind(kind));
         }
       }
     })();
@@ -235,14 +272,25 @@ function IdKitHost({
       allow_legacy_proofs
       preset={preset}
       handleVerify={async (result) => {
-        const verified = await world.verifyProof({
-          wallet,
-          idkitResponse: result,
-        });
-        onVerified(verified);
+        try {
+          const verified = await world.verifyProof({
+            wallet,
+            idkitResponse: result,
+          });
+          onVerified(verified);
+        } catch (error) {
+          const kind = error instanceof WorldClientError ? error.kind : "network";
+          onErrorKind(kind);
+          onStatus(worldStatusFromKind(kind));
+          throw error;
+        }
       }}
       onSuccess={() => onStatus("success")}
-      onError={(code) => onStatus(worldStatusFromIdKitError(code))}
+      onError={(code) => {
+        const kind = worldErrorKindFromIdKit(code);
+        onErrorKind(kind);
+        onStatus(worldStatusFromKind(kind));
+      }}
     />
   );
 }

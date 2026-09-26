@@ -9,9 +9,12 @@ import {
   isValidProphecy,
   isValidSlug,
   ISSUE_COPY,
+  launchButtonLabel,
   prophecyName,
   toDatetimeLocalValue,
+  worldErrorKindFromRegisterProphet,
   worldErrorMessage,
+  worldUserMessage,
 } from "./issue";
 
 describe("issue field rules", () => {
@@ -85,9 +88,58 @@ describe("launch button gating", () => {
     expect(worldErrorMessage("cancelled", true)).toBeNull();
   });
 
-  it("shows a clear English error on cancel or fail", () => {
+  it("uses the designer disabled label until World succeeds", () => {
+    expect(
+      launchButtonLabel({ returningProphet: false, worldStatus: "idle", canLaunch: false }),
+    ).toBe(ISSUE_COPY.disabledLaunch);
+    expect(
+      launchButtonLabel({ returningProphet: false, worldStatus: "cancelled", canLaunch: false }),
+    ).toBe(ISSUE_COPY.disabledLaunch);
+    expect(
+      launchButtonLabel({ returningProphet: false, worldStatus: "success", canLaunch: true }),
+    ).toBe(ISSUE_COPY.launch);
+  });
+});
+
+describe("designer World copy mapping", () => {
+  const codes = ["cancelled", "portal_rejected", "malformed_payload", "nullifier_reuse"] as const;
+
+  it("maps cancel to the locked-until-verify sentence", () => {
+    expect(worldUserMessage("cancelled")).toBe(
+      "Verification cancelled. Launching stays locked until you verify.",
+    );
+  });
+
+  it("maps portal_rejected without showing the code", () => {
+    const text = worldUserMessage("portal_rejected");
+    expect(text).toBe("World ID couldn't confirm this check. Try again in World App.");
+    expect(text).not.toMatch(/portal_rejected/);
+  });
+
+  it("maps malformed_payload and network to the same retry sentence", () => {
+    expect(worldUserMessage("malformed_payload")).toBe(
+      "Something went wrong with the check. Please try again.",
+    );
+    expect(worldUserMessage("network")).toBe("Something went wrong with the check. Please try again.");
+    expect(worldUserMessage("malformed_payload")).not.toMatch(/malformed_payload/);
+  });
+
+  it("maps a Launchpad nullifier reuse revert to one-human-one-name", () => {
+    expect(worldErrorKindFromRegisterProphet(new Error("NullifierUsed"))).toBe("nullifier_reuse");
+    expect(worldErrorKindFromRegisterProphet(new Error("nullifier already used"))).toBe("nullifier_reuse");
+    expect(worldUserMessage("nullifier_reuse")).toBe(
+      "This human already has a prophet name. One human, one name.",
+    );
+  });
+
+  it("never puts a raw server or revert code in designer copy", () => {
+    for (const kind of codes) {
+      const text = worldUserMessage(kind) ?? "";
+      expect(text).not.toContain("portal_rejected");
+      expect(text).not.toContain("malformed_payload");
+      expect(text).not.toContain("NullifierUsed");
+    }
     expect(worldErrorMessage("cancelled", false)).toBe(ISSUE_COPY.cancelled);
-    expect(worldErrorMessage("failed", false)).toBe(ISSUE_COPY.failed);
     expect(worldErrorMessage("idle", false)).toBeNull();
   });
 });

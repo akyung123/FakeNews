@@ -1,23 +1,44 @@
 import {
+  DEFAULT_WORLD_SERVER_URL,
   MOCK_IDKIT_RESULT,
   MOCK_RP_CONTEXT_RESPONSE,
   MOCK_WORLD_ACTION,
   MOCK_WORLD_APP_ID,
   MOCK_WORLD_CHAIN_ID,
+  MOCK_WORLD_HEALTH,
   MOCK_WORLD_LAUNCHPAD,
   MOCK_WORLD_VERIFY,
 } from "./mock";
 
 /**
  * Thin World ID client. Mock by default (`VITE_WORLD_MOCK` is not `0`/`false`).
- * Live HTTP matches world/ (PR #10 merged, PR #15 open) and INTERFACE §3:
- *   GET  {serverUrl}/rp-context  → { app_id, action, environment, rp_context }
- *   POST {serverUrl}/verify      { wallet, chainId, launchpad, idkitResponse }
- *                                → { nullifier, serverSig }
+ * Live HTTP matches world/ PR #10 and INTERFACE §3:
+ *   GET  {serverUrl}/rp-context  → IDKit 4 { app_id, action, environment, rp_context }
+ *   POST {serverUrl}/verify      → Portal v4; errors portal_rejected / malformed_payload
+ *   GET  {serverUrl}/health
+ * Default server URL is http://localhost:8787.
  *
  * serverSig is EIP-191 personal_sign of
  * keccak256(abi.encode(uint256 chainId, address launchpad, address wallet, uint256 nullifier)).
+ * The Launchpad stores the nullifier on-chain; this client does not.
  */
+
+export type WorldErrorKind =
+  | "cancelled"
+  | "portal_rejected"
+  | "malformed_payload"
+  | "network"
+  | "nullifier_reuse";
+
+export class WorldClientError extends Error {
+  readonly kind: WorldErrorKind;
+
+  constructor(kind: WorldErrorKind) {
+    super("World verification failed");
+    this.name = "WorldClientError";
+    this.kind = kind;
+  }
+}
 
 export type Hex = `0x${string}`;
 
@@ -57,6 +78,11 @@ export type WorldServerSignature = {
   serverSig: Hex;
 };
 
+export type WorldHealth = {
+  ok: true;
+  signer: string;
+};
+
 export type WorldClient = {
   isMock: boolean;
   appId: string;
@@ -65,6 +91,7 @@ export type WorldClient = {
   launchpad: string;
   fetchRpContext: () => Promise<RpContextResponse>;
   verifyProof: (input: { wallet: string; idkitResponse: IdKitResultV4 }) => Promise<WorldServerSignature>;
+  checkHealth: () => Promise<WorldHealth>;
 };
 
 export type WorldClientOptions = {
@@ -84,8 +111,31 @@ export function isWorldMockEnabled(value = import.meta.env.VITE_WORLD_MOCK): boo
   return value !== "0" && value !== "false";
 }
 
+export function worldErrorKindFromIdKit(code: string): WorldErrorKind {
+  return CANCELLED_CODES.has(code) ? "cancelled" : "network";
+}
+
+export function worldStatusFromKind(kind: WorldErrorKind): "cancelled" | "failed" {
+  return kind === "cancelled" ? "cancelled" : "failed";
+}
+
 export function worldStatusFromIdKitError(code: string): "cancelled" | "failed" {
-  return CANCELLED_CODES.has(code) ? "cancelled" : "failed";
+  return worldStatusFromKind(worldErrorKindFromIdKit(code));
+}
+
+export function worldErrorKindFromServerCode(code: unknown): WorldErrorKind {
+  if (code === "portal_rejected") return "portal_rejected";
+  if (code === "malformed_payload") return "malformed_payload";
+  return "network";
+}
+
+async function errorFromResponse(response: Response): Promise<WorldClientError> {
+  try {
+    const body = (await response.json()) as { error?: unknown };
+    return new WorldClientError(worldErrorKindFromServerCode(body.error));
+  } catch {
+    return new WorldClientError("network");
+  }
 }
 
 export function createWorldClient(options: WorldClientOptions = {}): WorldClient {
@@ -94,7 +144,10 @@ export function createWorldClient(options: WorldClientOptions = {}): WorldClient
   const action = options.action ?? import.meta.env.VITE_WORLD_ACTION ?? MOCK_WORLD_ACTION;
   const chainId = options.chainId ?? (Number(import.meta.env.VITE_CHAIN_ID) || SEPOLIA_CHAIN_ID);
   const launchpad = options.launchpad ?? import.meta.env.VITE_LAUNCHPAD_ADDRESS ?? (mock ? MOCK_WORLD_LAUNCHPAD : "");
-  const serverUrl = (options.serverUrl ?? import.meta.env.VITE_WORLD_SERVER_URL ?? "").replace(/\/$/, "");
+  const serverUrl = (options.serverUrl ?? import.meta.env.VITE_WORLD_SERVER_URL ?? DEFAULT_WORLD_SERVER_URL).replace(
+    /\/$/,
+    "",
+  );
   const doFetch = options.fetch ?? fetch;
 
   if (mock) {
@@ -110,6 +163,9 @@ export function createWorldClient(options: WorldClientOptions = {}): WorldClient
       async verifyProof() {
         return { ...MOCK_WORLD_VERIFY };
       },
+      async checkHealth() {
+        return { ...MOCK_WORLD_HEALTH };
+      },
     };
   }
 
@@ -120,36 +176,46 @@ export function createWorldClient(options: WorldClientOptions = {}): WorldClient
     chainId,
     launchpad,
     async fetchRpContext() {
-      if (!serverUrl) {
-        throw new Error("VITE_WORLD_SERVER_URL is not set");
+      try {
+        const response = await doFetch(`${serverUrl}/rp-context`, { method: "GET" });
+        if (!response.ok) throw await errorFromResponse(response);
+        return (await response.json()) as RpContextResponse;
+      } catch (error) {
+        if (error instanceof WorldClientError) throw error;
+        throw new WorldClientError("network");
       }
-      const response = await doFetch(`${serverUrl}/rp-context`, { method: "GET" });
-      if (!response.ok) {
-        throw new Error("Could not fetch World ID rp-context");
-      }
-      return (await response.json()) as RpContextResponse;
     },
     async verifyProof(input) {
-      if (!serverUrl) {
-        throw new Error("VITE_WORLD_SERVER_URL is not set");
-      }
       if (!launchpad) {
-        throw new Error("VITE_LAUNCHPAD_ADDRESS is not set");
+        throw new WorldClientError("malformed_payload");
       }
-      const response = await doFetch(`${serverUrl}/verify`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          wallet: input.wallet,
-          chainId,
-          launchpad,
-          idkitResponse: input.idkitResponse,
-        }),
-      });
-      if (!response.ok) {
-        throw new Error("World verification failed");
+      try {
+        const response = await doFetch(`${serverUrl}/verify`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            wallet: input.wallet,
+            chainId,
+            launchpad,
+            idkitResponse: input.idkitResponse,
+          }),
+        });
+        if (!response.ok) throw await errorFromResponse(response);
+        return (await response.json()) as WorldServerSignature;
+      } catch (error) {
+        if (error instanceof WorldClientError) throw error;
+        throw new WorldClientError("network");
       }
-      return (await response.json()) as WorldServerSignature;
+    },
+    async checkHealth() {
+      try {
+        const response = await doFetch(`${serverUrl}/health`, { method: "GET" });
+        if (!response.ok) throw await errorFromResponse(response);
+        return (await response.json()) as WorldHealth;
+      } catch (error) {
+        if (error instanceof WorldClientError) throw error;
+        throw new WorldClientError("network");
+      }
     },
   };
 }
