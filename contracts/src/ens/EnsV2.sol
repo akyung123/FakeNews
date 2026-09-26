@@ -13,6 +13,7 @@ uint256 constant ROOT_RESOURCE = 0;
 
 // Registry roles (`RegistryRolesLib` at `71a3b73`).
 uint256 constant ROLE_REGISTRAR = 1 << 0;
+uint256 constant ROLE_REGISTRAR_ADMIN = ROLE_REGISTRAR << 128;
 uint256 constant ROLE_SET_PARENT = 1 << 8;
 uint256 constant ROLE_SET_PARENT_ADMIN = ROLE_SET_PARENT << 128;
 uint256 constant ROLE_UNREGISTER = 1 << 12;
