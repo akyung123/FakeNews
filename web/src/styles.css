@@ -161,7 +161,7 @@ main.narrow { max-width: 720px; }
 }
 .home-toolbar h1 { font-size: 28px; }
 
-/* Closest to graduation — featured slot */
+/* Auction live — featured slot */
 .featured {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(180px, 0.7fr);
