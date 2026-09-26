@@ -151,6 +151,9 @@ contract Deploy is ScriptVm {
         _pasteLine(launchpadLine);
         _pasteLine(adapterLine);
         _pasteLine(string.concat("LAUNCHPAD_ADDRESS=", vm.toString(deployed)));
+        _pasteLine(string.concat("VITE_LAUNCHPAD_ADDRESS=", vm.toString(deployed)));
+        _pasteLine(string.concat("VITE_CHAIN_ID=", vm.toString(chainId)));
+        _pasteLine(string.concat("DEPLOYER=", vm.toString(deployer)));
         _pasteLine(signerLine);
     }
 

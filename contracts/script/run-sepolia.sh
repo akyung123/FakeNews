@@ -87,6 +87,30 @@ if [[ "${args[0]}" == *Deploy.s.sol* ]]; then
   echo "  ENS_ADAPTER_ADDRESS=<logged ProphecyEns>" >&2
   echo "  worldSigner address: <from the log — address only>" >&2
   echo "  WORLD_SIGNER_KEY: paste from local new-world-signer.sh only. Never print it here or in CI." >&2
+  echo "  Web: VITE_LAUNCHPAD_ADDRESS from the log; launchpadBlock is in deployments/*.json (fromBlock)." >&2
+fi
+
+if [[ "$send" -eq 1 && "${args[0]}" == *Deploy.s.sol* ]]; then
+  tmp="$(mktemp)"
+  set +e
+  "${cmd[@]}" | tee "$tmp"
+  rc=${PIPESTATUS[0]}
+  set -e
+  if [[ "$rc" -eq 0 ]]; then
+    repo="$(cd "$root/.." && pwd)"
+    val="$(grep -oE 'LAUNCHPAD_ADDRESS=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export LAUNCHPAD_ADDRESS="$val"
+    val="$(grep -oE 'ENS_ADAPTER_ADDRESS=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export ENS_ADAPTER_ADDRESS="$val"
+    val="$(grep -oE 'DEPLOYER=0x[0-9a-fA-F]{40}' "$tmp" | tail -n1 | cut -d= -f2 || true)"
+    [[ -n "$val" ]] && export DEPLOYER="$val"
+    if [[ "$SEPOLIA_RPC_URL" == *"127.0.0.1"* || "$SEPOLIA_RPC_URL" == *"localhost"* ]]; then
+      export DEPLOY_RECORD_LOCAL=1
+    fi
+    "$repo/infra/scripts/write-deployment-record.sh" || true
+  fi
+  rm -f "$tmp"
+  exit "$rc"
 fi
 
 exec "${cmd[@]}"

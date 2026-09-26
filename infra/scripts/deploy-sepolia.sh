@@ -134,6 +134,14 @@ _ingest_addresses() {
     export WORLD_LAUNCHPAD_ADDRESS="$val"
     export LAUNCHPAD_ADDRESS="${LAUNCHPAD_ADDRESS:-$val}"
   fi
+  val="$(grep -oE 'DEPLOYER=0x[0-9a-fA-F]{40}' "$log" | tail -n1 | cut -d= -f2 || true)"
+  if [[ -n "$val" ]]; then
+    export DEPLOYER="$val"
+  fi
+  val="$(grep -oE 'LAUNCHPAD_BLOCK=[0-9]+' "$log" | tail -n1 | cut -d= -f2 || true)"
+  if [[ -n "$val" ]]; then
+    export LAUNCHPAD_BLOCK="$val"
+  fi
 }
 
 wait_commit() {
@@ -194,17 +202,15 @@ run_step "grantAdapterRegistrar" script/SetupParent.s.sol --sig "grantAdapterReg
 
 echo >&2
 echo "Done. Parent name is NOT locked." >&2
-if [[ -n "${LAUNCHPAD_ADDRESS:-}" ]]; then
-  echo "LAUNCHPAD_ADDRESS=$LAUNCHPAD_ADDRESS"
-fi
-if [[ -n "${ENS_ADAPTER_ADDRESS:-}" ]]; then
-  echo "ENS_ADAPTER_ADDRESS=$ENS_ADAPTER_ADDRESS"
-fi
-if [[ -n "${PARENT_USER_REGISTRY:-}" ]]; then
-  echo "PARENT_USER_REGISTRY=$PARENT_USER_REGISTRY"
-fi
 echo "Paste onto Render (address only, never WORLD_SIGNER_KEY from CI):" >&2
 echo "  WORLD_CHAIN_ID=11155111"
 if [[ -n "${LAUNCHPAD_ADDRESS:-}" ]]; then
   echo "  WORLD_LAUNCHPAD_ADDRESS=$LAUNCHPAD_ADDRESS"
+fi
+
+if [[ "$send" -eq 1 && -n "${LAUNCHPAD_ADDRESS:-}" ]]; then
+  if [[ "$warp" -eq 1 ]]; then
+    export DEPLOY_RECORD_LOCAL=1
+  fi
+  "$root/infra/scripts/write-deployment-record.sh"
 fi
