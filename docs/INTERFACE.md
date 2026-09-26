@@ -29,6 +29,8 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 ### `Launchpad` `(draft)`
 
 ```solidity
+constructor(address protocolFeeRecipient, address worldSigner);
+
 // Create a prophet name. Needs a World ID server signature. Once per nullifier.
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
 
@@ -48,6 +50,8 @@ function quoteBuy(address token, uint256 ethIn) external view returns (uint256 t
 function quoteSell(address token, uint256 tokensIn) external view returns (uint256 ethOut, uint256 fee);
 function prophetOf(address wallet) external view returns (string label);
 function creatorFeeOf(address wallet) external view returns (uint256);
+function protocolFeeRecipient() external view returns (address);
+function worldSigner() external view returns (address);
 ```
 
 ```solidity

@@ -30,8 +30,8 @@ Lanes follow folders. One lane = one person (or one agent session).
 ## 2. Contracts (`contracts/`)
 
 - [x] `forge install ensdomains/contracts-v2`, remappings @cursor
-- [ ] `ProphecyToken`
-- [ ] `Launchpad` curve
+- [x] `ProphecyToken` @cursor-agent
+- [x] `Launchpad` curve @cursor-agent
   - SPEC constants exactly
   - reserves in a struct
   - a separate fee ledger
@@ -44,7 +44,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] `memo` on `buy` / `sell`, emitted in `Trade`, reverts above 140 bytes
 - [ ] Tests
   - [x] Lock tests: editing the sentence reverts, transfer reverts, swapping the resolver reverts, `hasAssignees(ROOT, UNREGISTER) == false` @cursor
-  - [ ] Three fuzz tests: solvency, a round trip never gains, graduation vs pool start price gap < 0.0068%
+  - [ ] Three fuzz tests: solvency (done @cursor-agent), a round trip never gains (done @cursor-agent), graduation vs pool start price gap < 0.0068%
   - [ ] World: reusing a nullifier reverts, a bad signature reverts
 - [ ] Sepolia deploy script (skill `deploy-sepolia`)
 
