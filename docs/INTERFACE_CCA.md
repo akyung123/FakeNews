@@ -14,7 +14,7 @@ Read on 2026-09-26. Every external signature below is copied from these pins. If
 
 | Piece | Pin | What we read |
 |---|---|---|
-| Continuous Clearing Auction factory **v2.1.0** | tag `v2.1.0`, commit `7d7602d257733315434570f2a0c2f94f1c7b207a` | [`ContinuousClearingAuctionFactory.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuctionFactory.sol), [`IContinuousClearingAuction.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuction.sol). Address from [Launchpad deployments](https://developers.uniswap.org/docs/liquidity/liquidity-launchpad/deployments) |
+| Continuous Clearing Auction **v2.1.0** (same as web [PR #43](https://github.com/prism-toggle-ai/FakeNews/pull/43) `35c1302`) | git tag `v2.1.0` = `a56d42231e7bf048136d9d88fa61e8518c10c5ff`. Deployments-page factory commit `7d7602d257733315434570f2a0c2f94f1c7b207a`. **Same tree** `e534d08279d7a7f6bf18ba8150eabf1cc8fa8840` — not a different version | [`IContinuousClearingAuction.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/a56d42231e7bf048136d9d88fa61e8518c10c5ff/src/interfaces/IContinuousClearingAuction.sol), [`ContinuousClearingAuctionFactory.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/ContinuousClearingAuctionFactory.sol). Sepolia factory address from [Launchpad deployments](https://developers.uniswap.org/docs/liquidity/liquidity-launchpad/deployments) |
 | CCALens | tag `v2.1.0` (lens source) / deployed **v2.0.0** commit `aee9bca51c92c24eb24a00d75ad98e678bac61d3` | [`CCALens.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/v2.1.0/src/lens/CCALens.sol) = `AuctionStateLens` + `TickDataLens`. Address from the CCA README Deployments table |
 | LBPStrategy **v3.3.0** | commit `1c5904912aefceaceb89c24528cd5e25d0b61597` (no `v3.3.0` git tag exists) | [`IStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IStrategy.sol), [`ILBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/ILBPStrategy.sol), [`LBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol), [`MigratorParams.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/libraries/MigratorParams.sol) |
 | InitializerHook **v3.3.0** | source at `1c590491…`; Sepolia deploy commit `7ea523c9d75a51cb2f497be5e49bacdaeb80a342` | [`InitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/periphery/hooks/InitializerHook.sol), [`IInitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IInitializerHook.sol) |
@@ -22,7 +22,19 @@ Read on 2026-09-26. Every external signature below is copied from these pins. If
 | Universal Router `execute` | [`IUniversalRouter.sol` on `main`](https://github.com/Uniswap/universal-router/blob/main/contracts/interfaces/IUniversalRouter.sol) | signature only; **V4_SWAP command bytes are `TBD(backend)`** — tag `v2.1.2` was not fetchable from this environment |
 | PositionManager collect actions | [`IPositionManager.sol` on `main`](https://github.com/Uniswap/v4-periphery/blob/main/src/interfaces/IPositionManager.sol) | `modifyLiquidities` only; **action-byte encoding is `TBD(backend)`** |
 
-The CCA README at tag `v2.1.0` still lists v2.0.0 as “latest” in its own table. The official deployments page lists factory **v2.1.0** at the address below. Use the deployments page for the factory address.
+The CCA README at tag `v2.1.0` still lists v2.0.0 as “latest” in its own table. The official deployments page lists factory **v2.1.0** at `0x000000001F26a0044BaA66024e7b6599c61963F8` / `7d7602d`. Use that address. The git tag SHA (`a56d422`) and the deployments SHA (`7d7602d`) are two commits of the same bump; `IContinuousClearingAuction` ABI is identical.
+
+**Cross-check vs web PR #43** (`web/src/lib/cca/abi/` at `35c1302`). External signatures that both files list **match**, including `owner` indexed on `BidSubmitted`, `BidExited`, and `TokensClaimed`. Differences that are **not** a CCA version split:
+
+| Item | This file | PR #43 `35c1302` |
+|---|---|---|
+| CCA version / factory | v2.1.0 · `0x000000001F26…63F8` · tag `a56d422` / deploy `7d7602d` | same address and v2.1.0; events cited at `a56d422`, factory commit comment `7d7602d` |
+| `BidSubmitted` / `BidExited` / `TokensClaimed` | `owner` indexed | `owner` indexed — same |
+| `submitBid` ABI | 5-arg and 4-arg | both in `cca.ts` |
+| `submitBid` demo call | use 5-arg; do not use 4-arg | `placeBid` sends the **4-arg** overload |
+| CCALens `state` | not `view`; `eth_call` | same |
+| LBPStrategy `migrate` | `1c590491` · `0x9543…2000` | same |
+| Universal Router | **2.1.2** `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`; `V4_SWAP` bytes `TBD(backend)` | **2.0** `0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b`; `V4_SWAP` `0x10` + actions `0x06` / `0x0c` / `0x0f`. `execute(commands, inputs, deadline)` matches. Both addresses are on the official Sepolia v4 table |
 
 ## 0.1 Fixed Sepolia addresses and parameters
 
