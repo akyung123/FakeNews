@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
 import {LaunchpadStack} from "./LaunchpadStack.sol";
 
@@ -17,9 +15,10 @@ contract CurveVectorsTest is LaunchpadStack {
     string internal vectors;
 
     function setUp() public {
-        _deployStack(address(0xFEE), address(0x51C));
+        _deployStack();
+        prophet = address(this);
         vm.deal(address(this), 10 ether);
-        token = launchpad.launch("lingo-2028", "", 0, 0);
+        token = _registerAndLaunch();
         vectors = vm.readFile(string.concat(vm.projectRoot(), "/test/Curve.vectors.json"));
     }
 

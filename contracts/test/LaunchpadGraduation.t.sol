@@ -12,11 +12,13 @@ import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {PoolSwapTest} from "v4-core/src/test/PoolSwapTest.sol";
 import {PoolDonateTest} from "v4-core/src/test/PoolDonateTest.sol";
 
+import {IProphecyEns} from "../src/ens/IProphecyEns.sol";
 import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
 import {Graduation} from "../src/uniswap/Graduation.sol";
 import {LiquidityLocker} from "../src/uniswap/LiquidityLocker.sol";
 import {LaunchpadStack} from "./LaunchpadStack.sol";
+import {MockProphecyEns} from "./LaunchpadHelpers.sol";
 
 contract RejectEth {
     // no receive / fallback
@@ -46,22 +48,22 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     using StateLibrary for IPoolManager;
     using PoolIdLibrary for PoolKey;
 
-    address internal prophet = address(0xA11CE);
-    address internal buyer = address(0xB0B);
-    address internal protocol = address(0xFEE);
-    address internal signer = address(0x51C);
-
     receive() external payable {}
 
     function setUp() public {
-        _deployStack(protocol, signer);
+        _deployStack();
         vm.deal(prophet, 10 ether);
         vm.deal(buyer, 10 ether);
     }
 
+    function _issue(address wallet, string memory label, string memory slug) internal returns (address token) {
+        _registerProphet(wallet, label);
+        vm.prank(wallet);
+        token = launchpad.launch(slug, "a prophecy sentence", 0, 0);
+    }
+
     function _launch() internal returns (address token) {
-        vm.prank(prophet);
-        token = launchpad.launch("lingo-2028", "", 0, 0);
+        token = _issue(prophet, "ringo", "lingo-2028");
     }
 
     function _graduate() internal returns (address token) {
@@ -184,8 +186,7 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     function test_rejectingProphetAccruesAndProtocolIsPaid() public {
         ToggleWallet prophetC = new ToggleWallet();
         vm.deal(address(prophetC), 1 ether);
-        vm.prank(address(prophetC));
-        address token = launchpad.launch("reject-eth", "", 0, 0);
+        address token = _issue(address(prophetC), "rejector", "reject-eth");
         vm.prank(buyer);
         launchpad.buy{value: 1 ether}(token, 0, "");
 
@@ -203,8 +204,7 @@ contract LaunchpadGraduationTest is LaunchpadStack {
         assertGt(accrued, 0);
 
         // A later graduation must not sweep the accrued ETH to the next seed refund.
-        vm.prank(prophet);
-        address other = launchpad.launch("second-grad", "", 0, 0);
+        address other = _issue(prophet, "ringo", "second-grad");
         vm.prank(buyer);
         launchpad.buy{value: 1 ether}(other, 0, "");
         assertEq(locker.accruedEth(address(prophetC)), accrued);
@@ -299,24 +299,27 @@ contract LaunchpadGraduationTest is LaunchpadStack {
     }
 
     function test_setUniswapNonDeployerReverts() public {
-        Launchpad pad = new Launchpad(protocol, signer);
+        Launchpad pad = new Launchpad(protocol, signer, IProphecyEns(address(new MockProphecyEns())));
         vm.prank(buyer);
         vm.expectRevert(Launchpad.NotDeployer.selector);
         pad.setUniswap(manager, address(hook), address(locker));
     }
 
     function test_graduationBeforeSetUniswapReverts() public {
-        Launchpad pad = new Launchpad(protocol, signer);
-        vm.deal(prophet, 1 ether);
+        MockProphecyEns ensAd = new MockProphecyEns();
+        Launchpad pad = new Launchpad(protocol, signer, IProphecyEns(address(ensAd)));
+        uint256 n = 7;
         vm.prank(prophet);
-        address token = pad.launch("no-uniswap", "", 0, 0);
+        pad.registerProphet("ringo", n, signRegister(address(pad), prophet, n, block.chainid, SIGNER_PK));
+        vm.prank(prophet);
+        address token = pad.launch("no-uniswap", "a prophecy sentence", 0, 0);
         vm.prank(buyer);
         vm.expectRevert(Launchpad.UniswapNotSet.selector);
         pad.buy{value: 1 ether}(token, 0, "");
     }
 
     function test_setUniswapRejectsZero() public {
-        Launchpad pad = new Launchpad(protocol, signer);
+        Launchpad pad = new Launchpad(protocol, signer, IProphecyEns(address(new MockProphecyEns())));
         vm.expectRevert(Launchpad.ZeroAddress.selector);
         pad.setUniswap(IPoolManager(address(0)), address(hook), address(locker));
         vm.expectRevert(Launchpad.ZeroAddress.selector);

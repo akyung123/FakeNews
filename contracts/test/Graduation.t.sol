@@ -1,36 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
 import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
-import {PoolManager} from "v4-core/src/PoolManager.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {Currency} from "v4-core/src/types/Currency.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
 import {StateLibrary} from "v4-core/src/libraries/StateLibrary.sol";
 import {PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
 
-import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
-import {ProphecyHook} from "../src/uniswap/ProphecyHook.sol";
-import {HookMiner} from "../src/uniswap/HookMiner.sol";
 import {Graduation} from "../src/uniswap/Graduation.sol";
-import {LiquidityLocker} from "../src/uniswap/LiquidityLocker.sol";
 import {LaunchpadStack} from "./LaunchpadStack.sol";
 
 contract GraduationTest is LaunchpadStack {
     using StateLibrary for IPoolManager;
     using PoolIdLibrary for PoolKey;
 
-    address internal prophet = address(0xA11CE);
-    address internal protocol = address(0xFEE);
-
     receive() external payable {}
 
     function setUp() public {
-        _deployStack(protocol, address(0x51C));
+        _deployStack();
         vm.deal(prophet, 10 ether);
     }
 
@@ -54,8 +44,7 @@ contract GraduationTest is LaunchpadStack {
     }
 
     function test_specGraduationReservesGapUnderLimit() public {
-        vm.prank(prophet);
-        address token = launchpad.launch("lingo-2028", "", 0, 0);
+        address token = _registerAndLaunch();
         vm.prank(prophet);
         launchpad.buy{value: 1 ether}(token, 0, "");
 
@@ -71,8 +60,7 @@ contract GraduationTest is LaunchpadStack {
     }
 
     function test_seedFullRangeAtVirtualReservePrice() public {
-        vm.prank(prophet);
-        address token = launchpad.launch("lingo-2028", "", 0, 0);
+        address token = _registerAndLaunch();
         vm.prank(prophet);
         launchpad.buy{value: 1 ether}(token, 0, "");
         (uint256 vEth, uint256 vToken,,, bool complete) = launchpad.curve(token);
