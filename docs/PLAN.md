@@ -87,15 +87,16 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] If the ENS app cannot read Sepolia ENSv2 names: use the viem lookup script in `infra/` (`getEnsAddress` and text record) output as the external lookup evidence for scenes 1 and 2.
 - [ ] `FEEDBACK.md` (Uniswap): keep notes of blockers during development; it is the fallback deliverable if Uniswap graduation is cut.
 
-## 6. CCA (`cca` branch family — not `main`)
+## 6. CCA Path B2 (`cca` branch only — do not merge to `main`)
 
-Gates (KST): 22:00 INTERFACE + contract skeleton; 02:00 Sepolia-fork 4 steps; 03:30 web + deploy script. Miss any gate → curve on `main`.
+Team decision B2: replace the bonding curve with official Uniswap LBPStrategy. The curve on `main` stays the fallback.
 
-- [x] `INTERFACE_CCA.md` + DECISIONS #18–#22 for B2 (LBPStrategy `initializeDistribution`, hook inherits `InitializerHook`, locker holds the NFT). `INTERFACE.md` on `main` stays the curve contract @cursor
-- [x] `FEEDBACK.md` Uniswap prize write-up (CCA + LBPStrategy + v4 hook) @cursor
-- [ ] Contracts skeleton on a `cca/*` branch (Launchpad calls `initializeDistribution`; no curve) — 22:00 gate
-- [ ] Sepolia-fork 4 steps green: launch+create auction, bid, migrate opens v4 pool, swap — 02:00 gate
-- [x] Web bid / CCALens / claim / migrate / v4 swap + deploy script keys in `deployments/sepolia.json` — 03:30 gate @cursor
+- [x] `Launchpad`: drop curve `buy`/`sell`/`graduate`; `launch` mints and calls `LBPStrategy.initializeDistribution`; `auctionOf(token)` @cursor
+- [x] `ProphecyHook`: official `InitializerHook` pattern so LBP can initialize the v4 pool (`authorized` = LBPStrategy); 24:76 stays on the locker @cursor
+- [x] `LiquidityLocker`: hold the v4 PositionManager LP NFT; no withdraw; `collect` splits prophet 24 : protocol 76 @cursor
+- [x] Unit tests with mocks; `forge build && forge test` green @cursor
+- [x] CCA `Deploy.s.sol`: hook `authorized` = LBPStrategy, `setUniswap` then `setCca`, sepolia.json schema @cursor
+- [x] Web bid / CCALens / claim / migrate / v4 swap + collect on existing screens @cursor
 
 ## If there is time
 

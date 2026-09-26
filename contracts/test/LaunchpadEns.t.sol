@@ -35,7 +35,9 @@ contract LaunchpadEnsTest is LaunchpadTestBase {
     string internal constant SENTENCE = "Every hackathon badge is an ENS name by 2028";
     uint64 internal constant DEADLINE = 1893456000;
 
-    event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
+    event Launched(
+        address indexed token, address indexed prophet, address indexed auction, string prophetLabel, string slug
+    );
 
     function setUp() public {
         signer = vm.addr(SIGNER_PK);
@@ -46,9 +48,6 @@ contract LaunchpadEnsTest is LaunchpadTestBase {
         parent = new LockRegistry();
         actor = new LockActor();
         vm.deal(address(actor), 10 ether);
-
-        // First Launchpad deploy also links CurveMath; do that before predicting.
-        new Launchpad(protocol, signer, IProphecyEns(address(new MockProphecyEns())));
 
         uint64 nonce = vm.getNonce(address(this));
         address predictedPad = vm.computeCreateAddress(address(this), nonce + 1);
@@ -62,6 +61,7 @@ contract LaunchpadEnsTest is LaunchpadTestBase {
         );
         launchpad = new Launchpad(protocol, signer, IProphecyEns(address(realEns)));
         require(address(launchpad) == predictedPad, "launchpad address");
+        _wireCcaMocks(launchpad);
 
         Grant[] memory grants = new Grant[](1);
         grants[0] = Grant({account: address(realEns), roleBitmap: ROLE_REGISTRAR});
@@ -72,10 +72,11 @@ contract LaunchpadEnsTest is LaunchpadTestBase {
         _registerActor();
         address predictedToken = vm.computeCreateAddress(address(launchpad), vm.getNonce(address(launchpad)));
         vm.expectEmit(true, true, false, true, address(launchpad));
-        emit Launched(predictedToken, address(actor), PROPHET, SLUG);
+        emit Launched(predictedToken, address(actor), address(0), PROPHET, SLUG);
 
         vm.prank(address(actor));
-        address token = launchpad.launch(SLUG, SENTENCE, DEADLINE, 0);
+        address token = launchpad.launch(SLUG, SENTENCE, DEADLINE);
+        assertTrue(launchpad.auctionOf(token) != address(0));
 
         assertEq(token, predictedToken);
         assertEq(ProphecyToken(token).name(), "badges-2028.ringo.prophecy.eth");
@@ -117,16 +118,16 @@ contract LaunchpadEnsTest is LaunchpadTestBase {
 
     function test_launchByNonProphetReverts() public {
         vm.expectRevert(Launchpad.NotProphet.selector);
-        launchpad.launch(SLUG, SENTENCE, DEADLINE, 0);
+        launchpad.launch(SLUG, SENTENCE, DEADLINE);
     }
 
     function test_reusedSlugReverts() public {
         _registerActor();
         vm.prank(address(actor));
-        launchpad.launch(SLUG, SENTENCE, DEADLINE, 0);
+        launchpad.launch(SLUG, SENTENCE, DEADLINE);
         vm.prank(address(actor));
         vm.expectRevert(Launchpad.SlugTaken.selector);
-        launchpad.launch(SLUG, "a different sentence", DEADLINE, 0);
+        launchpad.launch(SLUG, "a different sentence", DEADLINE);
     }
 
     function _registerActor() internal {

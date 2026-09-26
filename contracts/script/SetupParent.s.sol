@@ -28,7 +28,7 @@ interface IETHRegistry {
 }
 
 /// After prophecy.eth is registered, order is:
-///   deployUserRegistry → Deploy.s.sol (adapter then Launchpad, one broadcast)
+///   deployUserRegistry → Deploy.s.sol (adapter, Launchpad, Hook, Locker, setUniswap, setCca)
 ///   → linkParent → grantAdapterRegistrar.
 /// Do not lock the parent name here (irreversible; later lock PR).
 ///
