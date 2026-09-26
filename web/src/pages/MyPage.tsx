@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
-import { quoteSell } from "../lib/curve";
-import { eth, mcap, tokens } from "../lib/format";
-import { entryMcap, marketCap, myPosition, useStore, type Coin, type Position } from "../lib/store";
+import { price, quoteSell } from "../lib/curve";
+import { eth, tokens } from "../lib/format";
+import { myPosition, useStore, type Coin, type Position } from "../lib/store";
 
 export function MyPage() {
   const s = useStore();
@@ -60,8 +60,8 @@ export function MyPage() {
                     </span>
                   </span>
                   <span className="num col-mid">{tokens(pos.tokens)}</span>
-                  <span className="num col-mid">{mcap(entryMcap(pos))}</span>
-                  <span className="num col-mid">{mcap(marketCap(coin))}</span>
+                  <span className="num col-mid">{eth(pos.cost / pos.tokens, 12)}</span>
+                  <span className="num col-mid">{eth(price(coin), 12)}</span>
                   <span className="num strong">{eth(value)}</span>
                   <span className="num col-opt">{talk}</span>
                 </Link>
