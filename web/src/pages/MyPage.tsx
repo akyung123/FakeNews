@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { price, quoteSell } from "../lib/curve";
-import { eth, tokens } from "../lib/format";
+import { eth, gwei, tokens } from "../lib/format";
 import { myPosition, useStore, type Coin, type Position } from "../lib/store";
 
 export function MyPage() {
@@ -60,8 +60,8 @@ export function MyPage() {
                     </span>
                   </span>
                   <span className="num col-mid">{tokens(pos.tokens)}</span>
-                  <span className="num col-mid">{eth(pos.cost / pos.tokens, 12)}</span>
-                  <span className="num col-mid">{eth(price(coin), 12)}</span>
+                  <span className="num col-mid">{gwei(pos.cost / pos.tokens)}</span>
+                  <span className="num col-mid">{gwei(price(coin))}</span>
                   <span className="num strong">{eth(value)}</span>
                   <span className="num col-opt">{talk}</span>
                 </Link>

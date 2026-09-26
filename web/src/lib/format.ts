@@ -2,6 +2,11 @@ export function eth(value: number, digits = 3): string {
   return `${value.toFixed(digits)} ETH`;
 }
 
+/** ETH per token as gwei with four significant digits. */
+export function gwei(ethValue: number): string {
+  return `${Number((ethValue * 1e9).toPrecision(4))} gwei`;
+}
+
 /** Format the current price as an ETH figure. */
 export function mcap(value: number): string {
   return `${value < 10 ? value.toFixed(2) : value.toFixed(1)} ETH`;
