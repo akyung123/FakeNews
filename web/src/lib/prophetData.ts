@@ -13,6 +13,7 @@ import { CURVE_SUPPLY as PROTOTYPE_CURVE_SUPPLY } from "./curve";
 import { mockEnsAddress, mockEnsText, ENS_TEXT_PROPHECY } from "./ens";
 import { isMockMode } from "./mode";
 import { GRADUATION_ETH, MOCK_PARENT_NAME, MOCK_PROPHETS, MOCK_PROPHECIES } from "./mock";
+import { slugOf } from "./ensName";
 import { marketCap, type Coin } from "./store";
 
 /** Curve supply from SPEC.md. Used only to turn `sold` into a 0–1 bar. */
@@ -35,6 +36,10 @@ export type ProphetProphecy = {
   complete: boolean;
   /** 0–1 share of CURVE_SUPPLY already sold. 1 when graduated. */
   curveProgress: number;
+  /** CCA auction from the Launched log. Chain rows only. */
+  auction?: Address;
+  /** Block of the Launched log. Chain rows only. */
+  launchedBlock?: number;
 };
 
 export type ProphetPageData = {
@@ -220,4 +225,52 @@ function toProphetProphecy(row: (typeof MOCK_PROPHECIES)[number]): ProphetProphe
 
 function bySlug(a: ProphetProphecy, b: ProphetProphecy): number {
   return a.slug.localeCompare(b.slug);
+}
+
+/** A Launched-log coin (launched.ts) as a prophet-page row. Sentence comes from ENS, never the log. */
+export function prophecyFromCoin(coin: Coin): ProphetProphecy | null {
+  const token = coin.token;
+  if (!token) return null;
+  return {
+    slug: slugOf(coin.name) || coin.ticker.toLowerCase(),
+    ensName: coin.name,
+    sentence: coin.prophecy,
+    token,
+    sold: 0n,
+    complete: Boolean(coin.complete),
+    curveProgress: coin.complete ? 1 : 0,
+    auction: coin.auction,
+    launchedBlock: coin.launchedBlock,
+  };
+}
+
+/** Chain rows for one prophet label, newest launch first. */
+export function prophetProphecies(label: string, coins: readonly Coin[]): ProphetProphecy[] {
+  const key = label.toLowerCase();
+  const out: ProphetProphecy[] = [];
+  for (const coin of coins) {
+    if (!coin.fromChain || coin.creator.toLowerCase() !== key) continue;
+    const row = prophecyFromCoin(coin);
+    if (row) out.push(row);
+  }
+  return out.sort(byNewest);
+}
+
+function mockOrder(row: ProphetProphecy): number {
+  return MOCK_PROPHECIES.findIndex((item) => item.token.toLowerCase() === row.token.toLowerCase());
+}
+
+function byNewest(a: ProphetProphecy, b: ProphetProphecy): number {
+  const rank = (row: ProphetProphecy) => row.launchedBlock ?? mockOrder(row);
+  return rank(b) - rank(a);
+}
+
+/** Newest launch first: Launched block on chain, sample record order in demo mode. */
+export function newestFirst(rows: readonly ProphetProphecy[]): ProphetProphecy[] {
+  return [...rows].sort(byNewest);
+}
+
+/** Most recent prophecy: highest Launched block on chain, last sample record in demo mode. */
+export function latestProphecy(rows: readonly ProphetProphecy[]): ProphetProphecy | null {
+  return newestFirst(rows)[0] ?? null;
 }

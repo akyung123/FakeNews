@@ -50,7 +50,7 @@ describe("chain-mode token detail", () => {
     expect(screen.queryByText("Prophecy not found")).toBeNull();
   });
 
-  it("hides the trade box and never sends for a mock coin", async () => {
+  it("does not show or send for a demo seed coin", async () => {
     actions.reset();
     const sendBuy = vi.fn(async () => true);
     const sendSell = vi.fn(async () => true);
@@ -66,7 +66,9 @@ describe("chain-mode token detail", () => {
         </MemoryRouter>
       </Web3Provider>,
     );
-    await waitFor(() => expect(screen.getByText(/venue Wi-Fi dies/i)).toBeInTheDocument());
+    // Demo seed rows never show in chain mode.
+    await waitFor(() => expect(screen.getByText("Prophecy not found")).toBeInTheDocument());
+    expect(screen.queryByText(/venue Wi-Fi dies/i)).toBeNull();
     expect(document.querySelector(".trade")).toBeNull();
     expect(screen.queryByLabelText(/^Memo$/i)).toBeNull();
     expect(screen.queryByText("Amount (ETH)")).toBeNull();

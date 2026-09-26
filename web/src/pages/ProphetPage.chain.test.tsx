@@ -58,15 +58,16 @@ describe("chain-mode prophet page", () => {
     createClaim.mockRestore();
   });
 
-  it("hides Claim fees on a mock prophet in chain mode", async () => {
-    render(
+  it("never falls back to a sample prophet in chain mode", async () => {
+    const { container } = render(
       <MemoryRouter initialEntries={["/p/ringo"]}>
         <Routes>
           <Route path="/p/:name" element={<ProphetPage loadProphet={async () => null} />} />
         </Routes>
       </MemoryRouter>,
     );
-    await waitFor(() => expect(screen.getByText("ringo.prophecy.eth")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Prophet not found")).toBeInTheDocument());
+    expect(container.innerHTML).not.toContain("ringo");
     expect(screen.queryByRole("button", { name: /Claim fees/i })).toBeNull();
   });
 });

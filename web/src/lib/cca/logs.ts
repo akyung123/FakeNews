@@ -18,7 +18,7 @@ import type { Address } from "viem";
 import { LAUNCHED_LOOKBACK_BLOCKS, launchedFromBlock } from "../launchpad";
 import { ccaAbi } from "./abi/cca";
 
-export type CcaAuctionEvent = "BidSubmitted" | "BidExited" | "TokensClaimed";
+export type CcaAuctionEvent = "BidSubmitted" | "BidExited" | "TokensClaimed" | "ClearingPriceUpdated";
 
 export const CCA_LOG_CHUNK_BLOCKS = LAUNCHED_LOOKBACK_BLOCKS;
 
