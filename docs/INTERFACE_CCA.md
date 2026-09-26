@@ -18,6 +18,7 @@ Read on 2026-09-26. Every external signature below is copied from these pins. If
 | CCALens | tag `v2.1.0` (lens source) / deployed **v2.0.0** commit `aee9bca51c92c24eb24a00d75ad98e678bac61d3` | [`CCALens.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/v2.1.0/src/lens/CCALens.sol) = `AuctionStateLens` + `TickDataLens`. Address from the CCA README Deployments table |
 | LBPStrategy **v3.3.0** | commit `1c5904912aefceaceb89c24528cd5e25d0b61597` (no `v3.3.0` git tag exists) | [`IStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IStrategy.sol), [`ILBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/ILBPStrategy.sol), [`LBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/strategies/lbp/LBPStrategy.sol), [`MigratorParams.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/libraries/MigratorParams.sol) |
 | InitializerHook **v3.3.0** | source at `1c590491…`; Sepolia deploy commit `7ea523c9d75a51cb2f497be5e49bacdaeb80a342` | [`InitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/periphery/hooks/InitializerHook.sol), [`IInitializerHook.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/IInitializerHook.sol) |
+| Uniswap v4-core `IPoolManager` | tag `v4.0.0`, commit `e50237c43811bd9b526eff40f26772152a42daba` | [`IPoolManager.sol`](https://github.com/Uniswap/v4-core/blob/e50237c43811bd9b526eff40f26772152a42daba/src/interfaces/IPoolManager.sol) `Swap` / `Initialize`; [`PoolId.sol`](https://github.com/Uniswap/v4-core/blob/e50237c43811bd9b526eff40f26772152a42daba/src/types/PoolId.sol) `toId` = `keccak256(abi.encode(poolKey))` |
 | Uniswap v4 Sepolia | [v4 deployments](https://docs.uniswap.org/contracts/v4/deployments) | PoolManager, PositionManager, Universal Router 2.1.2, StateView, Quoter, Permit2 |
 | Universal Router `execute` | [`IUniversalRouter.sol` on `main`](https://github.com/Uniswap/universal-router/blob/main/contracts/interfaces/IUniversalRouter.sol) | signature only; **V4_SWAP command bytes are `TBD(backend)`** — tag `v2.1.2` was not fetchable from this environment |
 | PositionManager collect actions | [`IPositionManager.sol` on `main`](https://github.com/Uniswap/v4-periphery/blob/main/src/interfaces/IPositionManager.sol) | `modifyLiquidities` only; **action-byte encoding is `TBD(backend)`** |
@@ -552,6 +553,125 @@ Optional reads: StateView `0xe1dd9c3fa50edb962e442f60dfbc432e24537e4c`, Quoter `
 
 UI v2 chrome (DECISIONS #17) still applies. The trade controls on this branch are bid / claim / open market / swap, not curve Buy / Sell.
 
+## 4.8 Events for the prophet page and Following feed
+
+Web-only follow. No new route, no new contract, no server. The existing prophet page `/p/:name` gets a **Follow** button (prophet labels in `localStorage` only) and a list of that prophet's CCA bids and v4 swaps. A **Following** tab on the existing home chrome (same `/` — not a new path) aggregates followed prophets' new prophecies and trades. Every row is an on-chain log. Sentence and deadline still come from that prophecy's ENS resolver (DECISIONS #5), never from these events.
+
+Do not use the curve `Trade` / `Graduated` events on this branch (`removed-on-cca`). Read only the signatures below.
+
+Join rule: **`Launched` is the only event that names the prophet.** CCA bid logs name the bidder (`owner`), not the prophet. v4 `Swap` names the pool (`id`) and the caller (`sender`), not the prophet and not the user. Web first filters `Launched` by `prophet`, then walks `auction` / `token` → bid logs and `PoolId` → `Swap`.
+
+`fromBlock` for Launchpad logs is `VITE_LAUNCHPAD_DEPLOY_BLOCK`. CCA logs start at that auction's create block (the `Launched` receipt). PoolManager `Swap` is filtered by `PoolId` topic, not scanned from genesis.
+
+### 4.8.1 Our launch event — `prophet` is an indexed topic
+
+Proposed on this file (section 2). Copied here so the feed can subscribe without opening another section.
+
+```solidity
+event Launched(
+    address indexed token,      // topic[1]
+    address indexed prophet,    // topic[2] — YES, indexed
+    address indexed auction,    // topic[3]
+    string prophetLabel,
+    string slug
+);
+```
+
+- **`prophet` is an indexed topic.** The Following tab and `/p/:name` filter Launchpad `Launched` with `topics[2] = prophet wallet`. Resolve `/p/:name` → `<name>.prophecy.eth` (coinType 60) for that wallet.
+- The curve Launchpad on `main` (`contracts/src/Launchpad.sol` L112) already indexes `prophet` the same way; it does not have `auction`. `cca` keeps the index and adds `auction` as the third indexed field (Solidity max).
+- `Launched` still does **not** contain the sentence or the deadline.
+- New prophecy on the Following tab = one `Launched` for a followed `prophet`.
+- Do not ship `cca` without `indexed prophet`. The proposed signature already has it, so this is not a new contract request.
+
+`ProphetRegistered(address indexed wallet, string label, uint256 nullifier)` is how a wallet maps to a label. It is not a prophecy and is not a Following-feed row.
+
+### 4.8.2 Official CCA bid / claim / exit — `owner` is indexed
+
+Address: the CCA at `Launched.auction` / `auctionOf(token).auction`. Pin `7d7602d` [`IContinuousClearingAuction.sol`](https://github.com/Uniswap/continuous-clearing-auction/blob/7d7602d257733315434570f2a0c2f94f1c7b207a/src/interfaces/IContinuousClearingAuction.sol).
+
+```solidity
+event BidSubmitted(uint256 indexed id, address indexed owner, uint256 priceQ96, uint128 amount);
+event BidExited(uint256 indexed bidId, address indexed owner, uint256 tokensFilled, uint256 currencyRefunded);
+event TokensClaimed(uint256 indexed bidId, address indexed owner, uint256 tokensFilled);
+```
+
+| Event | Indexed topics | Prophet on the log? |
+|---|---|---|
+| `BidSubmitted` | `id` (bid id), **`owner` (bidder — YES, indexed)** | No. Join via the auction address |
+| `BidExited` | `bidId`, **`owner` (YES, indexed)** | No |
+| `TokensClaimed` | `bidId`, **`owner` (YES, indexed)** | No |
+
+- The bidder / owner **is indexed**. Filter one auction with `topics[2] = owner` for that wallet's bids, or omit the owner topic to list every bid on that prophet's auction.
+- There is **no** prophet, token, or slug field. A prophet page that shows “this prophet's bids” queries `BidSubmitted` on each auction from that prophet's `Launched` logs.
+- `CheckpointUpdated` / `ClearingPriceUpdated` / `TokensReceived` have no indexed owner and are not Following-feed rows.
+- Failed-auction full refund is still `BidExited` after `exitBid` (section 4.5). Show it as **Get back unused ETH**, not as a new prophecy.
+
+### 4.8.3 Official v4 `Swap` — `sender` is usually the router
+
+Address: PoolManager `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543`. Pin `e50237c` [`IPoolManager.sol`](https://github.com/Uniswap/v4-core/blob/e50237c43811bd9b526eff40f26772152a42daba/src/interfaces/IPoolManager.sol) (`v4.0.0`).
+
+```solidity
+event Swap(
+    PoolId indexed id,          // topic[1] — bytes32 PoolId
+    address indexed sender,     // topic[2] — the address that called PoolManager.swap
+    int128 amount0,
+    int128 amount1,
+    uint160 sqrtPriceX96,
+    uint128 liquidity,
+    int24 tick,
+    uint24 fee
+);
+```
+
+- **`sender` is not the user.** Official comment: “the address that initiated the swap call, and that received the callback.” `PoolManager._swap` emits `msg.sender`. After migrate, product swaps go through Universal Router `0x7E4f6c5e954Da5c61B3423D81E2277431Ac043f3`, so `sender` is usually that router (or `PoolSwapTest` in a fork harness). Do not display `sender` as the person who traded. Do not filter Following by `sender` = prophet.
+- There is **no** user, prophet, or token field on `Swap`. Amounts are pool deltas (`amount0` = ETH, `amount1` = token, because `currency0` is native ETH).
+- If the feed must show the wallet that swapped: **`TBD(backend)`** — no official user-indexed swap event. Do not invent one in web. `tx.from` is not an ABI and is not specified here.
+
+#### Link a `PoolId` to a prophecy
+
+`PoolId` is `bytes32`. Official `PoolIdLibrary.toId` equals `keccak256(abi.encode(poolKey))` ([`PoolId.sol` at `e50237c`](https://github.com/Uniswap/v4-core/blob/e50237c43811bd9b526eff40f26772152a42daba/src/types/PoolId.sol)).
+
+Our `PoolKey` after a successful migrate (section 4.6):
+
+| Field | Value |
+|---|---|
+| `currency0` | native ETH (`address(0)`) — always the lower address |
+| `currency1` | prophecy **token** (`Launched.token`) |
+| `fee` | `10000` |
+| `tickSpacing` | `200` |
+| `hooks` | `ProphecyHook` (`launchpad.hook()` / `VITE_HOOK_ADDRESS`) |
+
+```
+token  →  PoolKey  →  poolId = keccak256(abi.encode(key))  →  Swap.id
+```
+
+Other official joins (use when the key is not yet reconstructed):
+
+| Source | What it gives | Pin |
+|---|---|---|
+| `Launched.token` / `Launched.auction` | prophecy → token and CCA | this file |
+| `Launchpad.auctionOf(token)` | `(auction, poolOpened)` | this file |
+| `CCA.token()` / `CCA.currency()` | auction → token (ETH = `address(0)`) | `7d7602d` `IContinuousClearingAuction` |
+| `LBPStrategy.Migrated(initializer, key, …)` | `initializer` (auction) is indexed. Indexed `PoolKey` topic is the `keccak256` of the key = **`PoolId`** | `1c590491` [`ILBPStrategy.sol`](https://github.com/Uniswap/liquidity-launcher/blob/1c5904912aefceaceb89c24528cd5e25d0b61597/src/interfaces/ILBPStrategy.sol) |
+| `LBPStrategy.registeredPoolIds(poolId)` | auction while registered; official comment: **zeroed when migrated** — do not use it after the pool is open | `1c590491` `LBPStrategy.sol` L52–L53 |
+| `PoolManager.Initialize` | `id` indexed; `currency0` / `currency1` indexed. `currency1` = token. Confirm `fee` / `tickSpacing` / `hooks` in data | `e50237c` `IPoolManager` |
+
+```solidity
+event Initialize(
+    PoolId indexed id,
+    Currency indexed currency0,
+    Currency indexed currency1,
+    uint24 fee,
+    int24 tickSpacing,
+    IHooks hooks,
+    uint160 sqrtPriceX96,
+    int24 tick
+);
+event Migrated(ILBPInitializer indexed initializer, PoolKey indexed key, uint160 initialSqrtPriceX96, bytes plan);
+```
+
+Web path for one prophet: `Launched(prophet)` → each `token` → `poolId` from the key above (or `Migrated` for that `auction`) → `Swap` where `id = poolId`. Before migrate there is no pool and no `Swap`.
+
 ## 5. Environment variables and `deployments/sepolia.json`
 
 | Name | Used by |
@@ -698,6 +818,7 @@ Copy these into the contracts PR. Do not invent answers here.
 14. Universal Router 2.1.2 `V4_SWAP` command + inputs encoding.
 15. Whether `receive()` must accept ETH from LBPStrategy / PositionManager when Launchpad is `recipient`.
 16. Hook CREATE2 flags if any permission besides `BEFORE_INITIALIZE` is added.
+17. If the Following feed must show the wallet that swapped: there is no official user field on `Swap` (`sender` is the router). Do not invent a user-indexed event in web.
 
 ## 11. Copy (user-facing)
 
