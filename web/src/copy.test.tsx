@@ -115,8 +115,10 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(graduated).toContain("100% 0.0200 of 0.02 ETH to graduate");
     expect(graduated).not.toContain("Curve progress");
     expect(graduated).not.toContain("3.74 ETH");
-    expect(graduated).not.toContain(">Buy<");
-    expect(graduated).not.toContain(">Sell<");
+    // Buy / Sell here are the pool swap tabs, not the curve trade box.
+    expect(graduated).toContain("Swap");
+    expect(graduated).not.toContain("Amount (ETH)");
+    expect(graduated).not.toContain("Amount (% of holding)");
     assertRemoved(graduated);
   });
 

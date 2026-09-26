@@ -11,6 +11,7 @@ import {
   uniswapGraduationHref,
   v4PoolId,
 } from "../lib/graduation";
+import { SWAP_SECTION_COPY } from "../lib/cca/copy";
 import { getProphecyByName, prototypeCoinFromName } from "../lib/prophetData";
 import { Web3Provider } from "../providers/Web3Provider";
 import { CoinPage, TradeBox } from "./CoinPage";
@@ -62,7 +63,7 @@ describe("Screen 3 name route", () => {
 });
 
 describe("graduated trade panel", () => {
-  test("hides Buy/Sell and shows the three designer lines", () => {
+  test("swaps in the pool instead of the curve, and still links to the pool", () => {
     Date.now = () => NOW * 1000;
     try {
       const ens = "sold-out.ringo.prophecy.eth";
@@ -75,10 +76,14 @@ describe("graduated trade panel", () => {
       expect(html).toContain(GRADUATED_LINK);
       expect(html).toContain(uniswapGraduationHref({ graduated: true, poolId, token: row.token }));
       expect(html).not.toContain("Curve progress");
-      expect(html).not.toContain(">Buy<");
-      expect(html).not.toContain(">Sell<");
-      expect(html).not.toContain("Amount (ETH)");
       expect(html).not.toContain("Curve sold out");
+
+      // The curve trade box is gone; the pool swap takes its place.
+      expect(html).not.toContain("Amount (ETH)");
+      expect(html).not.toContain("Amount (% of holding)");
+      expect(html).toContain(SWAP_SECTION_COPY.title);
+      expect(html).toContain(SWAP_SECTION_COPY.buyField);
+      expect(html).toContain("Buy SOLD-OUT");
     } finally {
       Date.now = realNow;
     }

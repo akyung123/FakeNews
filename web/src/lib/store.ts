@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { TOTAL_SUPPLY, marketCap, price, quoteBuy, quoteSell, type CurveState } from "./curve";
-import { SEED_COINS, SEED_EVENTS } from "./mock";
+import { LP_SUPPLY, TOTAL_SUPPLY, marketCap, price, quoteBuy, quoteSell, type CurveState } from "./curve";
+import { GRADUATION_ETH, SEED_COINS, SEED_EVENTS } from "./mock";
 
 /**
  * Prototype store: everything lives in this browser (localStorage).
@@ -10,6 +10,9 @@ import { SEED_COINS, SEED_EVENTS } from "./mock";
 export const YOU = "you";
 const START_BALANCE = 0.05;
 const STORAGE_KEY = "prophecy:v4";
+
+/** Pool fee on the graduated market: 1%, the fee the v4 pool is opened with. */
+const POOL_FEE = 0.01;
 
 export type Coin = CurveState & {
   id: string;
@@ -25,6 +28,8 @@ export type Coin = CurveState & {
   complete?: boolean;
   /** Set when the row came from a Launched log or a live launch receipt. */
   fromChain?: boolean;
+  /** Demo-only v4 pool, seeded at graduation. On Sepolia the real pool holds these. */
+  pool?: { eth: number; tokens: number };
 };
 
 /** A one-line memo attached to a trade. */
@@ -84,6 +89,73 @@ function applyBuy(state: State, user: string, coinId: string, ethIn: number, at:
       [user]: { ...state.positions[user], [coinId]: { tokens: prev.tokens + q.tokens, cost: prev.cost + q.eth } },
     },
     balance: user === YOU ? state.balance - q.eth : state.balance,
+  };
+}
+
+/**
+ * The pool a graduated coin trades in once the curve is closed: the LP reserve
+ * and the ETH the curve collected. Demo only — on Sepolia these live in v4.
+ */
+export function poolOf(coin: Coin): { eth: number; tokens: number } {
+  return coin.pool ?? { eth: GRADUATION_ETH, tokens: LP_SUPPLY };
+}
+
+export function poolPrice(coin: Coin): number {
+  const { eth, tokens } = poolOf(coin);
+  return tokens > 0 ? eth / tokens : 0;
+}
+
+/** Constant product with the pool's 1% fee, the same shape as a v4 swap. */
+export function quotePool(
+  coin: Coin,
+  side: "buy" | "sell",
+  amountIn: number,
+): { out: number; pool: { eth: number; tokens: number } } {
+  const { eth, tokens } = poolOf(coin);
+  const inAfterFee = amountIn * (1 - POOL_FEE);
+  if (inAfterFee <= 0) return { out: 0, pool: { eth, tokens } };
+  if (side === "buy") {
+    const out = (tokens * inAfterFee) / (eth + inAfterFee);
+    return { out, pool: { eth: eth + amountIn, tokens: tokens - out } };
+  }
+  const out = (eth * inAfterFee) / (tokens + inAfterFee);
+  return { out, pool: { eth: eth - out, tokens: tokens + amountIn } };
+}
+
+function applyPoolSwap(
+  state: State,
+  user: string,
+  coinId: string,
+  side: "buy" | "sell",
+  amountIn: number,
+  at: number,
+): State {
+  const coin = state.coins.find((c) => c.id === coinId);
+  if (!coin) return state;
+  const prev = state.positions[user]?.[coinId] ?? { tokens: 0, cost: 0 };
+  const capped =
+    side === "buy" ? Math.min(amountIn, state.balance) : Math.min(amountIn, prev.tokens);
+  if (capped <= 0) return state;
+
+  const { out, pool } = quotePool(coin, side, capped);
+  if (out <= 0) return state;
+
+  const next: Coin = { ...coin, pool };
+  next.history = [...coin.history, { at, mcap: (pool.eth / pool.tokens) * TOTAL_SUPPLY }];
+
+  const held =
+    side === "buy"
+      ? { tokens: prev.tokens + out, cost: prev.cost + capped }
+      : {
+          tokens: prev.tokens - capped,
+          cost: prev.tokens > 0 ? prev.cost * ((prev.tokens - capped) / prev.tokens) : 0,
+        };
+
+  return {
+    ...state,
+    coins: state.coins.map((c) => (c.id === coinId ? next : c)),
+    positions: { ...state.positions, [user]: { ...state.positions[user], [coinId]: held } },
+    balance: user === YOU ? state.balance + (side === "buy" ? -capped : out) : state.balance,
   };
 }
 
@@ -207,6 +279,10 @@ export const actions = {
   },
   sell(coinId: string, tokens: number) {
     set(applySell(state, YOU, coinId, tokens, Date.now()));
+  },
+  /** Demo stand-in for a v4 swap. On Sepolia the router does this, not the store. */
+  poolSwap(coinId: string, side: "buy" | "sell", amountIn: number) {
+    set(applyPoolSwap(state, YOU, coinId, side, amountIn, Date.now()));
   },
   comment(coinId: string, text: string) {
     set(applyComment(state, YOU, coinId, text, Date.now()));

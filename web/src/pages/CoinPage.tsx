@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { parseUnits } from "viem";
+import { formatEther, parseEther, parseUnits } from "viem";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
 import { SampleBadge } from "../components/SampleBadge";
+import { PriceChart } from "../components/PriceChart";
+import { SwapBox } from "../components/SwapBox";
 import { TokenName, tokenDisplayName } from "../components/TokenName";
+import { usePoolPrice } from "../lib/cca/usePoolPrice";
 import { hasLaunchpad } from "../lib/contracts";
 import { graduated, progress, quoteBuy, quoteSell, TOTAL_SUPPLY } from "../lib/curve";
 import { ago, eth, gwei, tokens } from "../lib/format";
@@ -27,6 +30,7 @@ import {
   actions,
   myPosition,
   price,
+  poolPrice as demoPoolPrice,
   useStore,
   type Coin,
 } from "../lib/store";
@@ -89,6 +93,7 @@ export function CoinPage({
   const coin = chain ? (fromStore ?? chainCoin) : (fromStore ?? prototypeCoinFromName(lookup));
   const token = coin ? (coin.token ?? getProphecyByName(coin.name)?.token) : undefined;
   const graduation = useGraduation(token, coin ? graduated(coin) : false);
+  const poolPrice = usePoolPrice(token, graduation.hooks);
   if (!coin) {
     if (chain && !chainReady) {
       return <main className="coin-page" />;
@@ -105,6 +110,18 @@ export function CoinPage({
 
   const pos = myPosition(s, coin.id);
   const talk = s.comments.filter((c) => c.coinId === coin.id).sort((a, b) => b.at - a.at);
+  const poolPriceEth = Number(formatEther(poolPrice.priceWei));
+  // Demo mode has no chain to read, so a graduated coin prices from the local pool.
+  const demoPool = !chain && graduation.graduated;
+  const shownPrice = poolPrice.open
+    ? poolPriceEth
+    : demoPool
+      ? demoPoolPrice(coin)
+      : price(coin);
+  // Once the pool is open its slot0 is the price; before that, the curve history is.
+  const chartPoints = poolPrice.open
+    ? poolPrice.history.map((p) => ({ at: p.at, value: Number(formatEther(p.wei)) }))
+    : coin.history.map((h) => ({ at: h.at / 1000, value: h.mcap / TOTAL_SUPPLY }));
 
   return (
     <main className="coin-page">
@@ -123,10 +140,16 @@ export function CoinPage({
             </div>
           </div>
           <h1 className="prophecy-title">{coin.prophecy}</h1>
-          <p className="price-now">{gwei(price(coin))}</p>
+          <p className="price-now">{gwei(shownPrice)}</p>
           <p className="big-num">{curveProgressHeader(coin)}</p>
           {graduation.graduated ? null : <p className="faint">Curve progress</p>}
-          <Sparkline coin={coin} />
+          <PriceChart
+            points={chartPoints}
+            label={poolPrice.open ? "Pool price (ETH)" : "Price (ETH)"}
+            live={poolPrice.open}
+            format={(value) => gwei(value)}
+            emptyText="No trades yet. The chart starts with the first trade."
+          />
           <Bar value={progress(coin)} labelled />
         </section>
 
@@ -147,7 +170,27 @@ export function CoinPage({
 
       <aside className="stack side">
         {graduation.graduated ? (
-          <GraduationPanel href={uniswapGraduationHref(graduation)} />
+          <>
+            <SwapBox
+              token={token}
+              hooks={graduation.hooks}
+              symbol={coin.ticker}
+              poolOpen={poolPrice.open || !chain}
+              sqrtPriceX96={poolPrice.sqrtPriceX96}
+              demoPriceEth={chain ? undefined : demoPoolPrice(coin)}
+              ethBalanceWei={chain ? undefined : parseEther(s.balance.toFixed(18))}
+              tokenBalanceWei={chain ? undefined : parseEther((pos?.tokens ?? 0).toFixed(18))}
+              sendSwap={chain ? undefined : async () => false}
+              onLocalTrade={({ zeroForOne, amountIn }) => {
+                actions.poolSwap(
+                  coin.id,
+                  zeroForOne ? "buy" : "sell",
+                  Number(formatEther(amountIn)),
+                );
+              }}
+            />
+            <GraduationPanel href={uniswapGraduationHref(graduation)} />
+          </>
         ) : !chain || isChainWriteTarget(coin) ? (
           <TradeBox
             coin={coin}
@@ -383,21 +426,3 @@ function curveProgressHeader(coin: Coin): string {
   return `${pctFilled}% ${raised.toFixed(4)} of ${GRADUATION_ETH} ETH to graduate`;
 }
 
-function Sparkline({ coin }: { coin: Coin }) {
-  const points = coin.history.map((h) => h.mcap / TOTAL_SUPPLY);
-  if (points.length < 2) return null;
-  const w = 600;
-  const h = 120;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const span = max - min || 1;
-  const d = points
-    .map((v, i) => `${i === 0 ? "M" : "L"}${((i / (points.length - 1)) * w).toFixed(1)},${(h - ((v - min) / span) * (h - 8) - 4).toFixed(1)}`)
-    .join(" ");
-  const up = points[points.length - 1] >= points[0];
-  return (
-    <svg className={`spark ${up ? "up" : "down"}`} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-label="Price over time">
-      <path d={d} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
-}
