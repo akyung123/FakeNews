@@ -206,8 +206,9 @@ export function TradeBox({
   const sellTokens = Math.min(held, (held * Math.min(value, 100)) / 100);
   const sellQuote = quoteSell(coin, sellTokens).eth;
   const cannotTrade = side === "buy" ? buyQuote.tokens <= 0 : sellTokens <= 0 || sellQuote <= 0;
-  const rawQuoteZero = side === "buy" ? quoteBuy(coin, value).tokens <= 0 : sellQuote <= 0;
-  const showTooSmallBanner = value > 0 && rawQuoteZero;
+  const rawBuyQuoteZero = quoteBuy(coin, value).tokens <= 0;
+  const rawSellQuoteZero = held > 0 && quoteSell(coin, (held * Math.min(value, 100)) / 100).eth <= 0;
+  const showTooSmallBanner = value > 0 && (side === "buy" ? rawBuyQuoteZero : rawSellQuoteZero);
   const writeTarget = isChainWriteTarget(coin);
   const showWrites = !chain || writeTarget;
 
