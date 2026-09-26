@@ -4,17 +4,8 @@ out = "out"
 libs = ["lib"]
 test = "test"
 solc_version = "0.8.24"
-optimizer = true
-optimizer_runs = 200
 via_ir = true
-fs_permissions = [
-    { access = "read", path = "./" },
-    { access = "read", path = "../docs/fixtures" },
-]
+fs_permissions = [{ access = "read", path = "./" }]
 
 [fuzz]
 runs = 256
-
-[invariant]
-runs = 64
-depth = 16

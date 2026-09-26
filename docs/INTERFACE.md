@@ -28,12 +28,8 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 
 ### `Launchpad` `(draft)`
 
-M1 implements the bonding curve: `launch` mints a token and opens reserves, then `buy` / `sell` / quotes / `claimCreatorFee`. `registerProphet` and the ENS writes inside `launch` come in later milestones. `launch` still takes `prophecy` and `deadline` so the ABI can stay stable; they are **not** written to storage or events (DECISIONS #5). The buy that fills the last curve tokens sets `complete` and refunds leftover ETH. Moving liquidity into a Uniswap V4 pool is later.
-
-The protocol fee recipient is still not decided (DECISIONS). It is passed to the Launchpad constructor at deploy; nothing in the repo hardcodes that address. `claimProtocolFee` can be called by anyone; the ETH goes only to that recipient.
-
 ```solidity
-constructor(address protocolFeeRecipient);
+constructor(address protocolFeeRecipient, address worldSigner);
 
 // Create a prophet name. Needs a World ID server signature. Once per nullifier.
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
@@ -46,7 +42,6 @@ function launch(string slug, string prophecy, uint64 deadline, uint256 minTokens
 function buy(address token, uint256 minTokensOut, string memo) external payable;
 function sell(address token, uint256 tokensIn, uint256 minEthOut, string memo) external;
 function claimCreatorFee() external;
-function claimProtocolFee() external;
 
 // views
 function curve(address token) external view returns (
@@ -55,29 +50,25 @@ function quoteBuy(address token, uint256 ethIn) external view returns (uint256 t
 function quoteSell(address token, uint256 tokensIn) external view returns (uint256 ethOut, uint256 fee);
 function prophetOf(address wallet) external view returns (string label);
 function creatorFeeOf(address wallet) external view returns (uint256);
-function protocolFees() external view returns (uint256);
 function protocolFeeRecipient() external view returns (address);
+function worldSigner() external view returns (address);
 ```
 
 ```solidity
 event ProphetRegistered(address indexed wallet, string label, uint256 nullifier);
-event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
+event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug, uint64 deadline);
 event Trade(address indexed token, address indexed trader, bool isBuy,
             uint256 ethAmount, uint256 tokenAmount, uint256 fee, uint256 vEthAfter, uint256 vTokenAfter, string memo);
 event Graduated(address indexed token, uint256 ethToPool, uint256 tokensToPool);
 event CreatorFeeClaimed(address indexed prophet, uint256 amount);
-event ProtocolFeeClaimed(address indexed recipient, uint256 amount);
 ```
 
-- The sentence and deadline are not in `Launched` or any other event. They are read from ENS (DECISIONS #5).
+- The sentence is not in `Launched`. It is read from ENS (DECISIONS #5).
 - Constants are exactly the "Constants" section of SPEC.md.
-- Reserves live in a per-token struct. Creator and protocol fees use a separate ledger, never `address(this).balance`.
 - `memo` is only emitted, never stored. `buy`/`sell` revert if it is longer than 140 bytes (DECISIONS #15).
 - Rounding:
-  - Buy: fee rounds up, tokens out round down. A buy that would take more than the remaining curve supply fills only that remainder and refunds leftover ETH.
+  - Buy: fee rounds up, tokens out round down.
   - Sell: fee rounds up, ETH out rounds down.
-- `quoteBuy` / `quoteSell` match `buy` / `sell` exactly, including the last-fill refund path (fee is taken on the ETH actually used). `quoteBuy` returns tokens the buyer receives. `quoteSell` returns ETH the seller receives (after fee).
-- Canonical quote integers for `web/src/lib/curve.ts` are [`docs/fixtures/curve-vectors.json`](fixtures/curve-vectors.json). Amounts are decimal strings in wei, produced from the SPEC formulas. Foundry vector tests read this file; the web helper should match every row.
 
 ### `ProphecyToken`
 
