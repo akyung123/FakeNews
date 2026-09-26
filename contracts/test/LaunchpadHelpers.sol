@@ -45,6 +45,14 @@ contract MockProphecyEns is IProphecyEns {
     }
 }
 
+contract MockAuthorizedHook {
+    address public authorized;
+
+    constructor(address authorized_) {
+        authorized = authorized_;
+    }
+}
+
 abstract contract LaunchpadTestBase is Test {
     uint256 internal constant SIGNER_PK =
         0x51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C51C5;
@@ -76,7 +84,7 @@ abstract contract LaunchpadTestBase is Test {
         mockStrategy = new MockLBPStrategy();
         mockPosm = new MockPositionManager();
         address dummyPm = address(uint160(0xB001));
-        address dummyHook = address(uint160(0x400C));
+        address dummyHook = address(new MockAuthorizedHook(address(mockStrategy)));
         mockLocker = new LiquidityLocker(IPoolManager(dummyPm), address(pad), IHooks(dummyHook));
         pad.setUniswap(IPoolManager(dummyPm), dummyHook, address(mockLocker));
         pad.setCca(address(mockStrategy), address(mockPosm));

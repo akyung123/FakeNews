@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
-import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {PoolKey} from "v4-core/src/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "v4-core/src/types/Currency.sol";
 import {TickMath} from "v4-core/src/libraries/TickMath.sol";
@@ -39,15 +38,6 @@ library Graduation {
             tickSpacing: TICK_SPACING,
             hooks: hook
         });
-    }
-
-    /// Caller must be the Launchpad: `ProphecyHook.beforeInitialize` checks sender.
-    function initializePool(IPoolManager manager, PoolKey memory key, uint256 vEth, uint256 vToken)
-        internal
-        returns (uint160 sqrtPriceX96)
-    {
-        sqrtPriceX96 = sqrtPriceX96FromVirtualReserves(vEth, vToken);
-        manager.initialize(key, sqrtPriceX96);
     }
 
     function sqrtPriceX96FromVirtualReserves(uint256 vEth, uint256 vToken) internal pure returns (uint160) {

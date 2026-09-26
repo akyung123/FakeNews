@@ -10,6 +10,7 @@ import {LiquidityLocker} from "./uniswap/LiquidityLocker.sol";
 import {CcaLib} from "./cca/CcaLib.sol";
 import {MigratorParameters} from "./cca/CcaTypes.sol";
 import {ICca, IDistributorFactory, ILBPStrategy} from "./cca/ICca.sol";
+import {IInitializerHook} from "./uniswap/IInitializerHook.sol";
 
 /// CCA launchpad. `launch` mints the token and starts an official LBPStrategy auction.
 /// Constructor is (protocolFeeRecipient, worldSigner, ens). Uniswap + CCA addresses
@@ -76,6 +77,7 @@ contract Launchpad {
     error AuctionExists();
     error ProphetRecipient();
     error AuctionNotCreated();
+    error InvalidHook();
 
     modifier nonReentrant() {
         if (_status == _ENTERED) revert Reentrant();
@@ -111,6 +113,7 @@ contract Launchpad {
         if (address(lbpStrategy) != address(0) || positionManager != address(0)) revert CcaAlreadySet();
         if (lbpStrategy_ == address(0) || positionManager_ == address(0)) revert ZeroAddress();
         if (address(locker) == address(0)) revert UniswapNotSet();
+        if (IInitializerHook(address(hook)).authorized() != lbpStrategy_) revert InvalidHook();
         lbpStrategy = ILBPStrategy(lbpStrategy_);
         positionManager = positionManager_;
         locker.setPositionManager(positionManager_);
@@ -126,9 +129,7 @@ contract Launchpad {
     }
 
     receive() external payable {
-        if (
-            msg.sender != address(locker) && msg.sender != address(poolManager) && msg.sender != address(lbpStrategy)
-        ) revert UnexpectedEth();
+        if (msg.sender != address(locker) && msg.sender != address(poolManager)) revert UnexpectedEth();
     }
 
     /// World ID server signs `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))`

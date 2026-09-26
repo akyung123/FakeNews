@@ -3,12 +3,19 @@ pragma solidity ^0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
+import {PoolManager} from "v4-core/src/PoolManager.sol";
+
 import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
 import {CcaLib} from "../src/cca/CcaLib.sol";
 import {AuctionParameters, MigratorParameters} from "../src/cca/CcaTypes.sol";
+import {HookMiner} from "../src/uniswap/HookMiner.sol";
+import {LiquidityLocker} from "../src/uniswap/LiquidityLocker.sol";
+import {ProphecyHook} from "../src/uniswap/ProphecyHook.sol";
 import {LaunchpadStack} from "./LaunchpadStack.sol";
-import {MockAuction} from "./mocks/MockCca.sol";
+import {MockAuction, MockLBPStrategy, MockPositionManager} from "./mocks/MockCca.sol";
 
 contract CcaLaunchTest is LaunchpadStack {
     function setUp() public {
@@ -92,6 +99,22 @@ contract CcaLaunchTest is LaunchpadStack {
         AuctionParameters memory ap = abi.decode(initializerParams, (AuctionParameters));
         assertTrue(uint256(ap.endBlock) != uint256(deadline));
         assertTrue(uint256(mp.migrationBlock) != uint256(deadline));
+    }
+
+    function test_setCcaRequiresHookAuthorizedToStrategy() public {
+        Launchpad pad = new Launchpad(protocol, signer, launchpad.ens());
+        MockLBPStrategy strategy = new MockLBPStrategy();
+        MockPositionManager posm = new MockPositionManager();
+        IPoolManager pm = new PoolManager(address(this));
+        address other = address(0xBAD);
+        bytes memory ctorArgs = abi.encode(pm, other);
+        (, bytes32 salt) =
+            HookMiner.find(address(this), HookMiner.prophecyFlags(), type(ProphecyHook).creationCode, ctorArgs);
+        ProphecyHook wrongHook = new ProphecyHook{salt: salt}(pm, other);
+        LiquidityLocker loc = new LiquidityLocker(pm, address(pad), IHooks(address(wrongHook)));
+        pad.setUniswap(pm, address(wrongHook), address(loc));
+        vm.expectRevert(Launchpad.InvalidHook.selector);
+        pad.setCca(address(strategy), address(posm));
     }
 
     function test_launchWithoutCcaReverts() public {
