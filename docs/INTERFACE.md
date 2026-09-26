@@ -109,11 +109,11 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 
 Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0.
 
-## 6. Curve quote vectors `(draft)`
+## 6. Curve quote vectors
 
-[`curve-vectors.json`](curve-vectors.json) is the shared buy/sell quote table. Amounts are decimal strings of wei.
+Canonical rows live in backend M1 PR #8 as `contracts/test/Curve.vectors.json`. [`curve-vectors.json`](curve-vectors.json) is the same file (same ids and wei strings) so web CI can run before that PR merges. Do not re-derive the numbers.
 
 - Web: `web/src/lib/curve.vectors.test.ts` asserts `curve.ts` against every row.
-- Contracts: when `Launchpad.quoteBuy` / `quoteSell` land, replay the same rows in a forge test. Do not re-derive the expected numbers.
+- Contracts: forge tests read `contracts/test/Curve.vectors.json`.
 
-Rounding matches section 2: buy fee up then tokens out down; sell eth out down then fee up.
+In the fixture, sell `ethOut` is the seller payout. SPEC's pre-fee `ethOut` is the fixture's `rawOut`. Rounding matches section 2.
