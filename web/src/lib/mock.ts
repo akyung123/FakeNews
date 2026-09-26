@@ -55,9 +55,9 @@ export const MOCK_PROPHETS: readonly MockProphet[] = [
 
 export const MOCK_PROPHECIES: readonly MockProphecy[] = [
   {
-    slug: "lingo-2028",
+    slug: "badges-2028",
     prophetLabel: "ringo",
-    sentence: "ETH prints ten thousand before the next olympics",
+    sentence: "Every hackathon badge is an ENS name by 2028",
     deadline: 1_830_297_600, // 2028-01-01
     token: "0xa111111111111111111111111111111111111111",
     sold: 317_240_000n * 10n ** 18n, // 40% of curve supply

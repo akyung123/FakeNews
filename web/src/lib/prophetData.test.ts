@@ -21,7 +21,7 @@ describe("normalizeProphetLabel", () => {
   });
 
   test("rejects a prophecy name and an empty string", () => {
-    expect(normalizeProphetLabel("lingo-2028.ringo.prophecy.eth")).toBeNull();
+    expect(normalizeProphetLabel("badges-2028.ringo.prophecy.eth")).toBeNull();
     expect(normalizeProphetLabel("")).toBeNull();
     expect(normalizeProphetLabel("prophecy.eth")).toBeNull();
   });
@@ -61,7 +61,7 @@ describe("getProphetPage", () => {
     const open = page.prophecies.filter((p) => !p.departed);
     expect(page.departedCount).toBe(2);
     expect(departed.map((p) => p.slug).sort()).toEqual(["last-talk", "two-min"]);
-    expect(open.map((p) => p.slug).sort()).toEqual(["curve-out", "lingo-2028"]);
+    expect(open.map((p) => p.slug).sort()).toEqual(["badges-2028", "curve-out"]);
     const graduated = page.prophecies.find((p) => p.complete)!;
     expect(graduated.slug).toBe("two-min");
     expect(graduated.departed).toBe(true);
@@ -91,8 +91,8 @@ describe("curveProgress", () => {
 
 describe("prophecyDetailPath", () => {
   test("points at the Screen 3 name route", () => {
-    expect(prophecyDetailPath("lingo-2028.ringo.prophecy.eth")).toBe(
-      "/n/lingo-2028.ringo.prophecy.eth",
+    expect(prophecyDetailPath("badges-2028.ringo.prophecy.eth")).toBe(
+      "/n/badges-2028.ringo.prophecy.eth",
     );
   });
 });
