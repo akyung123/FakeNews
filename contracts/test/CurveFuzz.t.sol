@@ -1,19 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-
 import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
+import {LaunchpadStack} from "./LaunchpadStack.sol";
 
-contract CurveFuzzTest is Test {
-    Launchpad internal launchpad;
-    address internal prophet = address(0xA11CE);
-
+contract CurveFuzzTest is LaunchpadStack {
     address[] internal traders;
 
     function setUp() public {
-        launchpad = new Launchpad(address(0xFEE), address(0x51C));
+        _deployStack();
         vm.deal(prophet, 100 ether);
         traders.push(address(0x101));
         traders.push(address(0x102));
@@ -24,13 +20,13 @@ contract CurveFuzzTest is Test {
     }
 
     function _launch() internal returns (address token) {
-        vm.prank(prophet);
-        token = launchpad.launch("lingo-2028", "", 0, 0);
+        return _registerAndLaunch();
     }
 
     function _assertSolvent(address token) internal view {
-        (uint256 vEth,, uint256 realEth, uint256 sold,) = launchpad.curve(token);
-        uint256 reserved = realEth + launchpad.protocolFees() + launchpad.creatorFeeOf(prophet);
+        (uint256 vEth,, uint256 realEth, uint256 sold, bool complete) = launchpad.curve(token);
+        uint256 reserved = launchpad.protocolFees() + launchpad.creatorFeeOf(prophet);
+        if (!complete) reserved += realEth;
         assertGe(address(launchpad).balance, reserved, "balance covers reserves and fees");
         assertEq(vEth, launchpad.VIRTUAL_ETH() + realEth, "realEth tracks vEth");
         assertEq(sold, launchpad.VIRTUAL_TOKEN() - _vToken(token), "sold tracks vToken");

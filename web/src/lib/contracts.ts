@@ -1,4 +1,5 @@
 import { webEnv } from "./env";
+import { launchpadAbi } from "./launchpadAbi";
 
 /**
  * On-chain addresses the UI will read later.
@@ -8,6 +9,8 @@ export const contracts = {
   launchpad: webEnv.launchpadAddress,
   universalResolver: webEnv.universalResolver,
 } as const;
+
+export { launchpadAbi };
 
 export function hasLaunchpad(): boolean {
   return Boolean(contracts.launchpad);

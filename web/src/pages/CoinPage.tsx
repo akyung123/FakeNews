@@ -2,15 +2,14 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
-import { graduated, progress, quoteBuy, quoteSell } from "../lib/curve";
-import { ago, eth, mcap, pct, tokens, trend } from "../lib/format";
+import { graduated, progress, quoteBuy, quoteSell, TOTAL_SUPPLY } from "../lib/curve";
+import { isEnsName, slugOf } from "../lib/ensName";
+import { ago, eth, tokens } from "../lib/format";
+import { GRADUATION_ETH } from "../lib/mock";
 import { prototypeCoinFromName } from "../lib/prophetData";
 import {
   actions,
-  changeSinceLaunch,
-  entryMcap,
   holderCount,
-  marketCap,
   myPosition,
   useStore,
   type Coin,
@@ -34,7 +33,6 @@ export function CoinPage() {
 
   const pos = myPosition(s, coin.id);
   const talk = s.comments.filter((c) => c.coinId === coin.id).sort((a, b) => b.at - a.at);
-  const change = changeSinceLaunch(coin);
 
   return (
     <main className="coin-page">
@@ -43,31 +41,38 @@ export function CoinPage() {
           <div className="coin-id">
             <div>
               <p className="coin-name">
-                {coin.name} <span className="faint">${coin.ticker}</span>
+                {slugOf(coin.name)} <span className="faint">${coin.ticker}</span>
               </p>
               <p className="faint small">
+                {isEnsName(coin.name) ? (
+                  <>
+                    {coin.name} <CopyFullName value={coin.name} />
+                    {" · "}
+                  </>
+                ) : null}
                 by {coin.creator} · {ago(coin.createdAt)} · {holderCount(s, coin.id)} holders
               </p>
             </div>
           </div>
           <h1 className="prophecy-title">{coin.prophecy}</h1>
-          <p className="big-num">{mcap(marketCap(coin))}</p>
-          <p className={trend(change)}>
-            {pct(change)} <span className="faint">market cap since launch</span>
-          </p>
+          <p className="big-num">{curveProgressHeader(coin)}</p>
+          {graduated(coin) ? (
+            <p className="up">Graduated to Uniswap V4</p>
+          ) : (
+            <p className="faint">Curve progress</p>
+          )}
           <Sparkline coin={coin} />
           <Bar value={progress(coin)} labelled />
-          {graduated(coin) ? <p className="up">Graduated. The curve sold out.</p> : null}
         </section>
 
         <section className="block">
           <div className="block-head">
-            <h2>Holder talk</h2>
-            <span className="faint">{talk.length} posts</span>
+            <h2>Trade memos</h2>
+            <span className="faint">{talk.length} memos</span>
           </div>
           <PostBox coinId={coin.id} holds={Boolean(pos)} />
           <ul className="posts">
-            {talk.length === 0 ? <li className="empty">No talk yet. Buy in and say something.</li> : null}
+            {talk.length === 0 ? <li className="empty">No trades yet. The first memo shows up here.</li> : null}
             {talk.map((c) => (
               <CommentItem key={c.id} comment={c} coin={coin} />
             ))}
@@ -82,12 +87,6 @@ export function CoinPage() {
             <p className="faint small">You hold</p>
             <p className="you-amount">
               {tokens(pos.tokens)} <span className="faint">${coin.ticker}</span>
-            </p>
-            <p className="small">
-              <span className={trend(marketCap(coin) / entryMcap(pos) - 1)}>
-                {pct(marketCap(coin) / entryMcap(pos) - 1)}
-              </span>{" "}
-              <span className="faint">from {mcap(entryMcap(pos))} MC</span>
             </p>
           </section>
         ) : null}
@@ -122,7 +121,7 @@ function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: 
         </button>
       </div>
       <label className="field">
-        <span>{side === "buy" ? "Amount (ETH)" : "Amount (% of your bag)"}</span>
+        <span>{side === "buy" ? "Amount (ETH)" : "Amount (% of holding)"}</span>
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
       <div className="quick">
@@ -152,7 +151,7 @@ function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: 
 
 function PostBox({ coinId, holds }: { coinId: string; holds: boolean }) {
   const [text, setText] = useState("");
-  if (!holds) return <p className="locked">Only holders can talk here. Buy any amount to join.</p>;
+  if (!holds) return <p className="locked">Hold this prophecy to add a memo.</p>;
   return (
     <form
       className="composer"
@@ -165,7 +164,7 @@ function PostBox({ coinId, holds }: { coinId: string; holds: boolean }) {
       <input
         value={text}
         maxLength={140}
-        placeholder="How's your bag feeling?"
+        placeholder="Add a one-line memo (optional)"
         onChange={(e) => setText(e.target.value)}
       />
       <button type="submit" className="btn primary" disabled={!text.trim()}>
@@ -175,8 +174,34 @@ function PostBox({ coinId, holds }: { coinId: string; holds: boolean }) {
   );
 }
 
+function CopyFullName({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="link"
+      aria-label="Copy full name"
+      onClick={() => {
+        if (!navigator.clipboard) return;
+        void navigator.clipboard.writeText(value).then(() => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1500);
+        });
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
+function curveProgressHeader(coin: Coin): string {
+  const pctFilled = Math.round(progress(coin) * 100);
+  const raised = (pctFilled / 100) * GRADUATION_ETH;
+  return `${pctFilled}% ${raised.toFixed(4)} of ${GRADUATION_ETH} ETH to graduate`;
+}
+
 function Sparkline({ coin }: { coin: Coin }) {
-  const points = coin.history.map((h) => h.mcap);
+  const points = coin.history.map((h) => h.mcap / TOTAL_SUPPLY);
   if (points.length < 2) return null;
   const w = 600;
   const h = 120;
@@ -188,7 +213,7 @@ function Sparkline({ coin }: { coin: Coin }) {
     .join(" ");
   const up = points[points.length - 1] >= points[0];
   return (
-    <svg className={`spark ${up ? "up" : "down"}`} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-label="Market cap over time">
+    <svg className={`spark ${up ? "up" : "down"}`} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-label="Price over time">
       <path d={d} fill="none" strokeWidth="2" vectorEffect="non-scaling-stroke" />
     </svg>
   );

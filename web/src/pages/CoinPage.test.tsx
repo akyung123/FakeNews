@@ -27,7 +27,16 @@ describe("Screen 3 name route", () => {
       const row = getProphecyByName(ens, NOW)!;
       expect(html).toContain(row.sentence);
       expect(html).toContain(row.ensName);
+      expect(html).toContain(row.slug);
+      expect(html).toContain(">Copy<");
+      expect(html).toContain('aria-label="Copy full name"');
       expect(html).toContain("Buy");
+      expect(html).toContain("Trade memos");
+      expect(html).toContain("Curve progress");
+      expect(html).toContain("40% 0.0080 of 0.02 ETH to graduate");
+      expect(html).not.toContain("1.32 ETH");
+      expect(html).not.toContain("Holder talk");
+      expect(html).not.toContain("market cap since launch");
       expect(html).not.toContain("Prophecy not found");
       expect(html.trim()).not.toBe("");
     } finally {

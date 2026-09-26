@@ -27,6 +27,7 @@ export function WalletButton() {
           {isPending ? "Connecting…" : "Connect wallet"}
         </button>
         <p className="faint small">Sepolia. Demo cash below still works.</p>
+        {hasLaunchpad() ? null : <p className="faint small">Contracts not connected yet.</p>}
       </div>
     );
   }
@@ -47,9 +48,7 @@ export function WalletButton() {
           {isSwitching ? "Switching…" : "Switch to Sepolia"}
         </button>
       )}
-      <p className="faint small">
-        {hasLaunchpad() ? "Launchpad address loaded from env." : "Launchpad address not set yet."}
-      </p>
+      {hasLaunchpad() ? null : <p className="faint small">Contracts not connected yet.</p>}
       <button type="button" className="link" onClick={() => disconnect()}>
         Disconnect
       </button>

@@ -1,28 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
+import {IProphecyEns} from "../src/ens/IProphecyEns.sol";
 import {CurveMath, Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
+import {LaunchpadStack} from "./LaunchpadStack.sol";
 
-contract CurveTest is Test {
-    Launchpad internal launchpad;
-    address internal prophet = address(0xA11CE);
-    address internal buyer = address(0xB0B);
-    address internal protocol = address(0xFEE);
-    address internal signer = address(0x51C);
-
+contract CurveTest is LaunchpadStack {
     function setUp() public {
-        launchpad = new Launchpad(protocol, signer);
+        _deployStack();
         vm.deal(prophet, 100 ether);
         vm.deal(buyer, 100 ether);
     }
 
     function _launch() internal returns (address token) {
-        vm.prank(prophet);
-        token = launchpad.launch("lingo-2028", "", 0, 0);
+        return _registerAndLaunch();
     }
 
     function test_constantsMatchSpec() public view {
@@ -38,11 +32,11 @@ contract CurveTest is Test {
 
     function test_mintsFullSupplyToLaunchpad() public {
         address pad = address(0xB0B);
-        ProphecyToken token = new ProphecyToken("lingo-2028.prophecy.eth", "LINGO-2028", pad);
+        ProphecyToken token = new ProphecyToken("lingo-2028.ringo.prophecy.eth", "LINGO-2028", pad);
         assertEq(token.decimals(), 18);
         assertEq(token.totalSupply(), 1_000_000_000e18);
         assertEq(token.balanceOf(pad), 1_000_000_000e18);
-        assertEq(token.name(), "lingo-2028.prophecy.eth");
+        assertEq(token.name(), "lingo-2028.ringo.prophecy.eth");
         assertEq(token.symbol(), "LINGO-2028");
     }
 
@@ -61,12 +55,13 @@ contract CurveTest is Test {
         assertEq(sold, 0);
         assertFalse(complete);
         assertEq(ProphecyToken(token).balanceOf(address(launchpad)), 1_000_000_000e18);
-        assertEq(ProphecyToken(token).name(), "lingo-2028.prophecy.eth");
+        assertEq(ProphecyToken(token).name(), "lingo-2028.ringo.prophecy.eth");
         assertEq(ProphecyToken(token).symbol(), "LINGO-2028");
-        assertEq(bytes(launchpad.prophetOf(prophet)), bytes(""));
+        assertEq(bytes(launchpad.prophetOf(prophet)), bytes("ringo"));
     }
 
     function test_launchDoesNotStoreSentenceOrDeadline() public {
+        _registerProphet(prophet, "ringo");
         string memory sentence = "a sentence that must not be stored";
         vm.recordLogs();
         vm.prank(prophet);
@@ -169,23 +164,26 @@ contract CurveTest is Test {
         assertEq(vEth, launchpad.VIRTUAL_ETH() + 0.02 ether);
         assertEq(ProphecyToken(token).balanceOf(buyer), launchpad.CURVE_SUPPLY());
         assertLt(before - buyer.balance, 1 ether);
-        assertEq(address(launchpad).balance, before - buyer.balance);
         _assertSolvent(token);
     }
 
     function test_constructorRejectsZeroRecipient() public {
         vm.expectRevert(Launchpad.ZeroAddress.selector);
-        new Launchpad(address(0), signer);
+        new Launchpad(address(0), signer, IProphecyEns(address(mockEns)));
     }
 
     function test_constructorRejectsZeroWorldSigner() public {
         vm.expectRevert(Launchpad.ZeroAddress.selector);
-        new Launchpad(protocol, address(0));
+        new Launchpad(protocol, address(0), IProphecyEns(address(mockEns)));
     }
 
     function test_constructorStoresProtocolRecipient() public view {
         assertEq(launchpad.protocolFeeRecipient(), protocol);
         assertEq(launchpad.worldSigner(), signer);
+        assertEq(launchpad.deployer(), address(this));
+        assertEq(address(launchpad.poolManager()), address(manager));
+        assertEq(address(launchpad.hook()), address(hook));
+        assertEq(address(launchpad.locker()), address(locker));
     }
 
     function test_claimProtocolFeePaysOnlyTheRecipient() public {
@@ -231,37 +229,39 @@ contract CurveTest is Test {
         vm.deal(address(launchpad), 5 ether);
         (uint256 tokensA, uint256 feeA) = launchpad.quoteBuy(token, 0.001 ether);
 
-        address clean = address(new Launchpad(protocol, signer));
+        Launchpad clean = _newLaunchpad(protocol, signer);
+        uint256 n = 99;
         vm.prank(prophet);
-        address tokenB = Launchpad(clean).launch("eth-10k", "", 0, 0);
-        (uint256 tokensB, uint256 feeB) = Launchpad(clean).quoteBuy(tokenB, 0.001 ether);
+        clean.registerProphet("ringo", n, signRegister(address(clean), prophet, n, block.chainid, SIGNER_PK));
+        vm.prank(prophet);
+        address tokenB = clean.launch("eth-10k", "a prophecy sentence", 0, 0);
+        (uint256 tokensB, uint256 feeB) = Launchpad(payable(address(clean))).quoteBuy(tokenB, 0.001 ether);
         assertEq(tokensA, tokensB);
         assertEq(feeA, feeB);
     }
 
     function test_launchWithValueBuys() public {
+        _registerProphet(prophet, "ringo");
         vm.prank(prophet);
-        address token = launchpad.launch{value: 0.001 ether}("lingo-2028", "", 0, 0);
+        address token = launchpad.launch{value: 0.001 ether}("lingo-2028", "a prophecy sentence", 0, 0);
         (, , uint256 realEth, uint256 sold,) = launchpad.curve(token);
         assertGt(sold, 0);
         assertGt(realEth, 0);
         assertEq(ProphecyToken(token).balanceOf(prophet), sold);
     }
 
-    function test_registerProphetNotYet() public {
-        vm.expectRevert(Launchpad.NotImplemented.selector);
-        launchpad.registerProphet("ringo", 1, "");
-    }
-
     function test_badSlugReverts() public {
+        _registerProphet(prophet, "ringo");
         vm.prank(prophet);
         vm.expectRevert(Launchpad.BadSlug.selector);
-        launchpad.launch("ab", "", 0, 0);
+        launchpad.launch("ab", "a prophecy sentence", 0, 0);
     }
 
     function _assertSolvent(address token) internal view {
-        (,, uint256 realEth,,) = launchpad.curve(token);
-        assertGe(address(launchpad).balance, realEth + launchpad.protocolFees() + launchpad.creatorFeeOf(prophet));
+        (,, uint256 realEth,, bool complete) = launchpad.curve(token);
+        uint256 reserved = launchpad.protocolFees() + launchpad.creatorFeeOf(prophet);
+        if (!complete) reserved += realEth;
+        assertGe(address(launchpad).balance, reserved);
     }
 
     function _containsWord(bytes memory data, bytes32 word) internal pure returns (bool) {

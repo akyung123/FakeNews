@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { ISSUE_COPY } from "../lib/issue";
-import { MOCK_ISSUE_SESSION, MOCK_RETURNING_SESSION, MOCK_WORLD_HEALTH, MOCK_RP_CONTEXT_RESPONSE } from "../lib/mock";
+import type { RegisterProphetInput } from "../lib/launchpad";
+import { MOCK_ISSUE_SESSION, MOCK_RETURNING_SESSION, MOCK_WORLD_HEALTH, MOCK_RP_CONTEXT_RESPONSE, MOCK_WORLD_VERIFY } from "../lib/mock";
 import { WorldClientError, createWorldClient, type WorldClient } from "../lib/world";
 import { IssueScreen } from "./CreatePage";
 
@@ -11,7 +12,11 @@ const NOW = Date.parse("2026-09-26T00:00:00Z");
 
 function renderIssue(
   session = MOCK_ISSUE_SESSION,
-  extras: { world?: WorldClient; registerProphet?: IssueScreenProps["registerProphet"] } = {},
+  extras: {
+    world?: WorldClient;
+    registerProphet?: IssueScreenProps["registerProphet"];
+    onIssued?: (id: string) => void;
+  } = {},
 ) {
   return render(
     <MemoryRouter>
@@ -20,13 +25,14 @@ function renderIssue(
         world={extras.world ?? createWorldClient({ mock: true })}
         now={NOW}
         registerProphet={extras.registerProphet}
+        onIssued={extras.onIssued}
       />
     </MemoryRouter>,
   );
 }
 
 type IssueScreenProps = {
-  registerProphet?: (input: { label: string; nullifier: `0x${string}`; serverSig: `0x${string}` }) => Promise<void>;
+  registerProphet?: (input: RegisterProphetInput) => Promise<void>;
 };
 
 async function fillFirstTimeForm(user: ReturnType<typeof userEvent.setup>) {
@@ -186,20 +192,101 @@ describe("Screen 2 button gating", () => {
     assertNoRawCodes();
   });
 
-  it("maps a registerProphet nullifier reuse revert to one-human-one-name", async () => {
+  it("shows the name-claim failure copy after a reverted receipt and does not advance", async () => {
     const user = userEvent.setup();
+    const issued: string[] = [];
     renderIssue(MOCK_ISSUE_SESSION, {
       registerProphet: async () => {
-        throw new Error("NullifierUsed");
+        throw new Error("registerProphet did not succeed");
+      },
+      onIssued: (id) => {
+        issued.push(id);
       },
     });
     await fillFirstTimeForm(user);
     await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
     await waitFor(() => expect(launchButton()).toBeEnabled());
     await user.click(launchButton());
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(ISSUE_COPY.nullifierReuse));
-    expect(launchButton()).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(ISSUE_COPY.registerFailed));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Name claim failed. Nothing was charged except gas. Try again.",
+    );
+    expect(screen.queryByTestId("register-success")).toBeNull();
+    expect(issued).toEqual([]);
+    expect(launchButton()).toBeEnabled();
     assertNoRawCodes();
+  });
+
+  it("shows the name-claim failure copy when simulation fails, without advancing", async () => {
+    const user = userEvent.setup();
+    const issued: string[] = [];
+    renderIssue(MOCK_ISSUE_SESSION, {
+      registerProphet: async () => {
+        throw new Error("NullifierUsed");
+      },
+      onIssued: (id) => {
+        issued.push(id);
+      },
+    });
+    await fillFirstTimeForm(user);
+    await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
+    await waitFor(() => expect(launchButton()).toBeEnabled());
+    await user.click(launchButton());
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(ISSUE_COPY.registerFailed));
+    expect(issued).toEqual([]);
+    expect(screen.queryByTestId("register-success")).toBeNull();
+    assertNoRawCodes();
+  });
+
+  it("shows a pending banner while registerProphet waits for the wallet", async () => {
+    const user = userEvent.setup();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    renderIssue(MOCK_ISSUE_SESSION, {
+      registerProphet: async () => {
+        await gate;
+      },
+    });
+    await fillFirstTimeForm(user);
+    await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
+    await waitFor(() => expect(launchButton()).toBeEnabled());
+    await user.click(launchButton());
+    await waitFor(() => expect(screen.getByTestId("register-pending")).toHaveTextContent(ISSUE_COPY.registerPending));
+    expect(launchButton()).toBeDisabled();
+    expect(screen.queryByRole("alert")).toBeNull();
+    release();
+    await waitFor(() => expect(screen.getByTestId("register-success")).toHaveTextContent(ISSUE_COPY.registerSuccess));
+  });
+
+  it("calls registerProphet with { label, nullifier, serverSig } and advances only after success", async () => {
+    const user = userEvent.setup();
+    const seen: RegisterProphetInput[] = [];
+    const issued: string[] = [];
+    renderIssue(MOCK_ISSUE_SESSION, {
+      registerProphet: async (input) => {
+        seen.push(input);
+      },
+      onIssued: (id) => {
+        issued.push(id);
+      },
+    });
+    await fillFirstTimeForm(user);
+    await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
+    await waitFor(() => expect(launchButton()).toBeEnabled());
+    await user.click(launchButton());
+    await waitFor(() => expect(seen).toEqual([
+      {
+        label: "mina",
+        nullifier: MOCK_WORLD_VERIFY.nullifier,
+        serverSig: MOCK_WORLD_VERIFY.serverSig,
+      },
+    ]));
+    await waitFor(() => expect(issued).toHaveLength(1));
+    expect(screen.getByTestId("register-success")).toHaveTextContent(ISSUE_COPY.registerSuccess);
+    expect(screen.getByTestId("register-success")).toHaveTextContent("Your name is claimed on Sepolia.");
+    expect(MOCK_WORLD_VERIFY).not.toHaveProperty("label");
   });
 
   it("skips World ID for a returning prophet and enables Issue once the form is valid", async () => {

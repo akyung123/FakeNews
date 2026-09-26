@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
+import {PoolKey} from "v4-core/src/types/PoolKey.sol";
+import {PoolId, PoolIdLibrary} from "v4-core/src/types/PoolId.sol";
+
+import {IProphecyEns} from "./ens/IProphecyEns.sol";
 import {ProphecyToken} from "./ProphecyToken.sol";
+import {Graduation} from "./uniswap/Graduation.sol";
+import {LiquidityLocker} from "./uniswap/LiquidityLocker.sol";
 
 /// Constant-product quotes and fee rounding. Multiply first, divide once.
 library CurveMath {
@@ -46,7 +54,13 @@ library CurveMath {
 
 /// Bonding-curve launchpad. Price is the ratio of two reserves; fees sit in a
 /// separate ledger so they never move that price.
+///
+/// Constructor stays (protocolFeeRecipient_, worldSigner_, plus ENS args
+/// from the ENS wiring PR). Uniswap addresses are set once by the deployer
+/// via `setUniswap`. Deploy: Launchpad, Hook (CREATE2 with this address),
+/// Locker, then `setUniswap` once.
 contract Launchpad {
+    using PoolIdLibrary for PoolKey;
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
     uint256 private _status = _NOT_ENTERED;
@@ -82,10 +96,20 @@ contract Launchpad {
 
     mapping(address token => Curve) internal _curves;
     mapping(address wallet => uint256) internal _creatorFees;
+    mapping(uint256 nullifier => bool) internal _nullifierUsed;
+    mapping(bytes32 labelHash => bool) internal _labelTaken;
+    mapping(address wallet => string) internal _prophetOf;
+    mapping(bytes32 slugKey => bool) internal _slugTaken;
     uint256 public protocolFees;
     address public immutable protocolFeeRecipient;
     address public immutable worldSigner;
+    address public immutable deployer;
+    IProphecyEns public immutable ens;
+    IPoolManager public poolManager;
+    IHooks public hook;
+    LiquidityLocker public locker;
 
+    event ProphetRegistered(address indexed wallet, string label, uint256 nullifier);
     event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
     event Trade(
         address indexed token,
@@ -100,6 +124,17 @@ contract Launchpad {
     );
     event CreatorFeeClaimed(address indexed prophet, uint256 amount);
     event ProtocolFeeClaimed(address indexed recipient, uint256 amount);
+    event UniswapSet(address poolManager, address hook, address locker);
+    event Graduated(
+        address indexed token,
+        bytes32 indexed poolId,
+        uint256 ethToPool,
+        uint256 tokensToPool,
+        uint160 sqrtPriceX96,
+        uint24 fee,
+        int24 tickSpacing,
+        address hooks
+    );
 
     error UnknownToken();
     error CurveComplete();
@@ -107,12 +142,23 @@ contract Launchpad {
     error Slippage();
     error MemoTooLong();
     error BadSlug();
+    error BadLabel();
+    error BadProphecy();
+    error InvalidSignature();
+    error NullifierUsed();
+    error LabelTaken();
+    error AlreadyProphet();
+    error NotProphet();
+    error SlugTaken();
     error ExceedsSold();
     error EthTransferFailed();
-    error NotImplemented();
     error ZeroAddress();
     error Reentrant();
     error TokenTransferFailed();
+    error UnexpectedEth();
+    error NotDeployer();
+    error UniswapAlreadySet();
+    error UniswapNotSet();
 
     modifier nonReentrant() {
         if (_status == _ENTERED) revert Reentrant();
@@ -121,28 +167,74 @@ contract Launchpad {
         _status = _NOT_ENTERED;
     }
 
-    constructor(address protocolFeeRecipient_, address worldSigner_) {
-        if (protocolFeeRecipient_ == address(0) || worldSigner_ == address(0)) revert ZeroAddress();
+    /// Constructor ends at ens. Uniswap addresses set once via setUniswap.
+    constructor(address protocolFeeRecipient_, address worldSigner_, IProphecyEns ens_) {
+        if (
+            protocolFeeRecipient_ == address(0) || worldSigner_ == address(0) || address(ens_) == address(0)
+        ) revert ZeroAddress();
         protocolFeeRecipient = protocolFeeRecipient_;
         worldSigner = worldSigner_;
+        ens = ens_;
+        deployer = msg.sender;
     }
 
-    /// World ID prophet names are a later milestone. The server signature
-    /// check (chainId, this launchpad, unused nullifier, worldSigner) lands then.
-    function registerProphet(string calldata, uint256, bytes calldata) external pure {
-        revert NotImplemented();
+    /// Deployer-only, once. Call after Hook (CREATE2) and Locker exist.
+    function setUniswap(IPoolManager poolManager_, address hook_, address locker_) external {
+        if (msg.sender != deployer) revert NotDeployer();
+        if (address(poolManager) != address(0) || address(hook) != address(0) || address(locker) != address(0)) {
+            revert UniswapAlreadySet();
+        }
+        if (address(poolManager_) == address(0) || hook_ == address(0) || locker_ == address(0)) revert ZeroAddress();
+        poolManager = poolManager_;
+        hook = IHooks(hook_);
+        locker = LiquidityLocker(payable(locker_));
+        emit UniswapSet(address(poolManager_), hook_, locker_);
     }
 
-    /// Opens a curve and mints the token. `prophecy` and `deadline` are not
-    /// stored or emitted; they belong on the prophecy's ENS resolver.
-    function launch(string calldata slug, string calldata, uint64, uint256 minTokensOut)
+    /// Seed leftovers from the locker (and PoolManager native take/settle).
+    receive() external payable {
+        if (msg.sender != address(locker) && msg.sender != address(poolManager)) revert UnexpectedEth();
+    }
+
+    /// World ID server signs `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))`
+    /// with EIP-191 (`world/src/encode.ts`). Reconstructing that digest with
+    /// `block.chainid` and `address(this)` rejects a sig pinned to another chain
+    /// or launchpad (PR #16 context_mismatch). One nullifier, one prophet name.
+    function registerProphet(string calldata label, uint256 nullifier, bytes calldata serverSig)
+        external
+        nonReentrant
+    {
+        _requireProphetLabel(label);
+        if (_nullifierUsed[nullifier]) revert NullifierUsed();
+        if (bytes(_prophetOf[msg.sender]).length != 0) revert AlreadyProphet();
+        if (_labelTaken[keccak256(bytes(label))]) revert LabelTaken();
+        _verifyWorldSig(nullifier, serverSig);
+
+        _nullifierUsed[nullifier] = true;
+        _labelTaken[keccak256(bytes(label))] = true;
+        _prophetOf[msg.sender] = label;
+
+        ens.registerProphet(label, msg.sender);
+        emit ProphetRegistered(msg.sender, label, nullifier);
+    }
+
+    /// Opens a curve and mints the token. `prophecy` and `deadline` are written
+    /// only into the prophecy resolver at initialize — never stored or emitted.
+    function launch(string calldata slug, string calldata prophecy, uint64 deadline, uint256 minTokensOut)
         external
         payable
         nonReentrant
         returns (address token)
     {
+        string memory prophetLabel = _prophetOf[msg.sender];
+        if (bytes(prophetLabel).length == 0) revert NotProphet();
         _requireSlug(slug);
-        string memory name_ = string.concat(slug, ".prophecy.eth");
+        _requireProphecy(prophecy);
+        bytes32 slugKey = keccak256(abi.encode(prophetLabel, slug));
+        if (_slugTaken[slugKey]) revert SlugTaken();
+        _slugTaken[slugKey] = true;
+
+        string memory name_ = string.concat(slug, ".", prophetLabel, ".prophecy.eth");
         ProphecyToken minted = new ProphecyToken(name_, _symbolFromSlug(slug), address(this));
         token = address(minted);
 
@@ -151,7 +243,8 @@ contract Launchpad {
         c.vToken = VIRTUAL_TOKEN;
         c.prophet = msg.sender;
 
-        emit Launched(token, msg.sender, "", slug);
+        ens.registerProphecy(prophetLabel, slug, prophecy, deadline, token);
+        emit Launched(token, msg.sender, prophetLabel, slug);
 
         if (msg.value > 0) {
             BuyPreview memory preview = _previewBuy(c, msg.value);
@@ -231,8 +324,8 @@ contract Launchpad {
         return (payout, fee_);
     }
 
-    function prophetOf(address) external pure returns (string memory) {
-        return "";
+    function prophetOf(address wallet) external view returns (string memory) {
+        return _prophetOf[wallet];
     }
 
     function creatorFeeOf(address wallet) external view returns (uint256) {
@@ -301,6 +394,35 @@ contract Launchpad {
         _emitTrade(token, buyer, true, preview.ethUsed, preview.tokensOut, preview.fee, c.vEth, c.vToken, memo);
         _transferToken(token, buyer, preview.tokensOut);
         if (preview.refund > 0) _sendEth(buyer, preview.refund);
+        if (preview.completes) _graduate(token, c);
+    }
+
+    /// Last curve buy: open the V4 pool at the curve-end price and lock LP.
+    function _graduate(address token, Curve storage c) internal {
+        if (address(poolManager) == address(0) || address(hook) == address(0) || address(locker) == address(0)) {
+            revert UniswapNotSet();
+        }
+        PoolKey memory key = Graduation.poolKey(token, hook);
+        uint160 sqrtPriceX96 = Graduation.initializePool(poolManager, key, c.vEth, c.vToken);
+        uint256 ethToPool = c.realEth;
+        uint256 tokensToPool = LP_SUPPLY;
+        ProphecyToken(token).approve(address(locker), tokensToPool);
+        locker.lock{value: ethToPool}(token, c.prophet, protocolFeeRecipient, key, tokensToPool);
+        uint256 leftover = ProphecyToken(token).balanceOf(address(this));
+        if (leftover > 0) {
+            // ProphecyToken rejects address(0); dead address is the burn sink.
+            _transferToken(token, address(0x000000000000000000000000000000000000dEaD), leftover);
+        }
+        emit Graduated(
+            token,
+            PoolId.unwrap(key.toId()),
+            ethToPool,
+            tokensToPool,
+            sqrtPriceX96,
+            key.fee,
+            key.tickSpacing,
+            address(key.hooks)
+        );
     }
 
     function _emitTrade(
@@ -319,6 +441,46 @@ contract Launchpad {
 
     function _requireMemo(string calldata memo) internal pure {
         if (bytes(memo).length > MAX_MEMO) revert MemoTooLong();
+    }
+
+    /// EIP-191 personal_sign of the 32-byte world/ digest. chainId and launchpad
+    /// are not calldata: they are taken from this chain and this contract.
+    function _verifyWorldSig(uint256 nullifier, bytes calldata serverSig) internal view {
+        if (serverSig.length != 65) revert InvalidSignature();
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+        assembly ("memory-safe") {
+            r := calldataload(serverSig.offset)
+            s := calldataload(add(serverSig.offset, 32))
+            v := byte(0, calldataload(add(serverSig.offset, 64)))
+        }
+        if (v < 27) v += 27;
+        if (v != 27 && v != 28) revert InvalidSignature();
+        if (uint256(s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+            revert InvalidSignature();
+        }
+
+        bytes32 digest = keccak256(abi.encode(block.chainid, address(this), msg.sender, nullifier));
+        address recovered =
+            ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", digest)), v, r, s);
+        if (recovered == address(0) || recovered != worldSigner) revert InvalidSignature();
+    }
+
+    function _requireProphetLabel(string memory label) internal pure {
+        bytes memory raw = bytes(label);
+        uint256 n = raw.length;
+        if (n < 3 || n > 16) revert BadLabel();
+        for (uint256 i; i < n; ++i) {
+            bytes1 ch = raw[i];
+            bool ok = (ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9");
+            if (!ok) revert BadLabel();
+        }
+    }
+
+    function _requireProphecy(string memory prophecy) internal pure {
+        uint256 n = bytes(prophecy).length;
+        if (n < 1 || n > 140) revert BadProphecy();
     }
 
     function _requireSlug(string memory slug) internal pure {

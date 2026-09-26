@@ -15,7 +15,7 @@ export function App() {
     <div className="shell">
       <aside className="sidebar">
         <Link to="/" className="logo">
-          prophecy<span>.pump</span>
+          <span>prophecy</span>
         </Link>
 
         <nav className="side-nav" aria-label="Main">

@@ -1,25 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-import {Launchpad} from "../src/Launchpad.sol";
 import {ProphecyToken} from "../src/ProphecyToken.sol";
+import {LaunchpadStack} from "./LaunchpadStack.sol";
 
 /// Reads `test/Curve.vectors.json` so web/src/lib/curve.ts can reuse
 /// the same SPEC-derived integers.
-contract CurveVectorsTest is Test {
+contract CurveVectorsTest is LaunchpadStack {
     using stdJson for string;
 
-    Launchpad internal launchpad;
     address internal token;
     string internal vectors;
 
     function setUp() public {
-        launchpad = new Launchpad(address(0xFEE), address(0x51C));
+        _deployStack();
+        prophet = address(this);
         vm.deal(address(this), 10 ether);
-        token = launchpad.launch("lingo-2028", "", 0, 0);
+        token = _registerAndLaunch();
         vectors = vm.readFile(string.concat(vm.projectRoot(), "/test/Curve.vectors.json"));
     }
 
