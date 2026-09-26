@@ -153,6 +153,7 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 |---|---|
 | `VITE_RPC_URL` | web |
 | `VITE_LAUNCHPAD_ADDRESS` | web |
+| `VITE_LAUNCHPAD_DEPLOY_BLOCK` | web (`Launched` `fromBlock`; source: `deployments/sepolia.json` `launchpadBlock`; optional) |
 | `VITE_PARENT_NAME` | web (e.g. `prophecy.eth`) |
 | `VITE_UNIVERSAL_RESOLVER` | web ([`ENSV2.md`](ENSV2.md) section 0) |
 | `VITE_WORLD_APP_ID`, `VITE_WORLD_ACTION` | web |
@@ -169,12 +170,7 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 
 Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0.
 
-After a successful send, infra writes a machine-readable record (no secrets) to `deployments/sepolia.json`, or `deployments/anvil.json` on a local / fork run (gitignored). Format: [`infra/README.md`](../infra/README.md) “Deployment record”. Web consumes only two fields from that file, using the existing names above:
-
-- `launchpad` → `VITE_LAUNCHPAD_ADDRESS`
-- `launchpadBlock` → `fromBlock` for `Launched` log queries
-
-Do not add a new web env var for the block. `VITE_CHAIN_ID` stays `11155111` on Sepolia.
+After a successful send, infra writes a machine-readable record (no secrets) to `deployments/sepolia.json`, or `deployments/anvil.json` on a local / fork run (gitignored). Format: [`infra/README.md`](../infra/README.md) “Deployment record”. Web copies `launchpad` into `VITE_LAUNCHPAD_ADDRESS` and `launchpadBlock` into `VITE_LAUNCHPAD_DEPLOY_BLOCK` (optional; empty means the web uses a recent block range). `VITE_CHAIN_ID` stays `11155111` on Sepolia.
 
 `ENS_ADAPTER_ADDRESS` is the `ProphecyEns` address. **Default: output.** `Deploy.s.sol` creates the adapter (predicted Launchpad CREATE address) and the Launchpad in one broadcast, then logs `ENS_ADAPTER_ADDRESS`. **Optional input override:** if the env var is set, the script does not CREATE an adapter and passes that address as Launchpad `ens`. Off anvil, a set value cannot be `address(0)` or placeholder `0xe05` — the same `#24` guard as `PROTOCOL_FEE_RECIPIENT` / `0xfee` and `worldSigner` / `0x51e`. Anvil dry-run (`chainid == 31337`) fills `0xe05` when unset (Launchpad reverts on zero).
 
