@@ -5,9 +5,15 @@
  * the `cca` branch, replaced by the CCA auction (see web/src/lib/cca).
  *
  * `launch` and `Launched` below match the deployed `cca` Launchpad instead:
- * `launch(slug, prophecy)` is 2 args and not payable — no first
+ * `launch(slug, prophecy, deadline)` is 3 args and not payable — no first
  * buy — and `Launched` carries `auction` as a third indexed topic.
  */
+
+/**
+ * `deadline` is a legacy argument on the deployed Launchpad. The web app
+ * always sends 0 and never reads or shows it (DECISIONS #18).
+ */
+export const LAUNCH_DEADLINE = 0n;
 export const launchpadAbi = [
   {
     type: "constructor",
@@ -36,6 +42,7 @@ export const launchpadAbi = [
     inputs: [
       { name: "slug", type: "string" },
       { name: "prophecy", type: "string" },
+      { name: "deadline", type: "uint64" },
     ],
     outputs: [{ name: "token", type: "address" }],
   },

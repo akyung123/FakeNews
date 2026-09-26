@@ -82,7 +82,7 @@ Who is **not** a target right now:
 These are settled. Changing one means a new row in [`DECISIONS.md`](DECISIONS.md), agreed by a person.
 
 1. **No judging.** No oracle, no True / False, no payout. There is no status about the sentence. The only stage the product shows is the market stage (auction, graduated or ended), read from the chain. (#1, #18)
-2. **Written once, never edited.** The sentence lives only in that prophecy's own ENS record, and nobody holds the permission to change it. It is not stored in Launchpad storage or in the `Launched` event. There is no deadline. (#5, #18)
+2. **Written once, never edited.** The sentence lives only in that prophecy's own ENS record, and nobody holds the permission to change it. It is not stored in Launchpad storage or in the `Launched` event. The product has no deadline; the legacy on-chain `deadline` argument is always 0 and never shown. (#5, #18)
 3. **The name is the product.** `ringo.prophecy.eth` → the prophet's wallet. `badges-2028.ringo.prophecy.eth` → the prophecy's token. (#8)
 4. **One prophet name per person.** A human check (World ID) happens once, when you create your prophet name. Browsing and buying need no check. (#10)
 5. **Liquidity cannot be pulled.** When a prophecy sells out on the curve, its money moves into a Uniswap pool and is locked. Nobody can withdraw it; only trading fees come out. (#11)

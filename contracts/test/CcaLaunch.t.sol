@@ -89,6 +89,18 @@ contract CcaLaunchTest is LaunchpadStack {
         assertTrue(mp.positionRecipient != prophet);
     }
 
+    function test_deadlineIsNotAuctionEnd() public {
+        _registerProphet(prophet, "ringo");
+        uint64 deadline = 1_900_000_000;
+        vm.prank(prophet);
+        launchpad.launch("lingo-2028", "a prophecy sentence", deadline);
+        (MigratorParameters memory mp, bytes memory initializerParams) =
+            abi.decode(mockStrategy.lastConfigData(), (MigratorParameters, bytes));
+        AuctionParameters memory ap = abi.decode(initializerParams, (AuctionParameters));
+        assertTrue(uint256(ap.endBlock) != uint256(deadline));
+        assertTrue(uint256(mp.migrationBlock) != uint256(deadline));
+    }
+
     function test_setCcaRequiresHookAuthorizedToStrategy() public {
         Launchpad pad = new Launchpad(protocol, signer, launchpad.ens());
         MockLBPStrategy strategy = new MockLBPStrategy();
@@ -110,7 +122,7 @@ contract CcaLaunchTest is LaunchpadStack {
         _registerProphetOn(pad, prophet, "ringo");
         vm.prank(prophet);
         vm.expectRevert(Launchpad.CcaNotSet.selector);
-        pad.launch("lingo-2028", "a prophecy sentence");
+        pad.launch("lingo-2028", "a prophecy sentence", 1_800_000_000);
     }
 
     function test_setAuctionBlocksOnlyDeployer() public {
@@ -128,7 +140,7 @@ contract CcaLaunchTest is LaunchpadStack {
         _registerProphetOn(pad, prophet, "ringo");
         vm.prank(prophet);
         vm.expectRevert(Launchpad.ProphetRecipient.selector);
-        pad.launch("lingo-2028", "a prophecy sentence");
+        pad.launch("lingo-2028", "a prophecy sentence", 1_800_000_000);
     }
 
     function test_isGraduatedForwardsAuction() public {

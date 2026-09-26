@@ -157,7 +157,7 @@ describe("launch write", () => {
     expect(fns.simulateContract.mock.calls[0][1]).toMatchObject({
       address: MOCK_WORLD_LAUNCHPAD,
       functionName: "launch",
-      args: [launchInput.slug, launchInput.prophecy],
+      args: [launchInput.slug, launchInput.prophecy, 0n],
     });
     expect(fns.simulateContract.mock.calls[0][1]).not.toHaveProperty("value");
     expect(fns.writeContract.mock.calls[0][1]).toMatchObject({ functionName: "launch" });

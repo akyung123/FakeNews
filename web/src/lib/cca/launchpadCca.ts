@@ -5,6 +5,7 @@
  */
 import type { Address, Hex } from "viem";
 import { encodePacked } from "viem";
+import { LAUNCH_DEADLINE } from "../launchpadAbi";
 import { launchpadCcaAbi, lockerCcaAbi } from "./abi/launchpadCca";
 import type { CcaWriteRequest } from "./writes";
 
@@ -95,7 +96,8 @@ export function auctionBlocksRead(launchpad: Address) {
 }
 
 /**
- * `launch(slug, prophecy)` — not payable, no first buy.
+ * `launch(slug, prophecy, deadline)` — not payable, no first buy.
+ * `deadline` is legacy: always LAUNCH_DEADLINE (0).
  * Returns the token only — read auction from Launched or auctionOf.
  */
 export function launchCcaWrite(
@@ -107,7 +109,7 @@ export function launchCcaWrite(
     address: launchpad,
     abi: launchpadCcaAbi,
     functionName: "launch",
-    args: [slug, prophecy],
+    args: [slug, prophecy, LAUNCH_DEADLINE],
   };
 }
 

@@ -153,8 +153,8 @@ contract Launchpad {
     }
 
     /// Mints the token and starts the CCA via official LBPStrategy.
-    /// `prophecy` is written only into the prophecy resolver.
-    function launch(string calldata slug, string calldata prophecy)
+    /// `prophecy` and `deadline` are written only into the prophecy resolver.
+    function launch(string calldata slug, string calldata prophecy, uint64 deadline)
         external
         nonReentrant
         returns (address token)
@@ -198,7 +198,7 @@ contract Launchpad {
         if (auction == address(0) || auction.code.length == 0) revert AuctionNotCreated();
         _auctionOf[token] = auction;
 
-        ens.registerProphecy(prophetLabel, slug, prophecy, token);
+        ens.registerProphecy(prophetLabel, slug, prophecy, deadline, token);
         emit Launched(token, msg.sender, auction, prophetLabel, slug);
     }
 

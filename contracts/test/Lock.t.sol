@@ -63,6 +63,14 @@ contract LockTest {
                 "EACUnauthorizedAccountRoles"
             );
         }
+        try prophet.setText(prophecyResolver, name, "deadline", "1") {
+            revert("deadline edit should revert");
+        } catch (bytes memory err) {
+            require(
+                bytes4(err) == IPermissionedResolver.EACUnauthorizedAccountRoles.selector,
+                "deadline EAC"
+            );
+        }
         require(
             !IPermissionedResolver(prophecyResolver).hasAssignees(
                 uint256(keccak256(bytes("prophecy"))), ROLE_SET_TEXT
@@ -73,7 +81,7 @@ contract LockTest {
             !IPermissionedResolver(prophecyResolver).hasAssignees(
                 uint256(keccak256(bytes("deadline"))), ROLE_SET_TEXT
             ),
-            "no deadline writer"
+            "deadline key"
         );
         require(
             !IPermissionedResolver(prophecyResolver).hasAssignees(
@@ -163,7 +171,8 @@ contract LockTest {
         string memory sentence = _text(prophecyResolver, _prophecyDns(), "prophecy");
         require(keccak256(bytes(sentence)) == keccak256(bytes(SENTENCE)), "sentence");
 
-        require(bytes(_text(prophecyResolver, _prophecyDns(), "deadline")).length == 0, "no deadline record");
+        string memory deadline = _text(prophecyResolver, _prophecyDns(), "deadline");
+        require(keccak256(bytes(deadline)) == keccak256(bytes("1893456000")), "deadline");
 
         address wallet = _addr(prophetResolver, DnsCodec.join(PROPHET, parentDns));
         require(wallet == address(prophet), "prophet wallet");
@@ -178,7 +187,7 @@ contract LockTest {
 
     function _launch() internal returns (address prophetResolver, address prophecyResolver) {
         (, prophetResolver) = ens.registerProphet(PROPHET, address(prophet));
-        prophecyResolver = ens.registerProphecy(PROPHET, SLUG, SENTENCE, token);
+        prophecyResolver = ens.registerProphecy(PROPHET, SLUG, SENTENCE, 1893456000, token);
     }
 
     function _prophecyDns() internal view returns (bytes memory) {

@@ -14,6 +14,7 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 |---|---|---|---|
 | `<prophet>.prophecy.eth` | prophet wallet | `avatar`, `description` | prophet only (per-key role) |
 | `<slug>.<prophet>.prophecy.eth` | prophecy token | `prophecy` = sentence (1–140 UTF-8 bytes; `BadProphecy`) | **nobody** (written at init only) |
+| | | `deadline` = unix seconds, decimal string. Legacy: the web sends 0 and never reads it (DECISIONS #18) | **nobody** |
 | | | `avatar`, `description` | prophet only |
 
 - **Label rules** `(draft)`
@@ -21,7 +22,7 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
   - Prophecy: 3–32 chars, `[a-z0-9-]`, no leading or trailing hyphen
 - **Expiry:** `type(uint64).max` for every name, so names never expire (DECISIONS #14).
 - **Transfer:** not allowed. The owner's role bitmap is 0.
-- **No deadline record.** A prophecy has no deadline and no Departed status (DECISIONS #18).
+- **No Departed.** The screen shows no deadline and no Departed status. The `deadline` record is ignored even when it holds `"0"` (DECISIONS #18).
 
 ## 2. Contracts
 
@@ -39,7 +40,8 @@ function setUniswap(address poolManager, address hook, address locker) external;
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
 
 // Issue a prophecy. Caller must own a prophet name. Not payable; starts the CCA auction.
-function launch(string slug, string prophecy) external returns (address token);
+// deadline is legacy: written to the `deadline` text record only. The web always sends 0.
+function launch(string slug, string prophecy, uint64 deadline) external returns (address token);
 
 // memo: optional one-line note shown next to the trade. Empty string for none. At most 140 bytes.
 function buy(address token, uint256 minTokensOut, string memo) external payable;
@@ -199,7 +201,7 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 | `MOCK_USDC_MINT_AMOUNT` | optional MockUSDC `mint` amount (6 decimals). Empty = script mints enough for the fee |
 | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |
 
-Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. When the address is set, the web app sends `launch`, `buy`, `sell` (and ERC-20 `approve` before `sell` when allowance is short) only for tokens that came from a `Launched` log or a live `launch` receipt. Mock seed coins and `prototypeCoinFromName` rows are never simulate or write targets and do not render the trade box. `claimCreatorFee` is sent from a live prophet's own page (`prophetOf(wallet)` matches the name) only when `creatorFeeOf(wallet)` is greater than 0; the Claim fees button stays disabled (existing style) when the view is 0 so the send does not revert `ZeroAmount`. Mock prophet rows do not send it. `minTokensOut` / `minEthOut` use a 1% band under the local curve quote. `launch` and `buy` / `sell` have no deadline argument. Empty address keeps the local mock store. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0. The web app does not read `ENS_ADAPTER_ADDRESS`; if it needs the adapter it calls `launchpad.ens()`.
+Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. When the address is set, the web app sends `launch`, `buy`, `sell` (and ERC-20 `approve` before `sell` when allowance is short) only for tokens that came from a `Launched` log or a live `launch` receipt. Mock seed coins and `prototypeCoinFromName` rows are never simulate or write targets and do not render the trade box. `claimCreatorFee` is sent from a live prophet's own page (`prophetOf(wallet)` matches the name) only when `creatorFeeOf(wallet)` is greater than 0; the Claim fees button stays disabled (existing style) when the view is 0 so the send does not revert `ZeroAmount`. Mock prophet rows do not send it. `minTokensOut` / `minEthOut` use a 1% band under the local curve quote. `buy` / `sell` have no deadline argument; `launch` always sends `deadline = 0`. Empty address keeps the local mock store. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0. The web app does not read `ENS_ADAPTER_ADDRESS`; if it needs the adapter it calls `launchpad.ens()`.
 
 After a successful send, infra writes a machine-readable record (no secrets) to `deployments/sepolia.json`, or `deployments/anvil.json` on a local / fork run (gitignored). Format: [`infra/README.md`](../infra/README.md) “Deployment record”. Web copies `launchpad` into `VITE_LAUNCHPAD_ADDRESS` and `launchpadBlock` into `VITE_LAUNCHPAD_DEPLOY_BLOCK` (optional; empty means the web uses a recent block range). `hook` / `locker` / `poolManager` are recorded after `setUniswap`; optional `VITE_HOOK_ADDRESS` / `VITE_LOCKER_ADDRESS` copy the first two. `VITE_CHAIN_ID` stays `11155111` on Sepolia.
 

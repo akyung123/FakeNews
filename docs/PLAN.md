@@ -96,8 +96,7 @@ Team decision B2: replace the bonding curve with official Uniswap LBPStrategy. T
 - [x] Follow-up Sepolia fork tests: no-checkpoint 0.021@2× floor, `CannotExitBid` at clearing, Launchpad+ProphecyHook+Locker migrate/register, leftover ETH `assertEq(171)` @cursor
 - [x] CCA `Deploy.s.sol`: hook `authorized` = LBPStrategy, `setUniswap` then `setCca`, sepolia.json schema @cursor
 - [x] Web bid / CCALens / claim / migrate / v4 swap + collect on existing screens @cursor
-- [x] Remove deadline and Departed (DECISIONS #18): `launch(slug, prophecy)`, no `deadline` text record, no deadline field on Issue, no Departed on the prophet page @akyung123
-- [ ] Redeploy Launchpad and the ENS adapter on Sepolia with the new `launch` (a person broadcasts; skill `deploy-sepolia`)
+- [x] Remove deadline and Departed from the screens (DECISIONS #18): no deadline field on Issue, no Departed on the prophet page, `launch` always sends `deadline = 0`, no redeploy @akyung123
 - [ ] Market stage badge (Auction / Graduated / Ended) on the prophecy detail screen, then the list
 
 ## If there is time

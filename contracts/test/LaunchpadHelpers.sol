@@ -33,6 +33,7 @@ contract MockProphecyEns is IProphecyEns {
         string calldata prophetLabel,
         string calldata slug,
         string calldata,
+        uint64,
         address token
     ) external returns (address resolver) {
         if (walletOf[prophetLabel] == address(0)) revert UnknownProphet();
@@ -124,7 +125,7 @@ abstract contract LaunchpadTestBase is Test {
 
     function _launchOn(Launchpad pad, address wallet, string memory slug) internal returns (address token) {
         vm.prank(wallet);
-        token = pad.launch(slug, "a prophecy sentence");
+        token = pad.launch(slug, "a prophecy sentence", 1_800_000_000);
     }
 
     function _launch(string memory slug) internal returns (address token) {

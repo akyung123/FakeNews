@@ -735,7 +735,7 @@ describe("INTERFACE_CCA specified Launchpad names", () => {
     expect(names(launchpadCcaAbi, "function")).toEqual(expect.arrayContaining(["auctionBlocks"]));
     const launched = launchCcaWrite(launchpad, "lingo-2028", "hello");
     expect(launched.functionName).toBe("launch");
-    expect(launched.args).toEqual(["lingo-2028", "hello"]);
+    expect(launched.args).toEqual(["lingo-2028", "hello", 0n]);
     expect(collectCcaWrite(locker, TOKEN, 7n)).toMatchObject({
       abi: lockerCcaAbi,
       functionName: "collect",

@@ -11,7 +11,7 @@ import { quoteBuyWei, quoteSellWei, toCurveWei, type CurveState } from "./curve"
 import { contracts } from "./contracts";
 import { erc20Abi } from "./erc20Abi";
 import { ISSUE_COPY } from "./issue";
-import { launchpadAbi } from "./launchpadAbi";
+import { LAUNCH_DEADLINE, launchpadAbi } from "./launchpadAbi";
 import { MOCK_PROPHECIES, SEED_COINS } from "./mock";
 import { actions } from "./store";
 import { wagmiConfig } from "./wagmi";
@@ -215,7 +215,7 @@ export function launchWrite(input: LaunchInput, address: Address) {
     address,
     abi: launchpadAbi,
     functionName: "launch" as const,
-    args: [input.slug, input.prophecy] as const,
+    args: [input.slug, input.prophecy, LAUNCH_DEADLINE] as const,
   };
 }
 

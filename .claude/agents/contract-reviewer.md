@@ -15,7 +15,7 @@ You review Solidity changes in `contracts/` for the Prophecy launchpad. You do n
 ## Check, in this order
 
 1. **Locks (highest priority)**
-   - No account ends up holding `ROLE_SET_TEXT` for the `prophecy` key, or root `ROLE_SET_TEXT`, `ROLE_LINK`, `ROLE_UPGRADE` on a prophecy resolver.
+   - No account ends up holding `ROLE_SET_TEXT` for the `prophecy` or `deadline` keys, or root `ROLE_SET_TEXT`, `ROLE_LINK`, `ROLE_UPGRADE` on a prophecy resolver.
    - No registry grant or `register` role bitmap includes `ROLE_UNREGISTER`, `ROLE_SET_SUBREGISTRY`, root `ROLE_SET_RESOLVER` or `ROLE_CAN_TRANSFER_ADMIN`.
    - Names use `expiry = type(uint64).max` (DECISIONS #14), never 0.
    - Temporary roles (e.g. `ROLE_SET_PARENT`) are revoked in the same transaction, admin included.
@@ -32,7 +32,7 @@ You review Solidity changes in `contracts/` for the Prophecy launchpad. You do n
 5. **Reentrancy and transfers**
    - State changes happen before external calls, ETH is sent last, and `nonReentrant` is on buy/sell/claim/collect.
    - `collect` pays only the prophet and the protocol, never `msg.sender`.
-6. **Data placement:** the sentence is not stored in contract storage or events (DECISIONS #5).
+6. **Data placement:** the sentence and deadline are not stored in contract storage or events (DECISIONS #5).
 7. **Tests:** lock tests and the three fuzz tests from PLAN exist for what changed.
 
 ## Output
