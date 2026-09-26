@@ -17,6 +17,7 @@ import { actions } from "./store";
 import { wagmiConfig } from "./wagmi";
 import { classifyWriteError } from "./writeErrors";
 import { launchpadCcaAbi } from "./cca/abi/launchpadCca";
+import { onSepolia, requireSepolia } from "./chain";
 import { getPublicClient } from "./rpc";
 
 export { WRITE_REVERT_COPY, classifyWriteError } from "./writeErrors";
@@ -127,6 +128,8 @@ export type WriteOptions = {
   onPhase?: (phase: WritePhase) => void;
   /** Looks the new token up in fresh blocks when the receipt carried no Launched log. */
   findLaunched?: (input: FindLaunchedInput) => Promise<Address | null>;
+  /** Switches the wallet to Sepolia before a write. Default: wagmi switchChain(11155111). */
+  ensureChain?: () => Promise<void>;
 };
 
 export type FindLaunchedInput = {
@@ -358,9 +361,12 @@ async function sendWrite(
   extra?: { onPhase?: (phase: WritePhase) => void },
 ): Promise<WriteReceipt> {
   const { simulate, write, wait } = clients(options);
+  const mocked = Boolean(options.simulateContract || options.writeContract);
+  if (options.ensureChain) await options.ensureChain();
+  else if (!mocked) await requireSepolia();
   emitPhase(options, extra, phase);
-  const simulated = await simulate(wagmiConfig, request);
-  const hash = await write(wagmiConfig, simulated.request);
+  const simulated = await simulate(wagmiConfig, onSepolia(request));
+  const hash = await write(wagmiConfig, onSepolia(simulated.request ?? request));
   emitPhase(options, extra, "waiting");
   const receipt = await wait(wagmiConfig, { hash });
   if (receipt.status !== "success") throw new TransactionRevertedError();

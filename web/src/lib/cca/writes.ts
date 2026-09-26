@@ -6,10 +6,11 @@
 import { simulateContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { wagmiConfig } from "../wagmi";
 import type { Hex } from "../world";
-import { ensureSepoliaChain } from "./sepolia";
+import { onSepolia, switchWalletToSepolia } from "../chain";
 
 export type CcaWriteRequest = {
   address: `0x${string}`;
+  chainId?: number;
   abi: readonly unknown[];
   functionName: string;
   args?: readonly unknown[];
@@ -62,14 +63,16 @@ export async function sendCcaWriteResult(
 ): Promise<CcaWriteResult> {
   const mocked = Boolean(options.simulateContract || options.writeContract);
   if (!mocked) {
-    const onSepolia = await (options.ensureSepolia ?? ensureSepoliaChain)();
-    if (!onSepolia) throw new Error("Switch to Sepolia");
+    // wagmi switchChain(11155111) when the wallet is elsewhere; the request also pins chainId.
+    const ready = await (options.ensureSepolia ?? (() => switchWalletToSepolia()))();
+    if (!ready) throw new Error("Switch to Sepolia");
   }
   const simulate = options.simulateContract ?? ((config, req) => simulateContract(config, req as never));
   const send = options.writeContract ?? ((config, req) => writeContract(config, req as never));
   const wait = options.waitForTransactionReceipt ?? waitForTransactionReceipt;
-  await simulate(wagmiConfig, request);
-  const hash = await send(wagmiConfig, request);
+  const pinned = onSepolia(request);
+  await simulate(wagmiConfig, pinned);
+  const hash = await send(wagmiConfig, pinned);
   const receipt = (await wait(wagmiConfig, { hash })) ?? {};
   assertSuccessfulReceipt(receipt, label);
   return { hash, receipt };

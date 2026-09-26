@@ -1,6 +1,7 @@
 import { isAddress, type Address } from "viem";
 import { readContract, simulateContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { launchpadCcaAbi } from "./cca/abi/launchpadCca";
+import { onSepolia, requireSepolia } from "./chain";
 import { launchpadAbi } from "./launchpadAbi";
 import { contracts } from "./contracts";
 import { webEnv } from "./env";
@@ -42,6 +43,8 @@ export type RegisterProphetOptions = {
   simulateContract?: WagmiSimulate;
   writeContract?: WagmiRegisterWrite;
   waitForTransactionReceipt?: WagmiWaitForReceipt;
+  /** Switches the wallet to Sepolia before the write. Default: wagmi switchChain(11155111). */
+  ensureChain?: () => Promise<void>;
 };
 
 export function assertSuccessfulReceipt(receipt: { status?: string } | null | undefined): void {
@@ -126,13 +129,13 @@ export function registerProphetWrite(input: RegisterProphetInput, address = cont
   if (!address) {
     throw new Error("Launchpad address is not set");
   }
-  return {
+  return onSepolia({
     address,
     abi: launchpadAbi,
     functionName: "registerProphet" as const,
     args: registerProphetArgs(input),
     account: input.wallet,
-  };
+  });
 }
 
 /** curve(token) → complete is the on-chain graduation flag (PR #26). */
@@ -189,6 +192,9 @@ export function createRegisterProphet(
     const simulate = options.simulateContract ?? simulateContract;
     const send = options.writeContract ?? writeContract;
     const wait = options.waitForTransactionReceipt ?? waitForTransactionReceipt;
+    const mocked = Boolean(options.simulateContract || options.writeContract);
+    if (options.ensureChain) await options.ensureChain();
+    else if (!mocked) await requireSepolia();
     await simulate(wagmiConfig, request);
     const hash = await send(wagmiConfig, request);
     const receipt = await wait(wagmiConfig, { hash });
