@@ -29,9 +29,9 @@ import {ScriptVm} from "./ScriptVm.sol";
 ///   require(address(launchpad) == predictedPad)
 ///
 /// Then, still as the deployer (INTERFACE §2 / LaunchpadStack._wireUniswap):
-///   1. mine a CREATE2 salt so the hook address low bits match
-///      HookMiner.prophecyFlags() (BEFORE_INITIALIZE_FLAG), using the Launchpad
-///      address as ProphecyHook constructor input
+///   1. mine a CREATE2 salt (CREATE2_FACTORY = Nick's / Foundry factory) so
+///      the hook address low bits match HookMiner.prophecyFlags()
+///      (BEFORE_INITIALIZE_FLAG), using the Launchpad address as constructor input
 ///   2. new ProphecyHook{salt}(poolManager, launchpad)
 ///   3. new LiquidityLocker(poolManager, launchpad, hook)
 ///   4. launchpad.setUniswap(poolManager, hook, locker) exactly once
@@ -56,6 +56,11 @@ contract Deploy is ScriptVm {
     address internal constant PLACEHOLDER_FEE = address(uint160(0xfee));
     address internal constant PLACEHOLDER_SIGNER = address(uint160(0x51e));
     address internal constant PLACEHOLDER_ENS = address(uint160(0xe05));
+
+    /// Arachnid/Foundry CREATE2 factory. `new Foo{salt}` in a forge script
+    /// deploys through this address, not the EOA. Same address as
+    /// forge-std `CREATE2_FACTORY` / Nick's factory; present on Sepolia.
+    address internal constant CREATE2_FACTORY = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     event Deployed(string name, address addr);
     event CopyIntoWorldEnv(string name, address value);
@@ -140,7 +145,7 @@ contract Deploy is ScriptVm {
         require(launchpad.worldSigner() == worldSigner);
         require(launchpad.protocolFeeRecipient() == protocolFeeRecipient);
 
-        (address hookAddr, address lockerAddr, bytes32 hookSalt) = _wireUniswap(launchpad, poolManager, deployer);
+        (address hookAddr, address lockerAddr, bytes32 hookSalt) = _wireUniswap(launchpad, poolManager);
         require(address(launchpad.hook()) == hookAddr, "launchpad.hook");
         require(address(launchpad.locker()) == lockerAddr, "launchpad.locker");
         require(address(launchpad.poolManager()) == address(poolManager), "launchpad.poolManager");
@@ -193,8 +198,9 @@ contract Deploy is ScriptVm {
     }
 
     /// CREATE2 Hook (mined flags, Launchpad in the constructor), Locker, then
-    /// deployer-only setUniswap once. CREATE2 deployer is the broadcast EOA.
-    function _wireUniswap(Launchpad launchpad, IPoolManager poolManager, address deployer)
+    /// deployer-only setUniswap once. Salt is mined for CREATE2_FACTORY because
+    /// forge script `new Hook{salt}` goes through that factory, not the EOA.
+    function _wireUniswap(Launchpad launchpad, IPoolManager poolManager)
         internal
         returns (address hookAddr, address lockerAddr, bytes32 salt)
     {
@@ -203,10 +209,10 @@ contract Deploy is ScriptVm {
         salt = vm.envOr("HOOK_SALT", bytes32(0));
         if (salt == bytes32(0)) {
             (predicted, salt) =
-                HookMiner.find(deployer, HookMiner.prophecyFlags(), type(ProphecyHook).creationCode, ctorArgs);
+                HookMiner.find(CREATE2_FACTORY, HookMiner.prophecyFlags(), type(ProphecyHook).creationCode, ctorArgs);
         } else {
             bytes32 initCodeHash = keccak256(abi.encodePacked(type(ProphecyHook).creationCode, ctorArgs));
-            predicted = HookMiner.computeAddress(deployer, salt, initCodeHash);
+            predicted = HookMiner.computeAddress(CREATE2_FACTORY, salt, initCodeHash);
             require(uint160(predicted) & HookMiner.FLAG_MASK == HookMiner.prophecyFlags(), "HOOK_SALT flags");
         }
         ProphecyHook hook = new ProphecyHook{salt: salt}(poolManager, address(launchpad));
