@@ -9,6 +9,7 @@
  *
  * Sentences must come through this module. Screen components never hardcode them.
  */
+import { CURVE_SUPPLY } from "./curve";
 import { MOCK_PARENT_NAME, MOCK_PROPHETS, MOCK_PROPHECIES } from "./mock";
 import { marketCap, type Coin } from "./store";
 
@@ -90,7 +91,7 @@ export function getProphecyByName(name: string, nowSec = Math.floor(Date.now() /
 export function prototypeCoinFromName(name: string, nowSec?: number): Coin | null {
   const p = getProphecyByName(name, nowSec);
   if (!p) return null;
-  const sold = Number(p.sold / 10n ** 18n);
+  const sold = p.complete ? CURVE_SUPPLY : Number(p.sold / 10n ** 18n);
   const createdAt = (nowSec ?? Math.floor(Date.now() / 1000)) * 1000;
   const coin: Coin = {
     id: p.slug,

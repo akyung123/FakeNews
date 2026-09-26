@@ -2,7 +2,7 @@ export function eth(value: number, digits = 3): string {
   return `${value.toFixed(digits)} ETH`;
 }
 
-/** Market cap is how people talk about entry on a launchpad: "bought at 1.4 ETH MC". */
+/** Format the current price as an ETH figure. */
 export function mcap(value: number): string {
   return `${value < 10 ? value.toFixed(2) : value.toFixed(1)} ETH`;
 }
