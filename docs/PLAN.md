@@ -13,6 +13,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] Parent name: check that `prophecy.eth` is free on Sepolia
 - [x] DECISIONS #14: prophecy names never expire
 - [x] DECISIONS #15: trade memos yes, holder talk not now
+- [x] DECISIONS #18–#22: CCA B2 on the `cca` family; #15 memos superseded on that path @cursor
 - [ ] Protocol fee recipient
 - [ ] Who owns which lane (write names here)
 
@@ -85,6 +86,16 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [ ] Record the remaining scenes in SPEC "Demo" (total 2–4 minutes, success and failure paths).
 - [ ] If the ENS app cannot read Sepolia ENSv2 names: use the viem lookup script in `infra/` (`getEnsAddress` and text record) output as the external lookup evidence for scenes 1 and 2.
 - [ ] `FEEDBACK.md` (Uniswap): keep notes of blockers during development; it is the fallback deliverable if Uniswap graduation is cut.
+
+## 6. CCA (`cca` branch family — not `main`)
+
+Gates (KST): 22:00 INTERFACE + contract skeleton; 02:00 Sepolia-fork 4 steps; 03:30 web + deploy script. Miss any gate → curve on `main`.
+
+- [x] INTERFACE + DECISIONS #18–#22 for B2 (LBPStrategy `initializeDistribution`, hook inherits `InitializerHook`, locker holds the NFT) @cursor
+- [ ] `FEEDBACK.md` Uniswap prize write-up (CCA + LBPStrategy + v4 hook) @cursor
+- [ ] Contracts skeleton on a `cca/*` branch (Launchpad calls `initializeDistribution`; no curve) — 22:00 gate
+- [ ] Sepolia-fork 4 steps green: launch+create auction, bid, migrate opens v4 pool, swap — 02:00 gate
+- [ ] Web bid / CCALens / claim / migrate / v4 swap + deploy script keys in `deployments/sepolia.json` — 03:30 gate
 
 ## If there is time
 
