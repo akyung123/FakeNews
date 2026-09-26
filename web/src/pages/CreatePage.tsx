@@ -8,6 +8,7 @@ import {
   isIssueFormValid,
   isLaunchEnabled,
   isNamedProphet,
+  isProtocolFeeRecipient,
   isRegisterSubmitEnabled,
   ISSUE_COPY,
   ISSUE_PLACEHOLDER,
@@ -21,7 +22,12 @@ import {
   type RegisterStatus,
 } from "../lib/issue";
 import { useIssueSession, useProphetLookup, useWalletBoundWorld } from "../lib/issueSession";
-import { createReadProphetOf, createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
+import {
+  createReadProphetOf,
+  createReadProtocolFeeRecipient,
+  createRegisterProphet,
+  type RegisterProphetInput,
+} from "../lib/launchpad";
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_PARENT_NAME } from "../lib/mock";
 import { isMockMode } from "../lib/mode";
 import { actions } from "../lib/store";
@@ -47,7 +53,11 @@ export type IssueScreenProps = {
   registerProphet?: (input: RegisterProphetInput) => Promise<void>;
   launchProphecy?: (input: LaunchInput) => Promise<`0x${string}` | null>;
   lookupProphet?: (wallet: string) => Promise<string>;
+  /** Launchpad.protocolFeeRecipient(); that wallet can't launch. */
+  readFeeRecipient?: () => Promise<string | null>;
 };
+
+const readFeeRecipientDefault = createReadProtocolFeeRecipient();
 
 /** Sample hints in demo mode only, so chain mode never shows a sample prophet name. */
 export function issuePlaceholder(mock = isMockMode()) {
@@ -68,6 +78,7 @@ export function IssueScreen({
   registerProphet = createRegisterProphet(),
   launchProphecy,
   lookupProphet,
+  readFeeRecipient = readFeeRecipientDefault,
 }: IssueScreenProps) {
   const navigate = useNavigate();
   // One client per screen. A new one each render makes WorldGate recheck the
@@ -121,12 +132,26 @@ export function IssueScreen({
     storeLaunchDraft({ prophetLabel: typedLabel, prophecy, slug });
   }, [typedLabel, prophecy, slug]);
 
+  const [feeRecipientAddress, setFeeRecipientAddress] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void readFeeRecipient()
+      .then((value) => {
+        if (!cancelled) setFeeRecipientAddress(value);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [readFeeRecipient]);
+  const feeRecipient = isProtocolFeeRecipient(wallet, feeRecipientAddress);
+
   const formValid = isIssueFormValid({
     prophetLabel,
     prophecy,
     slug,
   });
-  const gate = { returningProphet, worldStatus, formValid, registerStatus };
+  const gate = { returningProphet, worldStatus, formValid, registerStatus, feeRecipient };
   const named = isNamedProphet(gate);
   const registeredHere = registerStatus === "success";
   const canLaunch = walletReady && isLaunchEnabled(gate);
@@ -236,6 +261,11 @@ export function IssueScreen({
                 setWriteSuccess(WRITE_COPY.launchSuccess);
                 if (onIssued) onIssued(token);
                 else navigate(`/coin/${token}`);
+                return;
+              }
+              if (!isMockMode()) {
+                // Chain mode never falls back to a local demo coin.
+                setWriteError(ISSUE_COPY.launchUnavailable);
                 return;
               }
               const id = actions.create({
@@ -352,6 +382,11 @@ export function IssueScreen({
         >
           {submitLabel}
         </button>
+        {feeRecipient ? (
+          <p className="faint small" data-testid="fee-recipient">
+            {ISSUE_COPY.feeRecipient}
+          </p>
+        ) : null}
         {walletReady && !named && worldStatus !== "success" ? (
           <p className="faint small">The button stays off until World verification succeeds.</p>
         ) : null}

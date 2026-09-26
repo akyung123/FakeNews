@@ -973,8 +973,10 @@ After `Migrated`, if `isRegistered(token, tokenId)` is false ([`LiquidityLocker.
 
 | Surface | Copy |
 |---|---|
-| CTA | `Set up fee collection` / pending: `Setting up…` / done (on `Registered` event): `Fee collection ready` |
-| Helper | `One-time step after the market opens. Anyone can do this.` |
+| CTA | `Turn on trading fees` / pending: `Turning on trading fees…` / done (on `Registered` event): `Trading fees on` |
+| Helper | `Links this pool to the fee vault so the prophet earns 24% of every trade. One-time, anyone can do it.` |
+
+The button sends `register` only. `Collect fees` (7.13) appears once `isRegistered(token, tokenId)` is true. (Web copy change, fix/chain-mode-polish: "Collect fees" on a pool that was not linked yet read like a payout.)
 
 `NotNftOwner()` has no UI copy (internal error). Before pool open, `UnknownLock` keeps showing `Fees start once the market opens.`
 

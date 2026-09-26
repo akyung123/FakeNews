@@ -26,10 +26,21 @@ function renderGate(fetch: typeof globalThis.fetch) {
 }
 
 describe("WorldGate server fallback", () => {
-  it("uses the existing mock World step when the signature server answers with an error", async () => {
-    renderGate(async () => new Response("", { status: 503 }));
+  it("shows an error with Retry, not the mock step, when the signature server answers 5xx", async () => {
+    const user = userEvent.setup();
+    let down = true;
+    const { statuses, kinds } = renderGate(async () =>
+      down ? new Response("", { status: 503 }) : Response.json(MOCK_WORLD_HEALTH),
+    );
+    await waitFor(() => expect(kinds).toEqual(["network"]));
+    expect(statuses).toEqual(["failed"]);
+    expect(screen.queryByText(/Mock World ID/)).toBeNull();
+    expect(screen.queryByText(ISSUE_COPY.prove)).toBeNull();
+
+    down = false;
+    await user.click(screen.getByRole("button", { name: ISSUE_COPY.retry }));
     await waitFor(() => expect(screen.getByText(ISSUE_COPY.prove)).toBeInTheDocument());
-    expect(screen.getByText(/Mock World ID/)).toBeInTheDocument();
+    expect(screen.queryByText(/Mock World ID/)).toBeNull();
   });
 
   it("reports a blocked World server instead of switching to mock, and recovers on retry", async () => {

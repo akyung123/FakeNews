@@ -300,4 +300,12 @@ export const launchpadAbi = [
   { type: "error", name: "NotDeployer", inputs: [] },
   { type: "error", name: "UniswapAlreadySet", inputs: [] },
   { type: "error", name: "UniswapNotSet", inputs: [] },
+  // CCA-path Launchpad errors (contracts/src/Launchpad.sol), so viem decodes them on launch.
+  { type: "error", name: "CcaAlreadySet", inputs: [] },
+  { type: "error", name: "CcaNotSet", inputs: [] },
+  { type: "error", name: "BadAuctionBlocks", inputs: [] },
+  { type: "error", name: "AuctionExists", inputs: [] },
+  { type: "error", name: "ProphetRecipient", inputs: [] },
+  { type: "error", name: "AuctionNotCreated", inputs: [] },
+  { type: "error", name: "InvalidHook", inputs: [] },
 ] as const;

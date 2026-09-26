@@ -12,6 +12,12 @@ export const WRITE_REVERT_COPY = {
   SlugTaken: "That token name is taken. Try another.",
   Slippage: "Price moved. Try again.",
   CurveComplete: "This token has graduated. Trade on Uniswap.",
+  InvalidSignature: "The human check doesn't match this wallet. Verify with World ID again.",
+  ProphetRecipient: "This wallet receives protocol fees and can't launch.",
+  NotProphet: "Claim your name before you launch.",
+  BadLabel: "That name can't be used. Use 3–16 characters, a–z and 0–9.",
+  BadSlug: "That short name can't be used. Use a–z, 0–9 and hyphens.",
+  BadProphecy: "The prophecy is empty or too long.",
 } as const;
 
 export type MappedRevertName = keyof typeof WRITE_REVERT_COPY;
@@ -53,6 +59,18 @@ function revertName(node: object): string | undefined {
   const data = (node as { data?: { errorName?: unknown } }).data;
   if (data && typeof data === "object" && typeof data.errorName === "string" && data.errorName) {
     return data.errorName;
+  }
+  return undefined;
+}
+
+/**
+ * The custom error name viem decoded from a revert (`ContractFunctionRevertedError.data.errorName`),
+ * anywhere in the cause chain. Never guessed from message text.
+ */
+export function revertErrorName(error: unknown): string | undefined {
+  for (const node of walkCauseChain(error)) {
+    const name = revertName(node);
+    if (name) return name;
   }
   return undefined;
 }

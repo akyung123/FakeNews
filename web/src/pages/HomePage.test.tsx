@@ -163,6 +163,13 @@ describe("Home featured card", () => {
     expect(document.querySelector(".featured .stage-badge")).toHaveTextContent("Market open");
   });
 
+  it("does not feature a row whose auction was never read", async () => {
+    renderHome([launched("lingo-2028", TOKEN, 1n)]);
+    await waitFor(() => expect(screen.getByText("$LINGO-2028")).toBeInTheDocument());
+    expect(document.querySelector(".featured")).toBeNull();
+    expect(gridSlugs()).toEqual(["lingo-2028"]);
+  });
+
   it("hides the featured card when nothing is live or open", async () => {
     renderHome([refunded("trump", 2), launched("unread", token(1), 1n)]);
     await waitFor(() => expect(screen.getByText("$TRUMP")).toBeInTheDocument());
