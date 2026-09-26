@@ -28,22 +28,7 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 
 ### `Launchpad` `(draft)`
 
-Constructor argument order is frozen from the left. This PR implements 1–3.
-The graduation PR appends 4–6 after `ens` and does not reorder.
-
-```solidity
-// Final constructor order:
-constructor(
-    address protocolFeeRecipient, // 1
-    address worldSigner,          // 2
-    address ens,                  // 3  this PR (`IProphecyEns`)
-    address poolManager,          // 4  graduation PR
-    address hook,                 // 5  graduation PR
-    address locker                // 6  graduation PR
-);
-```
-
-This PR's ABI is the first three arguments only:
+Final constructor. Graduation does not add constructor arguments.
 
 ```solidity
 constructor(address protocolFeeRecipient, address worldSigner, address ens);
@@ -83,6 +68,7 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 
 - The sentence and deadline are not in `Launched`. Both are read from ENS (DECISIONS #5).
 - `registerProphet` recovers EIP-191 `personal_sign` of `keccak256(abi.encode(chainId, launchpad, wallet, nullifier))` (section 3). `chainId` must be `block.chainid` and `launchpad` must be this contract; the signed wallet must be `msg.sender`. Label is chosen by the caller and is not in the signed payload.
+- Deploy order: Launchpad, Hook (CREATE2 with the Launchpad address), Locker, then a deployer-only one-time `setUniswap(poolManager, hook, locker)` added by the graduation PR. Uniswap addresses are not constructor args.
 - Constants are exactly the "Constants" section of SPEC.md.
 - `memo` is only emitted, never stored. `buy`/`sell` revert if it is longer than 140 bytes (DECISIONS #15).
 - Rounding:
@@ -174,9 +160,12 @@ Live `GET /rp-context` and `POST /verify` wait up to 60 seconds. The first check
 | `VITE_WORLD_SERVER_URL` | web (world/ base URL; unused while mock) |
 | `VITE_WALLETCONNECT_PROJECT_ID` | web (optional; injected wallets work without it) |
 | `SEPOLIA_RPC_URL`, `DEPLOYER_PRIVATE_KEY` | contract deployment (people only) |
+| `ENS_ADAPTER_ADDRESS` | deploy script (Launchpad `ens` constructor arg) |
 | `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |
 
 Empty `VITE_LAUNCHPAD_ADDRESS` means the launchpad is not deployed yet. The web app must not invent a contract address. `VITE_UNIVERSAL_RESOLVER` is the ENSv2 address from [`ENSV2.md`](ENSV2.md) section 0.
+
+`ENS_ADAPTER_ADDRESS` is the already-deployed ENS adapter. Off anvil (`chainid != 31337`) it must be set and cannot be `address(0)` or placeholder `0xe05` — the same guard as `PROTOCOL_FEE_RECIPIENT` / `0xfee` and `worldSigner` / `0x51e`. Anvil dry-run fills `0xe05` when unset. Infra adds this name to `.env.example`.
 
 ## 6. Curve quote vectors
 
