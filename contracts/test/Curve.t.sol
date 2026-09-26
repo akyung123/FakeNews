@@ -12,9 +12,10 @@ contract CurveTest is Test {
     address internal prophet = address(0xA11CE);
     address internal buyer = address(0xB0B);
     address internal protocol = address(0xFEE);
+    address internal signer = address(0x51C);
 
     function setUp() public {
-        launchpad = new Launchpad(protocol);
+        launchpad = new Launchpad(protocol, signer);
         vm.deal(prophet, 100 ether);
         vm.deal(buyer, 100 ether);
     }
@@ -174,11 +175,17 @@ contract CurveTest is Test {
 
     function test_constructorRejectsZeroRecipient() public {
         vm.expectRevert(Launchpad.ZeroAddress.selector);
-        new Launchpad(address(0));
+        new Launchpad(address(0), signer);
+    }
+
+    function test_constructorRejectsZeroWorldSigner() public {
+        vm.expectRevert(Launchpad.ZeroAddress.selector);
+        new Launchpad(protocol, address(0));
     }
 
     function test_constructorStoresProtocolRecipient() public view {
         assertEq(launchpad.protocolFeeRecipient(), protocol);
+        assertEq(launchpad.worldSigner(), signer);
     }
 
     function test_claimProtocolFeePaysOnlyTheRecipient() public {
@@ -224,7 +231,7 @@ contract CurveTest is Test {
         vm.deal(address(launchpad), 5 ether);
         (uint256 tokensA, uint256 feeA) = launchpad.quoteBuy(token, 0.001 ether);
 
-        address clean = address(new Launchpad(protocol));
+        address clean = address(new Launchpad(protocol, signer));
         vm.prank(prophet);
         address tokenB = Launchpad(clean).launch("eth-10k", "", 0, 0);
         (uint256 tokensB, uint256 feeB) = Launchpad(clean).quoteBuy(tokenB, 0.001 ether);

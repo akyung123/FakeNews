@@ -13,7 +13,7 @@ contract CurveFuzzTest is Test {
     address[] internal traders;
 
     function setUp() public {
-        launchpad = new Launchpad(address(0xFEE));
+        launchpad = new Launchpad(address(0xFEE), address(0x51C));
         vm.deal(prophet, 100 ether);
         traders.push(address(0x101));
         traders.push(address(0x102));

@@ -84,6 +84,7 @@ contract Launchpad {
     mapping(address wallet => uint256) internal _creatorFees;
     uint256 public protocolFees;
     address public immutable protocolFeeRecipient;
+    address public immutable worldSigner;
 
     event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
     event Trade(
@@ -120,12 +121,14 @@ contract Launchpad {
         _status = _NOT_ENTERED;
     }
 
-    constructor(address protocolFeeRecipient_) {
-        if (protocolFeeRecipient_ == address(0)) revert ZeroAddress();
+    constructor(address protocolFeeRecipient_, address worldSigner_) {
+        if (protocolFeeRecipient_ == address(0) || worldSigner_ == address(0)) revert ZeroAddress();
         protocolFeeRecipient = protocolFeeRecipient_;
+        worldSigner = worldSigner_;
     }
 
-    /// World ID prophet names are a later milestone.
+    /// World ID prophet names are a later milestone. The server signature
+    /// check (chainId, this launchpad, unused nullifier, worldSigner) lands then.
     function registerProphet(string calldata, uint256, bytes calldata) external pure {
         revert NotImplemented();
     }
