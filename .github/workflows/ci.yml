@@ -18,6 +18,8 @@ jobs:
       # No lint/typecheck scripts on the current web skeleton. tsc is the check.
       - name: Typecheck
         run: bunx tsc --noEmit
+      - name: Vitest
+        run: bunx vitest run
       - run: bun run build
 
   contracts:
