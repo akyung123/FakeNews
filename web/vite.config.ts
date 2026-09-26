@@ -21,6 +21,7 @@ export default defineConfig({
       "src/pages/CoinPage.test.tsx",
       "src/pages/ProphetPage.test.tsx",
       "src/copy.test.tsx",
+      "src/lib/cca/copy.test.ts",
     ],
   },
 });
