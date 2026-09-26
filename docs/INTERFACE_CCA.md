@@ -10,3 +10,5 @@ Companion to [`INTERFACE.md`](INTERFACE.md). **`INTERFACE.md` stays the bonding-
 - `TBD(backend)` / `TBD (#42)` is still open on the contracts PR. Do not guess a function, field, event, or error to fill it. Do not invent floor / tick numbers.
 
 ## 0. Pinned official sources
+
+Read on 2026-09-26. Every external signature below is copied from these pins. If a name is not in this file, it is not in the official source we read.
