@@ -98,13 +98,13 @@ export function CoinPage() {
 
 function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: number }) {
   const [side, setSide] = useState<"buy" | "sell">("buy");
-  const [amount, setAmount] = useState("0.05");
+  const [amount, setAmount] = useState("0.001");
   const value = Number(amount) || 0;
   const closed = graduated(coin);
 
   const buyQuote = quoteBuy(coin, Math.min(value, balance));
   const sellTokens = Math.min(held, (held * Math.min(value, 100)) / 100);
-  const sellQuote = quoteSell(coin, sellTokens);
+  const sellQuote = quoteSell(coin, sellTokens).eth;
 
   function submit() {
     if (side === "buy") actions.buy(coin.id, value);
@@ -114,7 +114,7 @@ function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: 
   return (
     <section className="block trade">
       <div className="tabs">
-        <button type="button" className={side === "buy" ? "on buy" : ""} onClick={() => { setSide("buy"); setAmount("0.05"); }}>
+        <button type="button" className={side === "buy" ? "on buy" : ""} onClick={() => { setSide("buy"); setAmount("0.001"); }}>
           Buy
         </button>
         <button type="button" className={side === "sell" ? "on sell" : ""} onClick={() => { setSide("sell"); setAmount("100"); }}>
@@ -126,7 +126,7 @@ function TradeBox({ coin, balance, held }: { coin: Coin; balance: number; held: 
         <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </label>
       <div className="quick">
-        {(side === "buy" ? ["0.01", "0.05", "0.1", "0.5"] : ["25", "50", "100"]).map((q) => (
+        {(side === "buy" ? ["0.0005", "0.001", "0.002", "0.005"] : ["25", "50", "100"]).map((q) => (
           <button type="button" key={q} onClick={() => setAmount(q)}>
             {side === "buy" ? `${q} ETH` : `${q}%`}
           </button>

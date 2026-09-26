@@ -8,7 +8,7 @@ export function MyPage() {
   const held: { coin: Coin; pos: Position; value: number }[] = [];
   for (const coin of s.coins) {
     const pos = myPosition(s, coin.id);
-    if (pos) held.push({ coin, pos, value: quoteSell(coin, pos.tokens) });
+    if (pos) held.push({ coin, pos, value: quoteSell(coin, pos.tokens).eth });
   }
   const total = held.reduce((n, h) => n + h.value, 0);
   const cost = held.reduce((n, h) => n + h.pos.cost, 0);
@@ -22,7 +22,7 @@ export function MyPage() {
           <p className="big-num">{eth(total)}</p>
         </div>
         <div>
-          <p className="faint small">Return if sold now</p>
+          <p className="faint small">Change since you bought</p>
           <p className={`big-num ${trend(change)}`}>{pct(change)}</p>
         </div>
         <div>
@@ -52,7 +52,7 @@ export function MyPage() {
               <span className="num col-mid">Bought at (MC)</span>
               <span className="num col-mid">Now (MC)</span>
               <span className="num">If sold now</span>
-              <span className="num">Return</span>
+              <span className="num">Change</span>
               <span className="num col-opt">Posts</span>
             </div>
             {held.map(({ coin, pos, value }) => {
