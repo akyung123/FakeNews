@@ -68,8 +68,8 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 ## 4. World verification server (`world/`, new folder)
 
-- [ ] IDKit 4 rp-context, Portal v4 verify (see PactShare `apps/back/src/lib/worldid.ts`)
-- [ ] On success, sign in the format of INTERFACE section 3
+- [x] IDKit 4 rp-context, Portal v4 verify (see PactShare `apps/back/src/lib/worldid.ts`) @cursor-agent
+- [x] On success, sign in the format of INTERFACE section 3 @cursor-agent
 
 ## 5. Demo
 
