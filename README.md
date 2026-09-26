@@ -33,6 +33,10 @@ Transactions on the deployed Launchpad. Each link opens Sepolia Etherscan; a ste
 | Fee registration (`register`) | The pool is linked to the fee vault so fees split 24 : 76 | `branching-minds` | TBD |
 | `swap` | Trading on the V4 pool | `branching-minds` | TBD |
 
+### Costs
+
+Launch costs ~5.35M gas (token + ENS subname + CCA auction + LBP strategy in one tx), paid as network gas only; no protocol fee on launch. Mainnet plan: L2 deploy and minimal-proxy clones.
+
 ## How it works
 
 ```text
