@@ -1,21 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IHooks} from "v4-core/src/interfaces/IHooks.sol";
+import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
+
 import {IProphecyEns} from "../src/ens/IProphecyEns.sol";
 import {ProphecyEns} from "../src/ens/ProphecyEns.sol";
 import {Launchpad} from "../src/Launchpad.sol";
+import {ProphecyHook} from "../src/uniswap/ProphecyHook.sol";
+import {HookMiner} from "../src/uniswap/HookMiner.sol";
+import {LiquidityLocker} from "../src/uniswap/LiquidityLocker.sol";
 import {EnsDeploy} from "./EnsDeploy.sol";
 import {SepoliaConfig} from "./SepoliaConfig.sol";
 import {ScriptVm} from "./ScriptVm.sol";
 
-/// Sepolia Launchpad + ProphecyEns deploy.
+/// Sepolia Launchpad + ProphecyEns + Hook + Locker deploy.
 ///
 /// Constructor (contracts/src/Launchpad.sol):
 ///   constructor(address protocolFeeRecipient_, address worldSigner_, IProphecyEns ens_)
-/// All three public immutable. Zero address reverts.
-/// setUniswap(poolManager, hook, locker) is coming in the graduation / lock PR
-/// (one deployer-only call). Do not call it from this script — it is not on
-/// Launchpad yet.
+/// All three public immutable. Zero address reverts. No setter on those.
 ///
 /// Default: create ProphecyEns then Launchpad in ONE broadcast, no other
 /// deployer tx in between (same pattern as contracts/test/LaunchpadEns.t.sol):
@@ -24,6 +27,20 @@ import {ScriptVm} from "./ScriptVm.sol";
 ///   new ProphecyEns(predictedPad, parentRegistry, dnsEncode(label.eth), ...)
 ///   new Launchpad(protocolFeeRecipient, worldSigner, adapter)
 ///   require(address(launchpad) == predictedPad)
+///
+/// Then, still as the deployer (INTERFACE §2 / LaunchpadStack._wireUniswap):
+///   1. mine a CREATE2 salt so the hook address low bits match
+///      HookMiner.prophecyFlags() (BEFORE_INITIALIZE_FLAG), using the Launchpad
+///      address as ProphecyHook constructor input
+///   2. new ProphecyHook{salt}(poolManager, launchpad)
+///   3. new LiquidityLocker(poolManager, launchpad, hook)
+///   4. launchpad.setUniswap(poolManager, hook, locker) exactly once
+///   5. require hook() / locker() / poolManager() match
+///
+/// PoolManager is the official Uniswap v4 Sepolia deployment
+/// (https://docs.uniswap.org/contracts/v4/deployments — same address as
+/// SepoliaConfig.POOL_MANAGER). Override with UNISWAP_V4_POOL_MANAGER.
+/// Optional HOOK_SALT skips the miner; the salt must still produce the flags.
 ///
 /// ENS_ADAPTER_ADDRESS is logged as an output. Optional override: if set, skip
 /// the adapter CREATE and pass that address as Launchpad `ens`. Off anvil a set
@@ -57,6 +74,7 @@ contract Deploy is ScriptVm {
         string memory label = vm.envOr("PARENT_LABEL", string("prophecy"));
         address deployer = _deployer();
         _teamWallet();
+        IPoolManager poolManager = _poolManager();
 
         if (chainId != 31337) {
             require(vm.envExists("DEPLOYER_PRIVATE_KEY"), "set DEPLOYER_PRIVATE_KEY");
@@ -79,6 +97,7 @@ contract Deploy is ScriptVm {
                     "ENS_ADAPTER_ADDRESS cannot be zero or placeholder 0xe05"
                 );
             }
+            require(address(poolManager).code.length > 0, "poolManager has no code");
         } else if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
             require(protocolFeeRecipient != address(0), "set PROTOCOL_FEE_RECIPIENT");
             require(worldSigner != address(0), "set WORLD_SIGNER_KEY or WORLD_SIGNER_ADDRESS");
@@ -120,18 +139,19 @@ contract Deploy is ScriptVm {
         }
         require(launchpad.worldSigner() == worldSigner);
         require(launchpad.protocolFeeRecipient() == protocolFeeRecipient);
-        vm.stopBroadcast();
 
-        // TODO(lock / graduation PR): after this broadcast, a later script will
-        //   1. mine a CREATE2 salt so Hook permission flags match, using the Launchpad address
-        //   2. deploy ProphecyHook (CREATE2) and LiquidityLocker
-        //   3. call launchpad.setUniswap(poolManager, hook, locker) once
-        //   4. require(launchpad.hook() == hook) and the locker / poolManager views
-        // Do not call those functions here — they are not on Launchpad yet.
+        (address hookAddr, address lockerAddr, bytes32 hookSalt) = _wireUniswap(launchpad, poolManager, deployer);
+        require(address(launchpad.hook()) == hookAddr, "launchpad.hook");
+        require(address(launchpad.locker()) == lockerAddr, "launchpad.locker");
+        require(address(launchpad.poolManager()) == address(poolManager), "launchpad.poolManager");
+        vm.stopBroadcast();
 
         address deployed = address(launchpad);
         emit Deployed("Launchpad", deployed);
         emit Deployed("ProphecyEns", ens);
+        emit Deployed("ProphecyHook", hookAddr);
+        emit Deployed("LiquidityLocker", lockerAddr);
+        emit Deployed("PoolManager", address(poolManager));
         emit Deployed("protocolFeeRecipient", protocolFeeRecipient);
         emit Deployed("worldSigner", worldSigner);
         emit CopyChainId("WORLD_CHAIN_ID", SepoliaConfig.CHAIN_ID);
@@ -153,8 +173,49 @@ contract Deploy is ScriptVm {
         _pasteLine(string.concat("LAUNCHPAD_ADDRESS=", vm.toString(deployed)));
         _pasteLine(string.concat("VITE_LAUNCHPAD_ADDRESS=", vm.toString(deployed)));
         _pasteLine(string.concat("VITE_CHAIN_ID=", vm.toString(chainId)));
+        _pasteLine(string.concat("HOOK_ADDRESS=", vm.toString(hookAddr)));
+        _pasteLine(string.concat("LOCKER_ADDRESS=", vm.toString(lockerAddr)));
+        _pasteLine(string.concat("POOL_MANAGER=", vm.toString(address(poolManager))));
+        _pasteLine(string.concat("UNISWAP_V4_POOL_MANAGER=", vm.toString(address(poolManager))));
+        _pasteLine(string.concat("HOOK_SALT=", vm.toString(hookSalt)));
+        _pasteLine(string.concat("VITE_HOOK_ADDRESS=", vm.toString(hookAddr)));
+        _pasteLine(string.concat("VITE_LOCKER_ADDRESS=", vm.toString(lockerAddr)));
         _pasteLine(string.concat("DEPLOYER=", vm.toString(deployer)));
         _pasteLine(signerLine);
+    }
+
+    /// Official Uniswap v4 Sepolia PoolManager, or UNISWAP_V4_POOL_MANAGER.
+    function _poolManager() internal view returns (IPoolManager) {
+        address pm = vm.envOr("UNISWAP_V4_POOL_MANAGER", address(0));
+        if (pm == address(0)) pm = SepoliaConfig.POOL_MANAGER;
+        require(pm != address(0), "poolManager");
+        return IPoolManager(pm);
+    }
+
+    /// CREATE2 Hook (mined flags, Launchpad in the constructor), Locker, then
+    /// deployer-only setUniswap once. CREATE2 deployer is the broadcast EOA.
+    function _wireUniswap(Launchpad launchpad, IPoolManager poolManager, address deployer)
+        internal
+        returns (address hookAddr, address lockerAddr, bytes32 salt)
+    {
+        bytes memory ctorArgs = abi.encode(poolManager, address(launchpad));
+        address predicted;
+        salt = vm.envOr("HOOK_SALT", bytes32(0));
+        if (salt == bytes32(0)) {
+            (predicted, salt) =
+                HookMiner.find(deployer, HookMiner.prophecyFlags(), type(ProphecyHook).creationCode, ctorArgs);
+        } else {
+            bytes32 initCodeHash = keccak256(abi.encodePacked(type(ProphecyHook).creationCode, ctorArgs));
+            predicted = HookMiner.computeAddress(deployer, salt, initCodeHash);
+            require(uint160(predicted) & HookMiner.FLAG_MASK == HookMiner.prophecyFlags(), "HOOK_SALT flags");
+        }
+        ProphecyHook hook = new ProphecyHook{salt: salt}(poolManager, address(launchpad));
+        require(address(hook) == predicted, "hook address");
+        require(uint160(address(hook)) & HookMiner.FLAG_MASK == HookMiner.prophecyFlags(), "hook flags");
+        LiquidityLocker locker = new LiquidityLocker(poolManager, address(launchpad), IHooks(address(hook)));
+        launchpad.setUniswap(poolManager, address(hook), address(locker));
+        hookAddr = address(hook);
+        lockerAddr = address(locker);
     }
 
     /// Source of truth is WORLD_SIGNER_KEY (generated at deploy, never committed).

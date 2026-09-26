@@ -15,6 +15,7 @@ interface Vm {
     function addr(uint256 privateKey) external pure returns (address);
     function toString(address value) external pure returns (string memory);
     function toString(uint256 value) external pure returns (string memory);
+    function toString(bytes32 value) external pure returns (string memory);
     function getNonce(address account) external view returns (uint64);
     function computeCreateAddress(address deployer, uint256 nonce) external pure returns (address);
     function startBroadcast() external;
