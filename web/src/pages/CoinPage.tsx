@@ -72,7 +72,10 @@ export function CoinPage({
   }, [chain, loadLaunched, lookup]);
 
   const fromStore = s.coins.find((c) => c.id === lookup || c.token === lookup || c.name === lookup);
-  const coin = chain ? (fromStore ?? chainCoin) : (fromStore ?? prototypeCoinFromName(lookup));
+  // Chain mode keeps only coins this browser launched on chain; demo seed rows stay in demo mode.
+  const coin = chain
+    ? ((fromStore?.fromChain ? fromStore : undefined) ?? chainCoin)
+    : (fromStore ?? prototypeCoinFromName(lookup));
   // Once migrate opens the pool, slot0 is the live price; before that the
   // auction's clearing price is, and the hook stays closed.
   const poolPrice = usePoolPrice(coin?.token, contracts.hook);

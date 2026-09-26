@@ -9,6 +9,7 @@ import {
   isNamedProphet,
   isRegisterSubmitEnabled,
   ISSUE_COPY,
+  ISSUE_PLACEHOLDER,
   launchButtonLabel,
   prophecyName,
   readLaunchDraft,
@@ -22,6 +23,7 @@ import {
 } from "../lib/issue";
 import { createReadProphetOf, createRegisterProphet, type RegisterProphetInput } from "../lib/launchpad";
 import { MOCK_ISSUE_PLACEHOLDER, MOCK_ISSUE_SESSION, MOCK_PARENT_NAME, MOCK_RETURNING_SESSION } from "../lib/mock";
+import { isMockMode } from "../lib/mode";
 import { actions } from "../lib/store";
 import { MAX_PROPHECY_BYTES, utf8ByteLength } from "../lib/limits";
 import {
@@ -50,8 +52,18 @@ export type IssueScreenProps = {
   lookupProphet?: (wallet: string) => Promise<string>;
 };
 
-export function resolveIssueSession(search: URLSearchParams, storedLabel = readStoredProphetLabel()): IssueSession {
-  if (search.get("returning") === "1") return { ...MOCK_RETURNING_SESSION };
+/** Sample hints in demo mode only, so chain mode never shows a sample prophet name. */
+export function issuePlaceholder(mock = isMockMode()) {
+  return mock ? MOCK_ISSUE_PLACEHOLDER : ISSUE_PLACEHOLDER;
+}
+
+export function resolveIssueSession(
+  search: URLSearchParams,
+  storedLabel = readStoredProphetLabel(),
+  mock = isMockMode(),
+): IssueSession {
+  // The sample returning prophet is a demo shortcut; chain mode reads prophetOf instead.
+  if (mock && search.get("returning") === "1") return { ...MOCK_RETURNING_SESSION };
   if (search.get("fresh") === "1") return { ...MOCK_ISSUE_SESSION };
   if (storedLabel) return { wallet: MOCK_ISSUE_SESSION.wallet, prophetLabel: storedLabel };
   return { ...MOCK_ISSUE_SESSION };
@@ -158,7 +170,7 @@ export function IssueScreen({
         </span>
       </div>
 
-      {world.isMock ? (
+      {world.isMock && isMockMode() ? (
         <p className="faint small" data-testid="mock-session-switch">
           Mock session: <Link to="/create?fresh=1">first-time</Link>
           {" · "}
@@ -246,7 +258,7 @@ export function IssueScreen({
             aria-label="Prophet name"
             value={prophetLabel}
             maxLength={16}
-            placeholder={MOCK_ISSUE_PLACEHOLDER.prophetLabel}
+            placeholder={issuePlaceholder().prophetLabel}
             readOnly={named}
             autoComplete="off"
             spellCheck={false}
@@ -261,7 +273,7 @@ export function IssueScreen({
             aria-label="Prophecy"
             rows={3}
             value={prophecy}
-            placeholder={MOCK_ISSUE_PLACEHOLDER.prophecy}
+            placeholder={issuePlaceholder().prophecy}
             onChange={(e) => setProphecy(e.target.value)}
           />
           <span className="faint small">{utf8ByteLength(prophecy)}/{MAX_PROPHECY_BYTES} · written once, then locked</span>
@@ -274,7 +286,7 @@ export function IssueScreen({
               aria-label="Short name"
               value={slug}
               maxLength={32}
-              placeholder={MOCK_ISSUE_PLACEHOLDER.slug}
+              placeholder={issuePlaceholder().slug}
               autoComplete="off"
               spellCheck={false}
               onChange={(e) => setSlug(e.target.value.toLowerCase())}

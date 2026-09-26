@@ -282,6 +282,7 @@ a.tr:hover { background: var(--soft); }
 .post-head { display: flex; align-items: center; gap: 8px; }
 .post.is-you .post-head strong { color: var(--gold-300); }
 .hold { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: var(--radius-1); font-variant-numeric: tabular-nums; background: var(--soft); color: var(--text); }
+.hold { display: inline-block; }
 .post-text { margin-top: 4px; font-size: 14px; overflow-wrap: anywhere; }
 .post-meta { margin-top: 4px; font-size: 12px; color: var(--faint); }
 .post-meta a { color: var(--gold-300); font-weight: 600; }

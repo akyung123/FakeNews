@@ -44,6 +44,13 @@ export const ISSUE_COPY = {
   continueIssue: "Continue to issue",
 } as const;
 
+/** Chain-mode input hints. Demo mode uses the sample placeholders in mock.ts. */
+export const ISSUE_PLACEHOLDER = {
+  prophecy: "One line, written once",
+  prophetLabel: "yourname",
+  slug: "short-name",
+} as const;
+
 const PROPHET_LABEL = /^[a-z0-9]{3,16}$/;
 const SLUG = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
 

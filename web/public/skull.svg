@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Default prophet picture">
+  <rect width="120" height="120" rx="60" fill="#1E2343"/>
+  <path d="M60 22c-19.9 0-34 14.2-34 32.6 0 10.6 4.7 18.3 11.6 23.2V88c0 3.3 2.7 6 6 6h32.8c3.3 0 6-2.7 6-6V77.8C89.3 72.9 94 65.2 94 54.6 94 36.2 79.9 22 60 22z" fill="#D5B470"/>
+  <ellipse cx="46" cy="56" rx="9" ry="10" fill="#0C0C0C"/>
+  <ellipse cx="74" cy="56" rx="9" ry="10" fill="#0C0C0C"/>
+  <path d="M60 66l-5.5 10h11z" fill="#0C0C0C"/>
+  <path d="M50 84v10M60 84v10M70 84v10" stroke="#0C0C0C" stroke-width="3" stroke-linecap="round"/>
+</svg>

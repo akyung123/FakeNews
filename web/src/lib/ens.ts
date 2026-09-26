@@ -12,9 +12,28 @@ import { sepolia } from "viem/chains";
 import { normalize } from "viem/ens";
 import { SEPOLIA_CHAIN_ID, webEnv } from "./env";
 import { MOCK_PARENT_NAME, MOCK_PROPHECIES, MOCK_PROPHETS } from "./mock";
+import { isMockMode } from "./mode";
 import { getPublicClient } from "./rpc";
 
 export const ENS_TEXT_PROPHECY = "prophecy";
+/** Prophet name records (INTERFACE §1). Read only; the prophet writes them. */
+export const ENS_TEXT_AVATAR = "avatar";
+export const ENS_TEXT_DESCRIPTION = "description";
+
+/**
+ * An `avatar` record as an image URL. https and data images load as-is,
+ * ipfs:// goes through a public gateway. Anything else (NFT URIs, http)
+ * falls back to the default picture.
+ */
+export function avatarImageUrl(record: string | null | undefined): string | null {
+  const value = record?.trim();
+  if (!value) return null;
+  if (/^https:\/\//i.test(value)) return value;
+  if (/^data:image\//i.test(value)) return value;
+  const ipfs = /^ipfs:\/\/(?:ipfs\/)?(.+)$/i.exec(value);
+  if (ipfs) return `https://ipfs.io/ipfs/${ipfs[1]}`;
+  return null;
+}
 
 export type EnsPublicClient = Pick<PublicClient, "getEnsText" | "getEnsAddress">;
 
@@ -91,7 +110,8 @@ export async function getEnsText(
   options: { client?: EnsPublicClient; universalResolver?: Address } = {},
 ): Promise<string | null> {
   const resolver = options.universalResolver ?? webEnv.universalResolver;
-  if (!resolver) return mockEnsText(name, key);
+  // Sample records only answer in demo mode; chain mode never shows them.
+  if (!resolver) return isMockMode() ? mockEnsText(name, key) : null;
   const client = options.client ?? createEnsClient();
   const normalized = normalize(name);
   const seenKey = `${resolver.toLowerCase()}|${normalized}|${key}`;
@@ -115,7 +135,7 @@ export async function getEnsAddress(
   options: { client?: EnsPublicClient; universalResolver?: Address } = {},
 ): Promise<Address | null> {
   const resolver = options.universalResolver ?? webEnv.universalResolver;
-  if (!resolver) return mockEnsAddress(name);
+  if (!resolver) return isMockMode() ? mockEnsAddress(name) : null;
   const client = options.client ?? createEnsClient();
   const address = await client.getEnsAddress({
     name: normalize(name),

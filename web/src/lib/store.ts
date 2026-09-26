@@ -27,6 +27,10 @@ export type Coin = CurveState & {
   fromChain?: boolean;
   /** CCA auction address from Launched / auctionOf. */
   auction?: `0x${string}`;
+  /** Prophet wallet from the Launched log. */
+  prophet?: `0x${string}`;
+  /** Block of the Launched log. */
+  launchedBlock?: number;
 };
 
 /** A one-line memo attached to a trade. */
