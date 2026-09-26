@@ -208,6 +208,7 @@ export function useStore(): State {
       return () => listeners.delete(l);
     },
     () => state,
+    () => state,
   );
 }
 
