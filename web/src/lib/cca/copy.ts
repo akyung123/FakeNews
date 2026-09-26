@@ -1,5 +1,5 @@
 /**
- * Designer v1 auction copy. English only. No wording about profit, yield, or price predictions.
+ * Designer v1 auction copy. English only. No wording about profit, yield, or price outlooks.
  * `{blocks}`, `{mm:ss}`, `{raised}`, `{amount}` are interpolated by the helpers below.
  */
 import { formatEther } from "viem";
