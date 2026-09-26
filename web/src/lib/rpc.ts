@@ -29,6 +29,12 @@ export function sepoliaTransport(primary = webEnv.rpcUrl) {
   return transports.length > 1 ? fallback(transports) : transports[0];
 }
 
+/**
+ * One poll per Sepolia block. viem's default (4s) polls three times per block,
+ * and every watched event or block number costs a request each time.
+ */
+export const SEPOLIA_POLLING_MS = 12_000;
+
 let sharedClient: PublicClient | null = null;
 
 /** The one viem client reads should go through. Never construct a second. */
@@ -38,6 +44,8 @@ export function getPublicClient(): PublicClient {
       chain: sepolia,
       transport: sepoliaTransport(),
       batch: { multicall: true },
+      pollingInterval: SEPOLIA_POLLING_MS,
+      cacheTime: SEPOLIA_POLLING_MS,
     });
   }
   return sharedClient;
@@ -82,4 +90,23 @@ export async function withRpcRetry<T>(run: () => Promise<T>, options: RetryOptio
     }
   }
   throw lastError;
+}
+
+/**
+ * Share one in-flight call and reuse its result for `ttlMs`. Two screens that
+ * mount together (or a quick back-and-forth) then cost one set of reads, not two.
+ * A rejected call is not kept, so the next caller tries again.
+ */
+export function shareFor<T>(ttlMs: number, run: () => Promise<T>, now: () => number = Date.now): () => Promise<T> {
+  let entry: { at: number; value: Promise<T> } | null = null;
+  return () => {
+    if (entry && now() - entry.at < ttlMs) return entry.value;
+    const value = run();
+    const current = { at: now(), value };
+    entry = current;
+    value.catch(() => {
+      if (entry === current) entry = null;
+    });
+    return value;
+  };
 }

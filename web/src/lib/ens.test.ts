@@ -55,6 +55,25 @@ describe("live Sepolia ENS text", () => {
     ]);
   });
 
+  it("reads a found sentence once per client and keeps asking while it is missing", async () => {
+    const answers: (string | null)[] = [null, MOCK_PROPHECIES[0].sentence];
+    let calls = 0;
+    const client = {
+      async getEnsText() {
+        calls += 1;
+        return answers.shift() ?? null;
+      },
+      async getEnsAddress() {
+        return null;
+      },
+    };
+    const opts = { client, universalResolver: RESOLVER };
+    await expect(getEnsText(ENS, ENS_TEXT_PROPHECY, opts)).resolves.toBeNull();
+    await expect(getEnsText(ENS, ENS_TEXT_PROPHECY, opts)).resolves.toBe(MOCK_PROPHECIES[0].sentence);
+    await expect(getEnsText(ENS, ENS_TEXT_PROPHECY, opts)).resolves.toBe(MOCK_PROPHECIES[0].sentence);
+    expect(calls).toBe(2);
+  });
+
   it("builds wagmi useEnsText args for Sepolia", () => {
     const q = ensTextQuery(ENS, ENS_TEXT_PROPHECY);
     expect(q.key).toBe("prophecy");

@@ -68,6 +68,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - [x] hide Buy/Sell after graduation; Uniswap V4 panel @cursor-agent
 - [x] Screen 4: prophet page. Every prophecy under the name, claimable fees @cursor
 - [ ] Every sentence is read from ENS. Nothing hardcoded
+- [x] Read budget: one poll per block, shared list load, found ENS text read once per session @claude
 - [ ] Republish the demo page (skill `demo-publish`)
 
 ## 4. World verification server (`world/`, new folder)

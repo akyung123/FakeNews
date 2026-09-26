@@ -10,7 +10,7 @@ import { TOTAL_SUPPLY } from "./curve";
 import { ENS_TEXT_PROPHECY, getEnsText } from "./ens";
 import { webEnv } from "./env";
 import { fetchLaunchedLogs, fetchLaunchedLogsChunked } from "./launchpad";
-import { getPublicClient } from "./rpc";
+import { getPublicClient, shareFor, SEPOLIA_POLLING_MS } from "./rpc";
 import type { Coin } from "./store";
 
 export type LaunchedLogLike = {
@@ -118,7 +118,14 @@ function defaultClient(): PublicClient {
   return getPublicClient();
 }
 
-export async function loadLaunchedCoins(options: LoadLaunchedOptions = {}): Promise<Coin[]> {
+/** Home and a coin page both load the list; navigating between them reuses it for one block. */
+const loadLaunchedCoinsShared = shareFor(SEPOLIA_POLLING_MS, () => readLaunchedCoins({}));
+
+export function loadLaunchedCoins(options: LoadLaunchedOptions = {}): Promise<Coin[]> {
+  return Object.keys(options).length === 0 ? loadLaunchedCoinsShared() : readLaunchedCoins(options);
+}
+
+async function readLaunchedCoins(options: LoadLaunchedOptions): Promise<Coin[]> {
   if (!hasLaunchpad() && !options.fetchLogs && !options.client) return [];
   const client = options.client ?? defaultClient();
   const logs = await (options.fetchLogs ?? fetchLaunchedLogsChunked)(client);
