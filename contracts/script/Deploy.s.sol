@@ -7,6 +7,7 @@ import {IPoolManager} from "v4-core/src/interfaces/IPoolManager.sol";
 import {IProphecyEns} from "../src/ens/IProphecyEns.sol";
 import {ProphecyEns} from "../src/ens/ProphecyEns.sol";
 import {Launchpad} from "../src/Launchpad.sol";
+import {CcaLib} from "../src/cca/CcaLib.sol";
 import {ProphecyHook} from "../src/uniswap/ProphecyHook.sol";
 import {HookMiner} from "../src/uniswap/HookMiner.sol";
 import {LiquidityLocker} from "../src/uniswap/LiquidityLocker.sol";
@@ -16,9 +17,11 @@ import {ScriptVm} from "./ScriptVm.sol";
 
 /// Sepolia Launchpad + ProphecyEns + Hook + Locker + CCA wiring.
 ///
-/// Constructor (contracts/src/Launchpad.sol at b71c64e):
+/// Constructor (contracts/src/Launchpad.sol):
 ///   constructor(address protocolFeeRecipient_, address worldSigner_, IProphecyEns ens_)
 /// All three public immutable. Zero address reverts. No setter on those.
+/// Floor / tick / supply split are never hardcoded here — they come from CcaLib
+/// (Launchpad public constants alias the same values).
 ///
 /// Default: create ProphecyEns then Launchpad in ONE broadcast, no other
 /// deployer tx in between (same pattern as contracts/test/LaunchpadEns.t.sol):
@@ -154,6 +157,12 @@ contract Deploy is ScriptVm {
         }
         require(launchpad.worldSigner() == worldSigner);
         require(launchpad.protocolFeeRecipient() == protocolFeeRecipient);
+        require(launchpad.TOTAL_SUPPLY() == CcaLib.TOTAL_SUPPLY, "CcaLib.TOTAL_SUPPLY");
+        require(launchpad.AUCTION_SUPPLY() == CcaLib.AUCTION_SUPPLY, "CcaLib.AUCTION_SUPPLY");
+        require(launchpad.LP_SUPPLY() == CcaLib.LP_SUPPLY, "CcaLib.LP_SUPPLY");
+        require(launchpad.REQUIRED_CURRENCY_RAISED() == CcaLib.REQUIRED_CURRENCY_RAISED, "CcaLib.REQUIRED_CURRENCY_RAISED");
+        require(launchpad.POOL_FEE() == CcaLib.POOL_FEE, "CcaLib.POOL_FEE");
+        require(launchpad.POOL_TICK_SPACING() == CcaLib.POOL_TICK_SPACING, "CcaLib.POOL_TICK_SPACING");
 
         (address hookAddr, address lockerAddr, bytes32 hookSalt) =
             _wireCca(launchpad, poolManager, lbpStrategy, positionManager);
@@ -208,6 +217,15 @@ contract Deploy is ScriptVm {
         _pasteLine(string.concat("INITIALIZER_HOOK=", vm.toString(initializerHook)));
         _pasteLine(string.concat("UNIVERSAL_ROUTER=", vm.toString(SepoliaConfig.UNIVERSAL_ROUTER)));
         _pasteLine(string.concat("PERMIT2=", vm.toString(SepoliaConfig.PERMIT2)));
+        _pasteLine(string.concat("CCA_TOTAL_SUPPLY=", vm.toString(CcaLib.TOTAL_SUPPLY)));
+        _pasteLine(string.concat("CCA_AUCTION_SUPPLY=", vm.toString(CcaLib.AUCTION_SUPPLY)));
+        _pasteLine(string.concat("CCA_LP_SUPPLY=", vm.toString(CcaLib.LP_SUPPLY)));
+        _pasteLine(string.concat("CCA_REQUIRED_CURRENCY_RAISED=", vm.toString(uint256(CcaLib.REQUIRED_CURRENCY_RAISED))));
+        _pasteLine(string.concat("CCA_FLOOR_PRICE_Q96=", vm.toString(CcaLib.FLOOR_PRICE_Q96)));
+        _pasteLine(string.concat("CCA_AUCTION_TICK_SPACING_Q96=", vm.toString(CcaLib.AUCTION_TICK_SPACING_Q96)));
+        _pasteLine(string.concat("CCA_POOL_FEE=", vm.toString(uint256(CcaLib.POOL_FEE))));
+        _pasteLine(string.concat("CCA_POOL_TICK_SPACING=", vm.toString(uint256(uint24(CcaLib.POOL_TICK_SPACING)))));
+        _pasteLine(string.concat("CCA_DEFAULT_AUCTION_BLOCKS=", vm.toString(uint256(CcaLib.DEFAULT_AUCTION_BLOCKS))));
         _pasteLine(string.concat("DEPLOYER=", vm.toString(deployer)));
         _pasteLine(signerLine);
     }
