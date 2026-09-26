@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
-import { quoteSell } from "../lib/curve";
-import { eth, mcap, pct, tokens, trend } from "../lib/format";
-import { entryMcap, marketCap, myPosition, useStore, type Coin, type Position } from "../lib/store";
+import { price, quoteSell } from "../lib/curve";
+import { eth, gwei, tokens } from "../lib/format";
+import { myPosition, useStore, type Coin, type Position } from "../lib/store";
 
 export function MyPage() {
   const s = useStore();
@@ -12,18 +12,13 @@ export function MyPage() {
   }
   const total = held.reduce((n, h) => n + h.value, 0);
   const cost = held.reduce((n, h) => n + h.pos.cost, 0);
-  const change = cost > 0 ? total / cost - 1 : 0;
 
   return (
     <main className="stack">
       <section className="block summary">
         <div>
-          <p className="faint small">Value if sold now</p>
+          <p className="faint small">Sell quote</p>
           <p className="big-num">{eth(total)}</p>
-        </div>
-        <div>
-          <p className="faint small">Change since you bought</p>
-          <p className={`big-num ${trend(change)}`}>{pct(change)}</p>
         </div>
         <div>
           <p className="faint small">Spent</p>
@@ -38,7 +33,7 @@ export function MyPage() {
       <section className="block">
         <div className="block-head">
           <h2>My prophecies</h2>
-          <span className="faint">click one to open its holder talk</span>
+          <span className="faint">click one to open its trade memos</span>
         </div>
         {held.length === 0 ? (
           <p className="empty">
@@ -49,14 +44,12 @@ export function MyPage() {
             <div className="tr th" role="row">
               <span>Prophecy</span>
               <span className="num col-mid">Holding</span>
-              <span className="num col-mid">Bought at (MC)</span>
-              <span className="num col-mid">Now (MC)</span>
-              <span className="num">If sold now</span>
-              <span className="num">Change</span>
-              <span className="num col-opt">Posts</span>
+              <span className="num col-mid">Entry price</span>
+              <span className="num col-mid">Price now</span>
+              <span className="num">Sell quote</span>
+              <span className="num col-opt">Memos</span>
             </div>
             {held.map(({ coin, pos, value }) => {
-              const c = marketCap(coin) / entryMcap(pos) - 1;
               const talk = s.comments.filter((x) => x.coinId === coin.id).length;
               return (
                 <Link key={coin.id} className="tr" role="row" to={`/coin/${coin.id}`}>
@@ -67,10 +60,9 @@ export function MyPage() {
                     </span>
                   </span>
                   <span className="num col-mid">{tokens(pos.tokens)}</span>
-                  <span className="num col-mid">{mcap(entryMcap(pos))}</span>
-                  <span className="num col-mid">{mcap(marketCap(coin))}</span>
+                  <span className="num col-mid">{gwei(pos.cost / pos.tokens)}</span>
+                  <span className="num col-mid">{gwei(price(coin))}</span>
                   <span className="num strong">{eth(value)}</span>
-                  <span className={`num strong ${trend(c)}`}>{pct(c)}</span>
                   <span className="num col-opt">{talk}</span>
                 </Link>
               );
