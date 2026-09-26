@@ -9,7 +9,7 @@ import { SEED_COINS, SEED_EVENTS } from "./mock";
 
 export const YOU = "you";
 const START_BALANCE = 0.05;
-const STORAGE_KEY = "prophecy-pump:v3";
+const STORAGE_KEY = "prophecy:v4";
 
 export type Coin = CurveState & {
   id: string;
