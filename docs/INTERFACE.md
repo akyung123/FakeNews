@@ -89,6 +89,8 @@ The web app never holds the RP signing key. HTTP matches `world/` (PR #10, now o
 
 `GET {VITE_WORLD_SERVER_URL}/rp-context`
 
+Live IDKit uses `app_id`, `action`, and `environment` from this envelope so the proof matches `WORLD_ENVIRONMENT`.
+
 ```json
 {
   "app_id": "app_...",

@@ -214,6 +214,7 @@ type IdKitWidget = (props: {
   onOpenChange: (open: boolean) => void;
   app_id: string;
   action: string;
+  environment: "production" | "staging";
   rp_context: RpContext;
   allow_legacy_proofs: boolean;
   preset: unknown;
@@ -240,7 +241,11 @@ function IdKitHost({
   const [Widget, setWidget] = useState<IdKitWidget | null>(null);
   const [preset, setPreset] = useState<unknown>(null);
   const [rpContext, setRpContext] = useState<RpContext | null>(null);
-  const [idKitApp, setIdKitApp] = useState<{ appId: string; action: string } | null>(null);
+  const [idKitApp, setIdKitApp] = useState<{
+    appId: string;
+    action: string;
+    environment: "production" | "staging";
+  } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -276,6 +281,7 @@ function IdKitHost({
       onOpenChange={onClose}
       app_id={idKitApp.appId}
       action={idKitApp.action}
+      environment={idKitApp.environment}
       rp_context={rpContext}
       allow_legacy_proofs
       preset={preset}

@@ -165,9 +165,13 @@ export function worldErrorKindFromServerCode(code: unknown): WorldErrorKind {
   return "network";
 }
 
-/** Live IDKit must use the server envelope. The server compares the proof action to WORLD_ACTION. */
-export function idKitConfigFromRpContext(envelope: RpContextResponse): { appId: string; action: string } {
-  return { appId: envelope.app_id, action: envelope.action };
+/** Live IDKit must use the server envelope. Portal rejects a proof whose environment is not WORLD_ENVIRONMENT. */
+export function idKitConfigFromRpContext(envelope: RpContextResponse): {
+  appId: string;
+  action: string;
+  environment: "production" | "staging";
+} {
+  return { appId: envelope.app_id, action: envelope.action, environment: envelope.environment };
 }
 
 async function errorFromResponse(response: Response): Promise<WorldClientError> {

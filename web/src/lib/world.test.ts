@@ -5,6 +5,7 @@ import {
   MOCK_RP_CONTEXT_RESPONSE,
   MOCK_WORLD_ACTION,
   MOCK_WORLD_APP_ID,
+  MOCK_WORLD_ENVIRONMENT,
   MOCK_WORLD_CHAIN_ID,
   MOCK_WORLD_HEALTH,
   MOCK_WORLD_LAUNCHPAD,
@@ -57,11 +58,12 @@ describe("world client", () => {
     expect(JSON.stringify({ ...MOCK_WORLD_VERIFY, ...MOCK_WORLD_HEALTH })).not.toContain(fixture.signerKey);
   });
 
-  it("uses app_id and action from GET /rp-context in live mode, not the VITE mock defaults", async () => {
+  it("uses app_id, action, and environment from GET /rp-context in live mode, not the mock defaults", async () => {
     const serverEnvelope = {
       ...MOCK_RP_CONTEXT_RESPONSE,
       app_id: "app_from_server",
       action: "action_from_server",
+      environment: "production" as const,
     };
     const client = createWorldClient({
       mock: false,
@@ -75,9 +77,26 @@ describe("world client", () => {
     expect(idKitConfigFromRpContext(envelope)).toEqual({
       appId: "app_from_server",
       action: "action_from_server",
+      environment: "production",
     });
     expect(idKitConfigFromRpContext(envelope).appId).not.toBe(client.appId);
     expect(idKitConfigFromRpContext(envelope).action).not.toBe(client.action);
+    expect(idKitConfigFromRpContext(envelope).environment).not.toBe(MOCK_WORLD_ENVIRONMENT);
+  });
+
+  it("uses VITE_WORLD_APP_ID, VITE_WORLD_ACTION, and the mock environment only as mock-mode defaults", async () => {
+    const mock = createWorldClient({ mock: true });
+    expect(mock.appId).toBe(MOCK_WORLD_APP_ID);
+    expect(mock.action).toBe(MOCK_WORLD_ACTION);
+    const envelope = await mock.fetchRpContext();
+    expect(idKitConfigFromRpContext(envelope)).toEqual({
+      appId: MOCK_WORLD_APP_ID,
+      action: MOCK_WORLD_ACTION,
+      environment: MOCK_WORLD_ENVIRONMENT,
+    });
+    const live = createWorldClient({ mock: false, launchpad: MOCK_WORLD_LAUNCHPAD });
+    expect(live.appId).toBe("");
+    expect(live.action).toBe("");
   });
 
   it("returns the world/ GET /rp-context envelope, fixture signature, and health", async () => {
