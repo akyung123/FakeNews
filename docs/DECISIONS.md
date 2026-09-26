@@ -26,11 +26,12 @@ One row per decision, with the reason.
 | 13 | 09-26 | ~~(Needs team confirmation) Holder talk and trade memos~~ → #15 | |
 | 14 | 09-26 | **Prophecy names never expire in ENS** (`type(uint64).max`), like prophet names. The deadline lives only in the `deadline` text record, and Departed is computed from it | Review A: an expired name stops pointing at the token and its label could be registered again. A departed prophecy must keep its name and token |
 | 15 | 09-26 | **Trade memos: yes.** `buy` and `sell` take an optional one-line `memo` (at most 140 bytes) that is emitted in the `Trade` event and shown on the prophecy detail screen next to the trade. **Holder talk (a separate board for holders): not now**, possibly later | A memo rides on a transaction the trader sends anyway: no extra wallet prompt, no server, and every note is backed by a real trade. A holder board would need its own server |
+| 16 | 09-26 | Protocol fee recipient is a **Launchpad constructor argument**. The address itself is **TBD** (a person supplies it at deploy) | The 0.95% protocol share is fixed; only the wallet that receives it needs to be chosen, and it can stay off-chain until the person broadcasts |
 
 ## Not decided yet
 
-- Parent name (`prophecy.eth`?)
-- Protocol fee recipient address
+- Parent name: `prophecy.eth` is unregistered on Sepolia (PLAN §0). Still needs `commit` → wait 60s → `register`
+- Protocol fee recipient **address** (how it is passed → #16)
 - Whether to run the final lock (emancipation) before or during the demo
 
 ## Spec review (checked against code, 09-26)
