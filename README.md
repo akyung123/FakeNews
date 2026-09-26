@@ -18,19 +18,29 @@ The product is called Prophit. The ENS parent name stays `prophecy.eth`, and the
 - **Site:** <https://prism-toggle-ai.github.io/Prophit/>
 - **Network:** Ethereum Sepolia (chain id `11155111`)
 - **Launchpad:** [`0x0b4BF5C6f73A1204CCe07f2522db9142d2BcB4Aa`](https://sepolia.etherscan.io/address/0x0b4BF5C6f73A1204CCe07f2522db9142d2BcB4Aa)
-- **Status:** prototype on Sepolia. The contracts are deployed and read back, but the full loop below has not run on the live Launchpad yet.
+- **Status:** prototype on Sepolia. A prophet name has been claimed and prophecies have been launched on the live Launchpad; one prophecy (`branching-minds`) has graduated and its Uniswap v4 market is open. The migrate, fee registration and swap transactions are not linked below yet.
 
 ### On-chain proof
 
-One full loop on the deployed Launchpad. Each cell gets a Sepolia Etherscan link once that step has run; until then it reads TBD.
+Transactions on the deployed Launchpad. Each link opens Sepolia Etherscan; a step without a link yet reads TBD.
 
-| Step | What it shows | ENS name | Transaction |
-|------|---------------|----------|-------------|
-| `registerProphet` | A World ID-checked prophet name points to the prophet's wallet | TBD | TBD |
-| `launch` | The prophecy name points to a new token; the sentence is written to ENS and the CCA auction opens | TBD | TBD |
-| `bid` | Someone bids ETH in the auction | TBD | TBD |
-| `migrate` | The auction ends and liquidity moves into a locked Uniswap V4 pool | TBD | TBD |
-| `swap` | Trading on the V4 pool | TBD | TBD |
+| Step | What it shows | Name | Link |
+|------|---------------|------|------|
+| `registerProphet` | A World ID-checked prophet name points to the prophet's wallet | `ringo.prophecy.eth` | [tx `0xfc7ff698…35c1fd`](https://sepolia.etherscan.io/tx/0xfc7ff6986f5165e6577552ad688a14ffd2988835fa2df09191b94c125435c1fd) |
+| `launch` | The prophecy name points to a new token; the sentence is written to ENS and the CCA auction opens | slug `trump` | [tx `0xff704906…aab905`](https://sepolia.etherscan.io/tx/0xff7049069c1fcd720c2353806bdecb9961ece52d0dac84ada3aa06df80aab905) |
+| Graduated prophecy | The auction reached its goal; the market is open on Uniswap v4 | slug `branching-minds` | [token `0x09f8d704…7b2398`](https://sepolia.etherscan.io/token/0x09f8d704556687efc0621580beef6511937b2398) |
+| `migrate` | Liquidity moves into a locked Uniswap V4 pool | `branching-minds` | TBD |
+| Fee registration (`register`) | The pool is linked to the fee vault so fees split 24 : 76 | `branching-minds` | TBD |
+| `swap` | Trading on the V4 pool | `branching-minds` | TBD |
+
+### Costs
+
+Launch costs ~5.35M gas (token + ENS subname + CCA auction + LBP strategy in one tx), paid as network gas only; no protocol fee on launch. Mainnet plan: L2 deploy and minimal-proxy clones.
+
+### Trust assumptions
+
+- The `prophecy.eth` owner still holds `SET_SUBREGISTRY` and `REGISTRAR` on the parent, to be revoked after the hackathon. Until then that wallet could point `prophecy.eth` at another registry or register a prophet name without World ID. Details in [Invariants & trust assumptions](#invariants--trust-assumptions).
+- Prophet registration requires an Orb-level World ID: one prophet name per verified human.
 
 ## How it works
 

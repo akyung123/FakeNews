@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { formatEther } from "viem";
+import { formatEther, isAddress } from "viem";
 import { CcaTrade } from "../components/CcaTrade";
 import { CommentItem } from "../components/CommentItem";
 import { Bar } from "../components/CoinCard";
 import { PriceChart } from "../components/PriceChart";
 import { SampleBadge } from "../components/SampleBadge";
+import { TokenAddress, type WatchAssetInput } from "../components/TokenAddress";
 import { TokenName, tokenDisplayName } from "../components/TokenName";
 import { CCA_COPY, raisedProgressCopy } from "../lib/cca";
 import { usePoolPrice } from "../lib/cca/usePoolPrice";
 import { contracts, hasLaunchpad } from "../lib/contracts";
 import { coinPriceWei, coinProgress, coinRaisedWei } from "../lib/coinFigures";
 import { graduated, TOTAL_SUPPLY } from "../lib/curve";
+import { follow, unfollow, useFollowing } from "../lib/following";
 import { ago, ethToWei, formatEth, formatPrice, tokens } from "../lib/format";
 import {
   GRADUATED_BODY,
@@ -38,11 +40,23 @@ import {
 export type CoinPageProps = {
   sendBuy?: (input: BuyInput) => Promise<boolean>;
   sendSell?: (input: SellInput) => Promise<boolean>;
-  loadLaunched?: () => Promise<Coin[]>;
+  loadLaunched?: (options?: { fresh?: boolean }) => Promise<Coin[]>;
+  watchAsset?: (input: WatchAssetInput) => Promise<boolean>;
+  /** A token just launched may not be indexed yet: read the list again this many times. */
+  retry?: { attempts: number; delayMs: number };
 };
+
+const LOOKUP_RETRY = { attempts: 3, delayMs: 2_500 };
+
+/** Only a token address or a full prophecy name can be a launch still being indexed. */
+function mayStillIndex(lookup: string): boolean {
+  return isAddress(lookup) || lookup.includes(".");
+}
 
 export function CoinPage({
   loadLaunched,
+  watchAsset,
+  retry = LOOKUP_RETRY,
 }: CoinPageProps = {}) {
   const { id = "", name = "" } = useParams();
   const s = useStore();
@@ -54,36 +68,52 @@ export function CoinPage({
   useEffect(() => {
     if (!chain) return;
     let cancelled = false;
-    const run = loadLaunched ?? (() => loadLaunchedCoins());
-    void run()
-      .then((rows) => {
-        if (cancelled) return;
-        setChainCoin(findLaunchedCoin(lookup, rows) ?? null);
-        setChainReady(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setChainCoin(null);
-        setChainReady(true);
-      });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = loadLaunched ?? ((options?: { fresh?: boolean }) => loadLaunchedCoins(options));
+    const attempt = (n: number) => {
+      void run(n > 0 ? { fresh: true } : undefined)
+        .then((rows) => findLaunchedCoin(lookup, rows) ?? null)
+        .catch(() => null)
+        .then((found) => {
+          if (cancelled) return;
+          if (!found && n < retry.attempts && mayStillIndex(lookup)) {
+            // Just launched: the RPC may not have indexed the block yet. Read again shortly.
+            timer = setTimeout(() => attempt(n + 1), retry.delayMs);
+            return;
+          }
+          setChainCoin(found);
+          setChainReady(true);
+        });
+    };
+    attempt(0);
     return () => {
       cancelled = true;
+      if (timer) clearTimeout(timer);
     };
-  }, [chain, loadLaunched, lookup]);
+  }, [chain, loadLaunched, lookup, retry.attempts, retry.delayMs]);
 
   const fromStore = s.coins.find((c) => c.id === lookup || c.token === lookup || c.name === lookup);
   // Chain mode keeps only coins this browser launched on chain; demo seed rows stay in demo mode.
   const coin = chain
-    ? ((fromStore?.fromChain ? fromStore : undefined) ?? chainCoin)
+    ? (chainCoin ?? (fromStore?.fromChain ? fromStore : undefined))
     : (fromStore ?? prototypeCoinFromName(lookup));
   // Once migrate opens the pool, slot0 is the live price; before that the
   // auction's clearing price is, and the hook stays closed.
   const poolPrice = usePoolPrice(coin?.token, contracts.hook);
   const ethBalance = useEthBalance();
   const tokenBalance = useTokenBalance(coin ? liveTokenAddress(coin.id, coin.token) : undefined);
+  const following = useFollowing();
   if (!coin) {
     if (chain && !chainReady) {
-      return <main className="coin-page" />;
+      return (
+        <main className="coin-page">
+          {mayStillIndex(lookup) ? (
+            <p className="faint" data-testid="coin-looking">
+              Looking for this prophecy on Sepolia…
+            </p>
+          ) : null}
+        </main>
+      );
     }
     return (
       <main className="narrow">
@@ -114,12 +144,21 @@ export function CoinPage({
                 <span className="faint">${coin.ticker}</span>
                 <SampleBadge />
               </div>
-              <p className="faint small">
-                by {coin.creator}
-                {ago(coin.createdAt) ? ` · ${ago(coin.createdAt)}` : null}
+              <p className="faint small coin-by">
+                {coin.creator ? (
+                  <>
+                    by <Link to={`/p/${coin.creator}`}>{coin.creator}</Link>{" "}
+                    <FollowToggle label={coin.creator} followed={following.includes(coin.creator.toLowerCase())} />
+                  </>
+                ) : null}
+                {coin.creator && ago(coin.createdAt) ? " · " : null}
+                {ago(coin.createdAt)}
               </p>
             </div>
           </div>
+          {chain && coin.token && isChainWriteTarget(coin) ? (
+            <TokenAddress address={coin.token} symbol={coin.ticker} watchAsset={watchAsset} />
+          ) : null}
           <h1 className="prophecy-title">{coin.prophecy}</h1>
           <p className="price-now">{formatPrice(poolPrice.open ? poolPrice.priceWei : coinPriceWei(coin))}</p>
           <p className="big-num">{auctionProgressHeader(coin)}</p>
@@ -246,3 +285,15 @@ function auctionProgressHeader(coin: Coin): string {
   return raisedProgressCopy(coinRaisedWei(coin));
 }
 
+/** Same toggle as the prophet page header: Follow → Following, click again to unfollow. */
+function FollowToggle({ label, followed }: { label: string; followed: boolean }) {
+  return followed ? (
+    <button type="button" className="btn ghost small" aria-pressed="true" onClick={() => unfollow(label)}>
+      Following
+    </button>
+  ) : (
+    <button type="button" className="btn primary small" aria-pressed="false" onClick={() => follow(label)}>
+      Follow
+    </button>
+  );
+}

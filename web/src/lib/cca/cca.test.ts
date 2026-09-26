@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { onSepolia } from "../chain";
 import { encodeAbiParameters, encodeEventTopics, encodePacked, parseEther, zeroAddress } from "viem";
 import { wagmiConfig } from "../wagmi";
 import { ccaAbi } from "./abi/cca";
@@ -562,7 +563,7 @@ describe("chain writes: simulate then write then require success", () => {
     const fns = revertedWrite();
     await expect(placeBid(bidInput, optionsOf(fns))).rejects.toThrow(/submitBid did not succeed/);
     expect(fns.write).toHaveBeenCalledTimes(1);
-    expect(fns.write).toHaveBeenCalledWith(wagmiConfig, placeBidWrite(bidInput));
+    expect(fns.write).toHaveBeenCalledWith(wagmiConfig, onSepolia(placeBidWrite(bidInput)));
     expect(() => assertSuccessfulReceipt({ status: "reverted" }, "submitBid")).toThrow(/did not succeed/);
   });
 
@@ -596,13 +597,13 @@ describe("chain writes: simulate then write then require success", () => {
   it("claimTokens throws when the receipt is not success", async () => {
     const fns = revertedWrite();
     await expect(claimTokens(AUCTION, 1n, optionsOf(fns))).rejects.toThrow(/claimTokens did not succeed/);
-    expect(fns.write).toHaveBeenCalledWith(wagmiConfig, claimTokensWrite(AUCTION, 1n));
+    expect(fns.write).toHaveBeenCalledWith(wagmiConfig, onSepolia(claimTokensWrite(AUCTION, 1n)));
   });
 
   it("exitBid throws when the receipt is not success", async () => {
     const fns = revertedWrite();
     await expect(exitBid(AUCTION, 1n, optionsOf(fns))).rejects.toThrow(/exitBid did not succeed/);
-    expect(fns.write).toHaveBeenCalledWith(wagmiConfig, exitBidWrite(AUCTION, 1n));
+    expect(fns.write).toHaveBeenCalledWith(wagmiConfig, onSepolia(exitBidWrite(AUCTION, 1n)));
   });
 
   it("exitPartiallyFilledBid throws when the receipt is not success", async () => {
@@ -663,7 +664,7 @@ describe("chain writes: simulate then write then require success", () => {
   it("checkpoint throws when the receipt is not success", async () => {
     const fns = revertedWrite();
     await expect(checkpoint(AUCTION, optionsOf(fns))).rejects.toThrow(/checkpoint did not succeed/);
-    expect(fns.write).toHaveBeenCalledWith(wagmiConfig, checkpointWrite(AUCTION));
+    expect(fns.write).toHaveBeenCalledWith(wagmiConfig, onSepolia(checkpointWrite(AUCTION)));
   });
 
   it("successful path simulates, writes, then waits", async () => {

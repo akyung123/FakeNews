@@ -131,10 +131,11 @@ export const FEE_COLLECT_COPY = {
   withdrawFees: "Withdraw fees",
   withdrawing: "Withdrawing…",
   feesWithdrawn: "Fees withdrawn",
-  setupFeeCollection: "Set up fee collection",
-  settingUp: "Setting up…",
-  feeCollectionReady: "Fee collection ready",
-  registerHelper: "One-time step after the market opens. Anyone can do this.",
+  setupFeeCollection: "Turn on trading fees",
+  settingUp: "Turning on trading fees…",
+  feeCollectionReady: "Trading fees on",
+  registerHelper:
+    "Links this pool to the fee vault so the prophet earns 24% of every trade. One-time, anyone can do it.",
 } as const;
 
 export const CCA_BID_ERROR_COPY = {

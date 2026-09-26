@@ -219,7 +219,7 @@ describe("DECISIONS #1 copy — new strings", () => {
     expect(held).not.toContain("bytes");
   });
 
-  test("write revert banners use the designer sentences for the six Launchpad errors", () => {
+  test("write revert banners use the designer sentences for the Launchpad errors", () => {
     expect(WRITE_REVERT_COPY.NullifierUsed).toBe("This World ID already has a name.");
     expect(WRITE_REVERT_COPY.LabelTaken).toBe("That name is taken. Try another.");
     expect(WRITE_REVERT_COPY.AlreadyProphet).toBe("This wallet already has a name.");
@@ -236,6 +236,12 @@ describe("DECISIONS #1 copy — new strings", () => {
       "SlugTaken",
       "Slippage",
       "CurveComplete",
+      "InvalidSignature",
+      "ProphetRecipient",
+      "NotProphet",
+      "BadLabel",
+      "BadSlug",
+      "BadProphecy",
     ]);
   });
 

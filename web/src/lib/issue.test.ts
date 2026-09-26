@@ -15,10 +15,48 @@ import {
   readStoredProphetLabel,
   storeLaunchDraft,
   storeProphetLabel,
+  registerRevertName,
   worldErrorKindFromRegisterProphet,
   worldErrorMessage,
   worldUserMessage,
 } from "./issue";
+import { ContractFunctionRevertedError, encodeErrorResult } from "viem";
+import { launchpadAbi } from "./launchpadAbi";
+import { WRITE_REVERT_COPY } from "./writeErrors";
+import { writeErrorMessage } from "./writes";
+
+/** What viem throws for a Launchpad custom error, wrapped the way writeContract wraps it. */
+function launchpadRevert(errorName: string) {
+  const data = encodeErrorResult({ abi: launchpadAbi, errorName: errorName as "NullifierUsed" });
+  return {
+    name: "ContractFunctionExecutionError",
+    message: "execution reverted",
+    cause: new ContractFunctionRevertedError({ abi: launchpadAbi, functionName: "registerProphet", data }),
+  };
+}
+
+describe("register and launch reverts by errorName", () => {
+  it("classifies each Launchpad error from the decoded revert, not the message", () => {
+    for (const name of ["NullifierUsed", "AlreadyProphet", "LabelTaken", "InvalidSignature", "ProphetRecipient"]) {
+      expect(registerRevertName(launchpadRevert(name))).toBe(name);
+    }
+    expect(registerRevertName(new Error("AlreadyProphet"))).toBeNull();
+    expect(registerRevertName({ code: 4001 })).toBeNull();
+    expect(registerRevertName(launchpadRevert("SlugTaken"))).toBeNull();
+  });
+
+  it("gives each one its own banner", () => {
+    expect(writeErrorMessage(launchpadRevert("InvalidSignature"), "registerProphet")).toBe(
+      WRITE_REVERT_COPY.InvalidSignature,
+    );
+    expect(writeErrorMessage(launchpadRevert("ProphetRecipient"))).toBe(
+      "This wallet receives protocol fees and can't launch.",
+    );
+    expect(writeErrorMessage(launchpadRevert("AlreadyProphet"), "registerProphet")).toBe(
+      WRITE_REVERT_COPY.AlreadyProphet,
+    );
+  });
+});
 
 describe("issue field rules", () => {
   it("accepts prophet labels of 3–16 [a-z0-9]", () => {
@@ -134,9 +172,12 @@ describe("designer World copy mapping", () => {
     expect(worldUserMessage("malformed_payload")).not.toMatch(/context_mismatch/);
   });
 
-  it("maps a Launchpad nullifier reuse revert to one-human-one-name", () => {
-    expect(worldErrorKindFromRegisterProphet(new Error("NullifierUsed"))).toBe("nullifier_reuse");
-    expect(worldErrorKindFromRegisterProphet(new Error("nullifier already used"))).toBe("nullifier_reuse");
+  it("maps a Launchpad nullifier reuse revert to one-human-one-name by errorName", () => {
+    expect(worldErrorKindFromRegisterProphet(launchpadRevert("NullifierUsed"))).toBe("nullifier_reuse");
+    // Message text alone is never trusted: only the decoded revert name counts.
+    expect(worldErrorKindFromRegisterProphet(new Error("nullifier already used"))).toBe("network");
+    expect(worldErrorKindFromRegisterProphet(new Error("NullifierUsed"))).toBe("network");
+    expect(worldErrorKindFromRegisterProphet(launchpadRevert("LabelTaken"))).toBe("network");
     expect(worldUserMessage("nullifier_reuse")).toBe(
       "This human already has a prophet name. One human, one name.",
     );

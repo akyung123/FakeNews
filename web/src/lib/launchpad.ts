@@ -1,6 +1,7 @@
 import { isAddress, type Address } from "viem";
 import { readContract, simulateContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
 import { launchpadCcaAbi } from "./cca/abi/launchpadCca";
+import { onSepolia, requireSepolia } from "./chain";
 import { launchpadAbi } from "./launchpadAbi";
 import { contracts } from "./contracts";
 import { webEnv } from "./env";
@@ -42,6 +43,8 @@ export type RegisterProphetOptions = {
   simulateContract?: WagmiSimulate;
   writeContract?: WagmiRegisterWrite;
   waitForTransactionReceipt?: WagmiWaitForReceipt;
+  /** Switches the wallet to Sepolia before the write. Default: wagmi switchChain(11155111). */
+  ensureChain?: () => Promise<void>;
 };
 
 export function assertSuccessfulReceipt(receipt: { status?: string } | null | undefined): void {
@@ -126,13 +129,13 @@ export function registerProphetWrite(input: RegisterProphetInput, address = cont
   if (!address) {
     throw new Error("Launchpad address is not set");
   }
-  return {
+  return onSepolia({
     address,
     abi: launchpadAbi,
     functionName: "registerProphet" as const,
     args: registerProphetArgs(input),
     account: input.wallet,
-  };
+  });
 }
 
 /** curve(token) → complete is the on-chain graduation flag (PR #26). */
@@ -189,6 +192,9 @@ export function createRegisterProphet(
     const simulate = options.simulateContract ?? simulateContract;
     const send = options.writeContract ?? writeContract;
     const wait = options.waitForTransactionReceipt ?? waitForTransactionReceipt;
+    const mocked = Boolean(options.simulateContract || options.writeContract);
+    if (options.ensureChain) await options.ensureChain();
+    else if (!mocked) await requireSepolia();
     await simulate(wagmiConfig, request);
     const hash = await send(wagmiConfig, request);
     const receipt = await wait(wagmiConfig, { hash });
@@ -294,4 +300,39 @@ export async function fetchLaunchedLogsChunked(
   const logs = [...priorLogs, ...freshLogs];
   launchedLogsCache.set(address, { scannedTo: latest, logs });
   return logs;
+}
+
+export function protocolFeeRecipientRead(address = contracts.launchpad) {
+  if (!address) {
+    throw new Error("Launchpad address is not set");
+  }
+  return {
+    address,
+    abi: launchpadAbi,
+    functionName: "protocolFeeRecipient" as const,
+    args: [] as const,
+  };
+}
+
+/**
+ * Launchpad.protocolFeeRecipient() (immutable). `launch` reverts ProphetRecipient
+ * when the sender is this wallet, so the issue screen checks it first.
+ * null when no launchpad is set or the read fails.
+ */
+export function createReadProtocolFeeRecipient(
+  options: { address?: Address; readContract?: (config: typeof wagmiConfig, request: ReturnType<typeof protocolFeeRecipientRead>) => Promise<unknown> } = {},
+): () => Promise<Address | null> {
+  const address = "address" in options ? options.address : contracts.launchpad;
+  let cached: Promise<Address | null> | null = null;
+  return () => {
+    if (!address) return Promise.resolve(null);
+    const read = options.readContract ?? (readContract as NonNullable<typeof options.readContract>);
+    cached ??= read(wagmiConfig, protocolFeeRecipientRead(address))
+      .then((value) => (typeof value === "string" && isAddress(value) ? value : null))
+      .catch(() => {
+        cached = null;
+        return null;
+      });
+    return cached;
+  };
 }

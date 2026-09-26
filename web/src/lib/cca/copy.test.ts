@@ -236,11 +236,11 @@ describe("designer FINAL CCA copy", () => {
     expect(SWAP_SECTION_COPY.buySymbol).toBe("Buy {SYMBOL}");
     expect(SWAP_SECTION_COPY.allowUniswap).toBe("Allow Uniswap to use your {SYMBOL}");
     expect(FEE_COLLECT_COPY.collectFees).toBe("Collect fees");
-    expect(FEE_COLLECT_COPY.setupFeeCollection).toBe("Set up fee collection");
-    expect(FEE_COLLECT_COPY.settingUp).toBe("Setting up…");
-    expect(FEE_COLLECT_COPY.feeCollectionReady).toBe("Fee collection ready");
+    expect(FEE_COLLECT_COPY.setupFeeCollection).toBe("Turn on trading fees");
+    expect(FEE_COLLECT_COPY.settingUp).toBe("Turning on trading fees…");
+    expect(FEE_COLLECT_COPY.feeCollectionReady).toBe("Trading fees on");
     expect(FEE_COLLECT_COPY.registerHelper).toBe(
-      "One-time step after the market opens. Anyone can do this.",
+      "Links this pool to the fee vault so the prophet earns 24% of every trade. One-time, anyone can do it.",
     );
     expect(FEE_COLLECT_COPY.beforeOpen).toBe("Fees start once the market opens.");
     expect(swapSectionCopy().sold).toBe("Sold {amount} {SYMBOL}");

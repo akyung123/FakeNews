@@ -104,3 +104,28 @@ describe("readMyHoldings", () => {
     expect(reads.mock.calls.some(([req]) => req.functionName === "accruedEth")).toBe(false);
   });
 });
+
+describe("readMyHoldings rows", () => {
+  it("lists held tokens with price and value, and separates prophecies this wallet launched", async () => {
+    const { client } = fakeClient({ label: "alice" });
+    const launchedHere = { ...coin(TOKEN_B, AUCTION_B), prophet: WALLET, launchedBlock: 9 };
+    const bought = { ...coin(TOKEN_A, AUCTION_A), prophet: LAUNCHPAD };
+    const out = await readMyHoldings(WALLET, {
+      client,
+      launchpad: LAUNCHPAD,
+      locker: LOCKER,
+      loadCoins: async () => [bought, launchedHere],
+      loadMarkets: async () => new Map([[TOKEN_A, snapshot(TOKEN_A, 10n ** 12n)]]),
+    });
+    expect(out.held).toHaveLength(1);
+    expect(out.held?.[0]).toMatchObject({
+      balanceWei: 2000n * E18,
+      priceWei: 10n ** 12n,
+      valueWei: 2n * 10n ** 15n,
+      launchedByYou: false,
+    });
+    expect(out.held?.[0]?.coin.token).toBe(TOKEN_A);
+    expect(out.launched?.map((row) => row.coin.token)).toEqual([TOKEN_B]);
+    expect(out.launched?.[0]?.balanceWei).toBe(0n);
+  });
+});

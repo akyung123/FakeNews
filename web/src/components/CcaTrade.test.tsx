@@ -260,7 +260,7 @@ describe("CcaTrade CCA states", () => {
     expect(screen.queryByText(CCA_COPY.marketFailedToast, { selector: ".up" })).toBeNull();
   });
 
-  it("shows one Collect fees button after the pool opens, including when register is still needed", async () => {
+  it("shows Collect fees once linked, and Turn on trading fees while register is still needed", async () => {
     renderTrade(
       snap({
         copyStatus: "pool_open",
@@ -293,10 +293,13 @@ describe("CcaTrade CCA states", () => {
         }),
       }),
     );
-    await waitFor(() => expect(screen.getByRole("button", { name: FEE_COLLECT_COPY.collectFees })).toBeInTheDocument());
-    expect(screen.getByText(FEE_COLLECT_COPY.registerHelper)).toBeInTheDocument();
-    expect(screen.queryByText(FEE_COLLECT_COPY.setupFeeCollection)).toBeNull();
-    expect(screen.getAllByRole("button", { name: FEE_COLLECT_COPY.collectFees })).toHaveLength(1);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Turn on trading fees" })).toBeInTheDocument());
+    expect(
+      screen.getByText(
+        "Links this pool to the fee vault so the prophet earns 24% of every trade. One-time, anyone can do it.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: FEE_COLLECT_COPY.collectFees })).toBeNull();
   });
 
   it("hides migrate, swap, and collect when their flags are off", async () => {
@@ -420,7 +423,7 @@ describe("CcaTrade CCA states", () => {
     expect(screen.queryByText(/Cash /)).toBeNull();
   });
 
-  it("Collect fees registers then collects when isRegistered is false", async () => {
+  it("Turn on trading fees sends register only when isRegistered is false", async () => {
     const user = userEvent.setup();
     const simulateContract = vi.fn(async () => ({}));
     const writeContract = vi.fn(async () => "0xabc" as const);
@@ -448,13 +451,11 @@ describe("CcaTrade CCA states", () => {
         writes={{ simulateContract, writeContract, waitForTransactionReceipt }}
       />,
     );
-    await waitFor(() => expect(screen.getByRole("button", { name: FEE_COLLECT_COPY.collectFees })).toBeEnabled());
-    await user.click(screen.getByRole("button", { name: FEE_COLLECT_COPY.collectFees }));
-    await waitFor(() => expect(writeContract).toHaveBeenCalledTimes(2));
-    expect(writeContract.mock.calls.map(([, request]) => request.functionName)).toEqual(["register", "collect"]);
-    expect(writeContract.mock.calls[0]?.[1].args).toEqual([TOKEN, 7n]);
-    expect(writeContract.mock.calls[1]?.[1].args).toEqual([TOKEN, 7n]);
-    expect(screen.queryByText(FEE_COLLECT_COPY.setupFeeCollection)).toBeNull();
+    await waitFor(() => expect(screen.getByRole("button", { name: FEE_COLLECT_COPY.setupFeeCollection })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: FEE_COLLECT_COPY.setupFeeCollection }));
+    await waitFor(() => expect(screen.getByText(FEE_COLLECT_COPY.feeCollectionReady)).toBeInTheDocument());
+    expect(writeContract).toHaveBeenCalledTimes(1);
+    expect(writeContract.mock.calls[0]?.[1]).toMatchObject({ functionName: "register", args: [TOKEN, 7n] });
   });
 
   it("Collect fees calls collect(token, tokenId) when already registered", async () => {

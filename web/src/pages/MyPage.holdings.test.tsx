@@ -46,3 +46,56 @@ describe("My page value cards", () => {
     expect(screen.queryByText("Fees ready to claim")).toBeNull();
   });
 });
+
+describe("My page lists what the wallet holds", () => {
+  const WAD = 10n ** 18n;
+  const base = {
+    fromChain: true,
+    ticker: "X",
+    creator: "ringo",
+    createdAt: 0,
+    sold: 0,
+    ethRaised: 0,
+    history: [],
+  };
+  const held = {
+    ...base,
+    id: "0xaaaa00000000000000000000000000000000aaaa",
+    token: "0xaaaa00000000000000000000000000000000aaaa" as const,
+    name: "trump.ringo.prophecy.eth",
+    prophecy: "A line someone else wrote",
+  };
+  const mine = {
+    ...base,
+    id: "0xbbbb00000000000000000000000000000000bbbb",
+    token: "0xbbbb00000000000000000000000000000000bbbb" as const,
+    name: "lingo-2028.me.prophecy.eth",
+    prophecy: "A line this wallet wrote",
+  };
+
+  it("shows tokens held from bids, claims or swaps, apart from the ones this wallet launched", async () => {
+    renderWith({
+      holdingsValueWei: 2n * 10n ** 15n,
+      tokensHeldWei: 2000n * WAD,
+      bidSpentWei: 0n,
+      feesWei: 0n,
+      held: [{ coin: held, balanceWei: 2000n * WAD, priceWei: 10n ** 12n, valueWei: 2n * 10n ** 15n, launchedByYou: false }],
+      launched: [{ coin: mine, balanceWei: 0n }],
+    });
+    const heldList = await screen.findByTestId("held-list");
+    expect(heldList).toHaveTextContent("A line someone else wrote");
+    expect(heldList).toHaveTextContent("2K");
+    expect(heldList).toHaveTextContent("0.000001 ETH per token");
+    expect(heldList).not.toHaveTextContent("A line this wallet wrote");
+    const launchedList = screen.getByTestId("launched-list");
+    expect(launchedList).toHaveTextContent("Launched by you");
+    expect(launchedList).toHaveTextContent("A line this wallet wrote");
+    expect(launchedList).toHaveTextContent("Not held by this wallet");
+  });
+
+  it("says so when the wallet holds nothing", async () => {
+    renderWith({ holdingsValueWei: 0n, tokensHeldWei: 0n, bidSpentWei: 0n, feesWei: null, held: [], launched: [] });
+    expect(await screen.findByText(/You don't hold a prophecy token yet/)).toBeInTheDocument();
+    expect(screen.queryByTestId("launched-list")).toBeNull();
+  });
+});

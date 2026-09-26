@@ -16,6 +16,9 @@ import { MOCK_PROPHECIES, SEED_COINS } from "./mock";
 import { actions } from "./store";
 import { wagmiConfig } from "./wagmi";
 import { classifyWriteError } from "./writeErrors";
+import { launchpadCcaAbi } from "./cca/abi/launchpadCca";
+import { onSepolia, requireSepolia } from "./chain";
+import { getPublicClient } from "./rpc";
 
 export { WRITE_REVERT_COPY, classifyWriteError } from "./writeErrors";
 export type { ClassifiedWriteError, MappedRevertName } from "./writeErrors";
@@ -93,6 +96,7 @@ export function writePhaseCopy(phase: WritePhase | null): string | null {
 
 export type WriteReceipt = {
   status?: string;
+  blockNumber?: bigint;
   logs?: readonly { address?: string; topics?: readonly string[]; data?: string }[];
 };
 
@@ -122,7 +126,65 @@ export type WriteOptions = {
     args: { address: Address },
   ) => Promise<bigint | { value: bigint }>;
   onPhase?: (phase: WritePhase) => void;
+  /** Looks the new token up in fresh blocks when the receipt carried no Launched log. */
+  findLaunched?: (input: FindLaunchedInput) => Promise<Address | null>;
+  /** Switches the wallet to Sepolia before a write. Default: wagmi switchChain(11155111). */
+  ensureChain?: () => Promise<void>;
 };
+
+export type FindLaunchedInput = {
+  launchpad: Address;
+  slug: string;
+  prophet?: Address;
+  fromBlock?: bigint;
+};
+
+export type FindLaunchedOptions = {
+  client?: {
+    getBlockNumber: () => Promise<bigint>;
+    getContractEvents: (query: never) => Promise<unknown>;
+  };
+  attempts?: number;
+  delayMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+};
+
+/**
+ * A launch went through but its receipt had no Launched log (an RPC that
+ * answered before indexing the block). Read the Launched event for this slug
+ * from the new blocks, retrying for a few seconds, before giving up.
+ */
+export async function findLaunchedToken(
+  input: FindLaunchedInput,
+  options: FindLaunchedOptions = {},
+): Promise<Address | null> {
+  const client = options.client ?? (getPublicClient() as unknown as NonNullable<FindLaunchedOptions["client"]>);
+  const attempts = options.attempts ?? 5;
+  const delayMs = options.delayMs ?? 2_000;
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) await sleep(delayMs);
+    try {
+      const latest = await client.getBlockNumber();
+      const fromBlock = input.fromBlock ?? (latest > 100n ? latest - 100n : 0n);
+      const logs = await client.getContractEvents({
+        address: input.launchpad,
+        abi: launchpadCcaAbi,
+        eventName: "Launched",
+        args: input.prophet ? { prophet: input.prophet } : undefined,
+        fromBlock,
+        toBlock: latest,
+      } as never);
+      const hit = (Array.isArray(logs) ? logs : []).find(
+        (log) => (log as { args?: { slug?: string } }).args?.slug === input.slug,
+      ) as { args?: { token?: Address } } | undefined;
+      if (hit?.args?.token && isAddress(hit.args.token)) return hit.args.token;
+    } catch {
+      // the next attempt reads again
+    }
+  }
+  return null;
+}
 
 export type LaunchInput = {
   slug: string;
@@ -299,9 +361,12 @@ async function sendWrite(
   extra?: { onPhase?: (phase: WritePhase) => void },
 ): Promise<WriteReceipt> {
   const { simulate, write, wait } = clients(options);
+  const mocked = Boolean(options.simulateContract || options.writeContract);
+  if (options.ensureChain) await options.ensureChain();
+  else if (!mocked) await requireSepolia();
   emitPhase(options, extra, phase);
-  const simulated = await simulate(wagmiConfig, request);
-  const hash = await write(wagmiConfig, simulated.request);
+  const simulated = await simulate(wagmiConfig, onSepolia(request));
+  const hash = await write(wagmiConfig, onSepolia(simulated.request ?? request));
   emitPhase(options, extra, "waiting");
   const receipt = await wait(wagmiConfig, { hash });
   if (receipt.status !== "success") throw new TransactionRevertedError();
@@ -365,7 +430,25 @@ export function createLaunch(
   return async (input) => {
     if (!address) return null;
     const receipt = await sendWrite(launchWrite(input, address) as unknown as Record<string, unknown>, options);
-    return tokenFromLaunchedReceipt(receipt);
+    try {
+      return tokenFromLaunchedReceipt(receipt);
+    } catch (error) {
+      if (!isLaunchedParseError(error)) throw error;
+      let prophet: Address | undefined;
+      try {
+        prophet = clients(options).accountOf().address;
+      } catch {
+        prophet = undefined;
+      }
+      const found = await (options.findLaunched ?? findLaunchedToken)({
+        launchpad: address,
+        slug: input.slug,
+        prophet,
+        fromBlock: receipt.blockNumber,
+      });
+      if (found) return found;
+      throw error;
+    }
   };
 }
 
