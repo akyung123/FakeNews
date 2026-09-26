@@ -111,8 +111,9 @@ if pad_tx:
                 rec = r
                 break
     if rec is not None:
-        if not block:
-            block = parse_int(rec.get("blockNumber"))
+        rec_block = parse_int(rec.get("blockNumber"))
+        if rec_block:
+            block = rec_block
         if not deployer:
             deployer = rec.get("from") or ""
 
