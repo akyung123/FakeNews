@@ -44,6 +44,7 @@ contract Launchpad is ReentrancyGuard {
     mapping(address token => Curve) internal _curves;
     mapping(address wallet => uint256) internal _creatorFees;
     uint256 public protocolFees;
+    address public immutable protocolFeeRecipient;
 
     event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
     event Trade(
@@ -58,6 +59,7 @@ contract Launchpad is ReentrancyGuard {
         string memo
     );
     event CreatorFeeClaimed(address indexed prophet, uint256 amount);
+    event ProtocolFeeClaimed(address indexed recipient, uint256 amount);
 
     error UnknownToken();
     error CurveComplete();
@@ -68,6 +70,12 @@ contract Launchpad is ReentrancyGuard {
     error ExceedsSold();
     error EthTransferFailed();
     error NotImplemented();
+    error ZeroAddress();
+
+    constructor(address protocolFeeRecipient_) {
+        if (protocolFeeRecipient_ == address(0)) revert ZeroAddress();
+        protocolFeeRecipient = protocolFeeRecipient_;
+    }
 
     /// World ID prophet names are a later milestone.
     function registerProphet(string calldata, uint256, bytes calldata) external pure {
@@ -140,6 +148,15 @@ contract Launchpad is ReentrancyGuard {
         _creatorFees[msg.sender] = 0;
         emit CreatorFeeClaimed(msg.sender, amount);
         _sendEth(msg.sender, amount);
+    }
+
+    /// Anyone may call. ETH goes only to the constructor recipient.
+    function claimProtocolFee() external nonReentrant {
+        uint256 amount = protocolFees;
+        if (amount == 0) revert ZeroAmount();
+        protocolFees = 0;
+        emit ProtocolFeeClaimed(protocolFeeRecipient, amount);
+        _sendEth(protocolFeeRecipient, amount);
     }
 
     function curve(address token)
