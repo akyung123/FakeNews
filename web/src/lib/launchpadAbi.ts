@@ -1,13 +1,12 @@
 /**
- * Launchpad ABI from contracts/src/Launchpad.sol at 0ee30ce (current main).
+ * Launchpad ABI. Most of this file still matches the curve-era `main` branch
+ * (contracts/src/Launchpad.sol at 0ee30ce): buy, sell, curve, quoteBuy,
+ * quoteSell, Trade, Graduated, claimCreatorFee/claimProtocolFee are gone on
+ * the `cca` branch, replaced by the CCA auction (see web/src/lib/cca).
  *
- * Custom errors match the source (and forge `out/Launchpad.sol/Launchpad.json`
- * when present): every `error` on Launchpad so viem can decode reverts.
- * Constructor ends at ens: (protocolFeeRecipient, worldSigner, ens).
- * Uniswap addresses are not constructor args; deployer-only one-time
- * setUniswap(poolManager, hook, locker). Launched has no deadline.
- * Graduation: curve().complete and Graduated(token, poolId, …).
- * The web never reads ENS_ADAPTER_ADDRESS — call launchpad.ens().
+ * `launch` and `Launched` below match the deployed `cca` Launchpad instead:
+ * `launch(slug, prophecy, deadline)` is 3 args and not payable — no first
+ * buy — and `Launched` carries `auction` as a third indexed topic.
  */
 export const launchpadAbi = [
   {
@@ -33,12 +32,11 @@ export const launchpadAbi = [
   {
     type: "function",
     name: "launch",
-    stateMutability: "payable",
+    stateMutability: "nonpayable",
     inputs: [
       { name: "slug", type: "string" },
       { name: "prophecy", type: "string" },
       { name: "deadline", type: "uint64" },
-      { name: "minTokensOut", type: "uint256" },
     ],
     outputs: [{ name: "token", type: "address" }],
   },
@@ -214,6 +212,7 @@ export const launchpadAbi = [
     inputs: [
       { name: "token", type: "address", indexed: true },
       { name: "prophet", type: "address", indexed: true },
+      { name: "auction", type: "address", indexed: true },
       { name: "prophetLabel", type: "string", indexed: false },
       { name: "slug", type: "string", indexed: false },
     ],

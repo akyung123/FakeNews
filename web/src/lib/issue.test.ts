@@ -6,7 +6,6 @@ import {
   isLaunchEnabled,
   isRegisterSubmitEnabled,
   isValidDeadline,
-  isValidFirstBuy,
   isValidProphetLabel,
   isValidProphecy,
   isValidSlug,
@@ -48,12 +47,6 @@ describe("issue field rules", () => {
     expect(isValidDeadline(100, 100)).toBe(false);
   });
 
-  it("treats first buy as optional and non-negative", () => {
-    expect(isValidFirstBuy("")).toBe(true);
-    expect(isValidFirstBuy("0")).toBe(true);
-    expect(isValidFirstBuy("-1")).toBe(false);
-  });
-
   it("builds the nested prophecy name", () => {
     expect(prophecyName("lingo-2028", "ringo", "prophecy.eth")).toBe("lingo-2028.ringo.prophecy.eth");
   });
@@ -70,7 +63,6 @@ describe("launch button gating", () => {
     prophecy: "The projector survives the demo",
     slug: "lingo-2028",
     deadlineUnix: 200,
-    firstBuy: "0",
     nowSeconds: 100,
   };
 

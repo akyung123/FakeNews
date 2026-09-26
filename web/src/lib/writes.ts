@@ -128,7 +128,6 @@ export type LaunchInput = {
   slug: string;
   prophecy: string;
   deadline: bigint;
-  firstBuyWei: bigint;
 };
 
 export type BuyInput = {
@@ -170,19 +169,9 @@ export function ethInputToWei(value: string | number): bigint {
   return parseEther(n.toFixed(18));
 }
 
-export function minTokensOutForBuy(ethIn: bigint, curve: CurveState = { sold: 0, ethRaised: 0 }): bigint {
-  if (ethIn === 0n) return 0n;
-  return minOutAfterSlippage(quoteBuyWei(toCurveWei(curve), ethIn).tokensOut);
-}
-
 export function minEthOutForSell(tokensIn: bigint, curve: CurveState): bigint {
   if (tokensIn === 0n) return 0n;
   return minOutAfterSlippage(quoteSellWei(toCurveWei(curve), tokensIn).ethPayout);
-}
-
-/** Optional first buy: 0 ETH is allowed. Positive ETH that quotes to 0 tokens is refused. */
-export function isFirstBuyTooSmall(firstBuyWei: bigint): boolean {
-  return firstBuyWei > 0n && minTokensOutForBuy(firstBuyWei) === 0n;
 }
 
 /** Only address-id coins (a just-launched token) go on chain. Mock ids stay local. */
@@ -223,13 +212,11 @@ export function isChainWriteTarget(coin: WriteTargetCoin): boolean {
 }
 
 export function launchWrite(input: LaunchInput, address: Address) {
-  const minTokensOut = minTokensOutForBuy(input.firstBuyWei);
   return {
     address,
     abi: launchpadAbi,
     functionName: "launch" as const,
-    args: [input.slug, input.prophecy, input.deadline, minTokensOut] as const,
-    value: input.firstBuyWei,
+    args: [input.slug, input.prophecy, input.deadline] as const,
   };
 }
 
@@ -378,7 +365,6 @@ export function createLaunch(
   const address = resolveAddress(options);
   return async (input) => {
     if (!address) return null;
-    if (isFirstBuyTooSmall(input.firstBuyWei)) throw new ZeroQuoteError();
     const receipt = await sendWrite(launchWrite(input, address) as unknown as Record<string, unknown>, options);
     return tokenFromLaunchedReceipt(receipt);
   };
