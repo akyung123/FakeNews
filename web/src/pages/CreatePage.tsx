@@ -24,13 +24,10 @@ import { actions } from "../lib/store";
 import { MAX_PROPHECY_BYTES, utf8ByteLength } from "../lib/limits";
 import {
   createLaunch,
-  ethInputToWei,
-  isFirstBuyTooSmall,
   refreshCoinFromChain,
   writeErrorMessage,
   writePhaseCopy,
   WRITE_COPY,
-  ZERO_QUOTE_COPY,
   type LaunchInput,
   type WritePhase,
 } from "../lib/writes";
@@ -85,7 +82,6 @@ export function IssueScreen({
   const [prophecy, setProphecy] = useState("");
   const [slug, setSlug] = useState("");
   const [deadlineLocal, setDeadlineLocal] = useState(toDatetimeLocalValue(now + WEEK_MS));
-  const [firstBuy, setFirstBuy] = useState("0");
   const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
   const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
@@ -114,14 +110,12 @@ export function IssueScreen({
     prophecy,
     slug,
     deadlineUnix,
-    firstBuy,
     nowSeconds,
   });
   const gate = { returningProphet, worldStatus, formValid, registerStatus };
   const canLaunch = isLaunchEnabled(gate);
   const canRegister = isRegisterSubmitEnabled(gate);
   const canSubmit = isIssueSubmitEnabled(gate);
-  const firstBuyTooSmall = isFirstBuyTooSmall(ethInputToWei(firstBuy));
   const registerBusy = registerStatus === "pending";
   const busy = registerBusy || writeBusy;
   const pending = writeBusy
@@ -165,7 +159,7 @@ export function IssueScreen({
         className="block create"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!canSubmit || busy || (canLaunch && firstBuyTooSmall)) return;
+          if (!canSubmit || busy) return;
           void (async () => {
             setWriteError(null);
             if (canRegister) {
@@ -197,7 +191,6 @@ export function IssueScreen({
                 slug,
                 prophecy: prophecy.trim(),
                 deadline: BigInt(deadlineUnix),
-                firstBuyWei: ethInputToWei(firstBuy),
               });
               if (token) {
                 actions.create({
@@ -207,7 +200,7 @@ export function IssueScreen({
                   prophecy: prophecy.trim(),
                   name: fullName || slug,
                   ticker: slug.toUpperCase().slice(0, 11),
-                  firstBuy: Number(firstBuy) || 0,
+                  firstBuy: 0,
                 });
                 await refreshCoinFromChain(token, token).catch(() => undefined);
                 if (!returningProphet) storeProphetLabel(prophetLabel);
@@ -220,7 +213,7 @@ export function IssueScreen({
                 prophecy: prophecy.trim(),
                 name: fullName || slug,
                 ticker: slug.toUpperCase().slice(0, 11),
-                firstBuy: Number(firstBuy) || 0,
+                firstBuy: 0,
               });
               if (!returningProphet) storeProphetLabel(prophetLabel);
               if (onIssued) onIssued(id);
@@ -293,11 +286,6 @@ export function IssueScreen({
 
         {fullName ? <p className="name-preview">{fullName}</p> : null}
 
-        <label className="field">
-          <span>First buy (ETH, optional)</span>
-          <input inputMode="decimal" value={firstBuy} onChange={(e) => setFirstBuy(e.target.value)} />
-        </label>
-
         <WorldGate
           returningProphet={returningProphet}
           prophetName={session.prophetLabel ? `${session.prophetLabel}.${parentName}` : ""}
@@ -332,17 +320,12 @@ export function IssueScreen({
             {error}
           </p>
         ) : null}
-        {firstBuyTooSmall ? (
-          <p className="banner-error" role="alert">
-            {ZERO_QUOTE_COPY}
-          </p>
-        ) : null}
 
         <button
           type="submit"
           className="btn primary full"
           data-testid={canLaunch ? "launch-submit" : canRegister ? "register-submit" : "issue-submit"}
-          disabled={!canSubmit || busy || (canLaunch && firstBuyTooSmall)}
+          disabled={!canSubmit || busy}
         >
           {submitLabel}
         </button>

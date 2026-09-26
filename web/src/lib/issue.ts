@@ -55,26 +55,18 @@ export function isValidDeadline(unixSeconds: number, nowSeconds: number): boolea
   return Number.isInteger(unixSeconds) && unixSeconds > nowSeconds;
 }
 
-export function isValidFirstBuy(value: string): boolean {
-  if (value.trim() === "") return true;
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0;
-}
-
 export function isIssueFormValid(input: {
   prophetLabel: string;
   prophecy: string;
   slug: string;
   deadlineUnix: number;
-  firstBuy: string;
   nowSeconds: number;
 }): boolean {
   return (
     isValidProphetLabel(input.prophetLabel) &&
     isValidProphecy(input.prophecy) &&
     isValidSlug(input.slug) &&
-    isValidDeadline(input.deadlineUnix, input.nowSeconds) &&
-    isValidFirstBuy(input.firstBuy)
+    isValidDeadline(input.deadlineUnix, input.nowSeconds)
   );
 }
 
