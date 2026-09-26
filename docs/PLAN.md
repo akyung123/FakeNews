@@ -30,6 +30,13 @@ Lanes follow folders. One lane = one person (or one agent session).
 | Infra | CI, Sepolia deploy skeleton, static hosting |
 | Designer | UI copy and the demo storyboard |
 
+- [x] Official ENS app vs Sepolia ENSv2 (read-only, 2026-09-26 ~00:53 UTC, Sepolia block `11782825`) @pm
+  - `https://app.ens.domains` — Mainnet ENSv1. HTTP 200. Banner: "ENSv2 is coming!" Does **not** read Sepolia v2 names.
+  - `https://sepolia.app.ens.domains` — **legacy ENSv1** Sepolia app. HTTP 200. On-page: "legacy ENS app" / "no longer maintained". Official support list (support.ens.domains, "Official ENS websites") calls it "ENS App (v1 on Sepolia)".
+  - Official **ENSv2** surfaces (these **do** target Sepolia v2): `https://app.ens.dev` (banner: last deploy **2026-09-15**, matches ENSV2.md `71a3b73`) and `https://explorer.ens.dev` (connects to Sepolia RPC / `api.sepolia.ensnode.io`). Sources: [ENS blog 2026-08-12](https://ens.domains/blog/post/ensv2-beta-public-testing), support article above.
+  - Demo scenes 1–2: do not use app.ens.domains or sepolia.app.ens.domains. Use app.ens.dev / explorer.ens.dev, or `bun infra/ens-lookup.ts <name>` (read-only viem via UniversalResolverV2). See [`infra/ENS-LOOKUP.md`](../infra/ENS-LOOKUP.md).
+  - Script probe (same block window): `prophecy.eth` → address `null` / resolver `0x0` (still unregistered). Docs test name `ur.integration-tests.eth` → `0x1111…1111` via UniversalResolverV2, so the lookup path works before we mint.
+
 ## 1. ENS setup (`contracts/script`, one team wallet)
 
 - [ ] Get Sepolia ETH, `mint` MockUSDC
