@@ -28,6 +28,8 @@ The parent is written as `prophecy.eth`. The real one comes from `VITE_PARENT_NA
 
 ### `Launchpad` `(draft)`
 
+M1 implements the bonding curve: `launch` mints a token and opens reserves, then `buy` / `sell` / quotes / `claimCreatorFee`. `registerProphet` and the ENS writes inside `launch` come in later milestones. `launch` still takes `prophecy` and `deadline` so the ABI can stay stable; they are **not** written to storage or events (DECISIONS #5). The buy that fills the last curve tokens sets `complete` and refunds leftover ETH. Moving liquidity into a Uniswap V4 pool is later.
+
 ```solidity
 // Create a prophet name. Needs a World ID server signature. Once per nullifier.
 function registerProphet(string label, uint256 nullifier, bytes serverSig) external;
@@ -48,23 +50,26 @@ function quoteBuy(address token, uint256 ethIn) external view returns (uint256 t
 function quoteSell(address token, uint256 tokensIn) external view returns (uint256 ethOut, uint256 fee);
 function prophetOf(address wallet) external view returns (string label);
 function creatorFeeOf(address wallet) external view returns (uint256);
+function protocolFees() external view returns (uint256);
 ```
 
 ```solidity
 event ProphetRegistered(address indexed wallet, string label, uint256 nullifier);
-event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug, uint64 deadline);
+event Launched(address indexed token, address indexed prophet, string prophetLabel, string slug);
 event Trade(address indexed token, address indexed trader, bool isBuy,
             uint256 ethAmount, uint256 tokenAmount, uint256 fee, uint256 vEthAfter, uint256 vTokenAfter, string memo);
 event Graduated(address indexed token, uint256 ethToPool, uint256 tokensToPool);
 event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 ```
 
-- The sentence is not in `Launched`. It is read from ENS (DECISIONS #5).
+- The sentence and deadline are not in `Launched` or any other event. They are read from ENS (DECISIONS #5).
 - Constants are exactly the "Constants" section of SPEC.md.
+- Reserves live in a per-token struct. Creator and protocol fees use a separate ledger, never `address(this).balance`.
 - `memo` is only emitted, never stored. `buy`/`sell` revert if it is longer than 140 bytes (DECISIONS #15).
 - Rounding:
-  - Buy: fee rounds up, tokens out round down.
+  - Buy: fee rounds up, tokens out round down. A buy that would take more than the remaining curve supply fills only that remainder and refunds leftover ETH.
   - Sell: fee rounds up, ETH out rounds down.
+- `quoteBuy` / `quoteSell` match `buy` / `sell` exactly, including the last-fill refund path (fee is taken on the ETH actually used).
 
 ### `ProphecyToken`
 
