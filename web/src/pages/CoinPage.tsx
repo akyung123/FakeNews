@@ -27,8 +27,10 @@ import {
   useStore,
   type Coin,
 } from "../lib/store";
+import { useEthBalance, useTokenBalance } from "../lib/useWalletBalance";
 import {
   isChainWriteTarget,
+  liveTokenAddress,
   type BuyInput,
   type SellInput,
 } from "../lib/writes";
@@ -74,6 +76,8 @@ export function CoinPage({
   // Once migrate opens the pool, slot0 is the live price; before that the
   // auction's clearing price is, and the hook stays closed.
   const poolPrice = usePoolPrice(coin?.token, contracts.hook);
+  const ethBalance = useEthBalance();
+  const tokenBalance = useTokenBalance(coin ? liveTokenAddress(coin.id, coin.token) : undefined);
   if (!coin) {
     if (chain && !chainReady) {
       return <main className="coin-page" />;
@@ -89,6 +93,7 @@ export function CoinPage({
   }
 
   const pos = myPosition(s, coin.id);
+  const held = chain ? (tokenBalance ?? 0) : (pos?.tokens ?? 0);
   const talk = s.comments.filter((c) => c.coinId === coin.id).sort((a, b) => b.at - a.at);
   const closed = graduated(coin) || Boolean(coin.complete);
   const poolPriceEth = Number(formatEther(poolPrice.priceWei));
@@ -151,16 +156,16 @@ export function CoinPage({
         {!chain || isChainWriteTarget(coin) ? (
           <CcaTrade
             coin={coin}
-            balance={s.balance}
-            held={pos?.tokens ?? 0}
+            balance={chain ? (ethBalance ?? 0) : s.balance}
+            held={held}
             chain={chain}
           />
         ) : null}
-        {pos ? (
+        {held > 0 ? (
           <section className="block you-hold">
             <p className="faint small">You hold</p>
             <p className="you-amount">
-              {tokens(pos.tokens)} <span className="faint">${coin.ticker}</span>
+              {tokens(held)} <span className="faint">${coin.ticker}</span>
             </p>
           </section>
         ) : null}
