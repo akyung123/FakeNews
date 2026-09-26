@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Script, console} from "forge-std/Script.sol";
 import {SepoliaConfig} from "./SepoliaConfig.sol";
+import {ScriptVm} from "./ScriptVm.sol";
 
 /// Surfaces that already exist on Sepolia (ENSV2 `71a3b73`). Our Launchpad is still landing.
 interface IVerifiableFactory {
@@ -33,17 +33,20 @@ interface IETHRegistry {
 ///   ./script/run-sepolia.sh script/SetupParent.s.sol --sig "grantLaunchpadRegistrar()"
 ///
 /// Role bits from docs/ENSV2.md section 3. Do not grant UNREGISTER or SET_SUBREGISTRY.
-contract SetupParent is Script {
+contract SetupParent is ScriptVm {
     uint256 internal constant ROLE_REGISTRAR = 1 << 0;
     uint256 internal constant ROLE_SET_PARENT = 1 << 8;
     uint256 internal constant ROLE_RENEW = 1 << 16;
     uint256 internal constant ADMIN = 1 << 128;
 
+    event ParentRegistry(address registry);
+    event Linked(string label, address registry);
+    event RegistrarGranted(address launchpad);
+
     function deployUserRegistry() external {
         require(_sepolia(), "sepolia or anvil only");
         address owner = vm.envAddress("TEAM_WALLET");
         bytes32 salt = vm.envOr("USER_REGISTRY_SALT", keccak256("UserRegistry"));
-        // Owner keeps registrar/renew/setParent admins so the later steps can run, then lock.
         uint256 initRoles = (ROLE_REGISTRAR | ROLE_RENEW | ROLE_SET_PARENT) * (1 + ADMIN);
 
         Grant[] memory grants = new Grant[](1);
@@ -51,12 +54,12 @@ contract SetupParent is Script {
         bytes memory init = abi.encodeCall(IUserRegistry.initialize, (grants));
 
         _start();
-        address registry = IVerifiableFactory(SepoliaConfig.VERIFIABLE_FACTORY)
-            .deployProxy(SepoliaConfig.USER_REGISTRY_IMPL, salt, init);
+        address registry = IVerifiableFactory(SepoliaConfig.VERIFIABLE_FACTORY).deployProxy(
+            SepoliaConfig.USER_REGISTRY_IMPL, salt, init
+        );
         vm.stopBroadcast();
 
-        console.log("parent UserRegistry", registry);
-        console.log("set PARENT_USER_REGISTRY to this address, then run linkParent()");
+        emit ParentRegistry(registry);
     }
 
     function linkParent() external {
@@ -68,11 +71,10 @@ contract SetupParent is Script {
         _start();
         IETHRegistry(SepoliaConfig.ETH_REGISTRY).setSubregistry(labelhash, registry);
         IUserRegistry(registry).setParent(SepoliaConfig.ETH_REGISTRY, label);
-        // Drop setParent (+ admin) so the parent pointer cannot move.
         IUserRegistry(registry).revokeRootRoles(ROLE_SET_PARENT * (1 + ADMIN), vm.envAddress("TEAM_WALLET"));
         vm.stopBroadcast();
 
-        console.log("linked", label, "->", registry);
+        emit Linked(label, registry);
     }
 
     function grantLaunchpadRegistrar() external {
@@ -85,18 +87,10 @@ contract SetupParent is Script {
         IUserRegistry(registry).grantRootRoles(ROLE_REGISTRAR, launchpad);
         vm.stopBroadcast();
 
-        console.log("granted ROLE_REGISTRAR to", launchpad);
+        emit RegistrarGranted(launchpad);
     }
 
     function _sepolia() internal view returns (bool) {
         return block.chainid == SepoliaConfig.CHAIN_ID || block.chainid == 31337;
-    }
-
-    function _start() internal {
-        if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
-            vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
-        } else {
-            vm.startBroadcast();
-        }
     }
 }
