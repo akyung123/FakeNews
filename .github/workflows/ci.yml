@@ -27,19 +27,52 @@ jobs:
     defaults:
       run:
         working-directory: contracts
+    env:
+      # Fork tests read one fixed block, so Foundry's RPC cache (restored below)
+      # answers reruns without spending the Sepolia RPC key. Raise it with the
+      # repo variable when a test needs newer chain state.
+      SEPOLIA_FORK_BLOCK: ${{ vars.SEPOLIA_FORK_BLOCK || '11788197' }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
       - uses: foundry-rs/foundry-toolchain@v1
       - run: forge --version
       - run: forge build
+      - name: Restore fork RPC cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.foundry/cache/rpc
+          # Cache entries cannot be overwritten. A per-run key saves the slots each
+          # run adds; restore-keys picks up the newest one for this block.
+          key: foundry-rpc-sepolia-${{ env.SEPOLIA_FORK_BLOCK }}-${{ github.run_id }}
+          restore-keys: foundry-rpc-sepolia-${{ env.SEPOLIA_FORK_BLOCK }}-
+      # Only a PR that touches contracts (or this file) spends the RPC key.
+      # Pushes to the default branch always do.
+      - name: Detect contracts change
+        id: changed
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "contracts=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet "origin/${BASE_REF}...HEAD" -- . ../.gitmodules ../.github/workflows/ci.yml; then
+            echo "contracts=false" >> "$GITHUB_OUTPUT"
+            echo "No contracts change. LockReal skips; CCA fork tests use the public RPC."
+          else
+            echo "contracts=true" >> "$GITHUB_OUTPUT"
+          fi
       # PR #19 LockReal tests skip when this is empty. Missing secret must not fail CI.
       # Fork PRs do not receive Actions secrets, so those runs stay skipped and still pass.
+      # Export only when there is a URL: an empty SEPOLIA_RPC_URL would make the
+      # CCA fork tests skip instead of falling back to the public RPC.
       - name: Test
         env:
-          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
-        run: forge test -vv
+          RPC: ${{ steps.changed.outputs.contracts == 'true' && secrets.SEPOLIA_RPC_URL || '' }}
+        run: |
+          if [[ -n "$RPC" ]]; then export SEPOLIA_RPC_URL="$RPC"; fi
+          forge test -vv
 
   detect-world:
     # hashFiles is not valid on a job-level if. Detect after checkout instead.

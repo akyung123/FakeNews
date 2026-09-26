@@ -50,6 +50,7 @@ Lanes follow folders. One lane = one person (or one agent session).
 - [x] Single-wallet Sepolia ENS + Launchpad: adapter then Launchpad in one broadcast (predicted CREATE); wrapper sleeps ~70s for commit-reveal; no parent lock @cursor
 - [x] After send, write `deployments/sepolia.json` (or gitignored `deployments/anvil.json` on a fork) and print launchpad + deploy block for web `Launched` fromBlock @cursor
 - [x] After Launchpad: CREATE2 Hook (mined flags, Launchpad ctor input), Locker, deployer `setUniswap` once; record hook / locker / poolManager @cursor
+- [x] CI fork tests pin one block and reuse Foundry's RPC cache; the RPC key is spent only when `contracts/` changes @claude
 
 ## 3. Web (`web/`)
 
