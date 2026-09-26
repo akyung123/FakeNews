@@ -46,7 +46,7 @@ Lanes follow folders. One lane = one person (or one agent session).
   - [ ] Lock tests: editing the sentence reverts, transfer reverts, swapping the resolver reverts, `hasAssignees(ROOT, UNREGISTER) == false`
   - [ ] Three fuzz tests: solvency, a round trip never gains, graduation vs pool start price gap < 0.0068%
   - [ ] World: reusing a nullifier reverts, a bad signature reverts
-- [ ] Sepolia deploy script (skill `deploy-sepolia`) — skeleton in section 6; contracts lane extends it when Launchpad exists
+- [ ] Sepolia deploy script (skill `deploy-sepolia`)
 
 ## 3. Web (`web/`)
 
@@ -75,13 +75,6 @@ Lanes follow folders. One lane = one person (or one agent session).
 
 - [ ] Create a prophecy with a 2-minute deadline beforehand so it is already Departed
 - [ ] Record the five scenes in SPEC "Demo" (2–4 minutes)
-
-## 6. Infra (CI, Sepolia deploy skeleton, hosting)
-
-- [x] GitHub Actions: `forge build` + `forge test`; web install / lint / typecheck / build; world when the folder exists @cursor-agent
-- [x] Sepolia deploy skeleton (Foundry scripts, dry-run by default) @cursor-agent
-- [x] Public hosting for `web/` as a static site (zero extra secrets) @cursor-agent
-- [x] `docs/INFRA.md` and `.env.example` placeholders (names only) @cursor-agent
 
 ## If there is time
 

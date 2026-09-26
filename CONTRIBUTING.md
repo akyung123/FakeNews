@@ -27,11 +27,10 @@ cd web && bun install && bun run build
 
 | Lane | Folder | Owns |
 |------|--------|------|
-| contracts | `contracts/` | Launchpad, token, hook, locker, ENS adapter; extend deploy scripts when those land |
+| contracts | `contracts/` | Launchpad, token, hook, locker, ENS adapter, deploy scripts |
 | web | `web/` | The four screens, wallet, ENS reads |
 | world | `world/` | World ID verification server |
 | docs | `docs/` | Spec, decisions, plan |
-| infra | `.github/`, `contracts/script/`, `.env.example`, [`docs/INFRA.md`](docs/INFRA.md) | CI, Sepolia deploy skeleton, static hosting, env names |
 
 Do not edit another lane's folder. If you need something from it, change [`docs/INTERFACE.md`](docs/INTERFACE.md) in your PR and tell that lane.
 

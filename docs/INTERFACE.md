@@ -96,26 +96,12 @@ event CreatorFeeClaimed(address indexed prophet, uint256 amount);
 
 ## 5. Environment variables
 
-Names only. Values live in a local `.env` (never committed). How to obtain each value is in [`INFRA.md`](INFRA.md).
-
 | Name | Used by |
 |---|---|
-| `VITE_RPC_URL` | web (Sepolia JSON-RPC, no API key in git) |
+| `VITE_RPC_URL` | web |
 | `VITE_LAUNCHPAD_ADDRESS` | web |
 | `VITE_PARENT_NAME` | web (e.g. `prophecy.eth`) |
 | `VITE_UNIVERSAL_RESOLVER` | web ([`ENSV2.md`](ENSV2.md) section 0) |
-| `VITE_WORLD_APP_ID`, `VITE_WORLD_ACTION` | web (World Developer Portal) |
-| `VITE_WORLD_RP_ID` | web (IDKit 4 relying-party id, if the Portal action requires it) |
-| `VITE_BASE` | web build only (`/Prophecy/` on GitHub Pages; `/` locally) |
-| `SEPOLIA_RPC_URL` | Foundry dry-run / broadcast (`--rpc-url`) |
-| `DEPLOYER_PRIVATE_KEY` | Foundry broadcast only (person; never an agent) |
-| `TEAM_WALLET` | Team address that registers `prophecy.eth` and deploys |
-| `PROTOCOL_FEE_RECIPIENT` | Launchpad deploy |
-| `WORLD_SIGNER` | Launchpad deploy (address that signs World server payloads) |
-| `UNISWAP_V4_POOL_MANAGER` | Launchpad / hook deploy (override; default is the official Sepolia PoolManager) |
-| `HOOK_SALT` | `ProphecyHook` CREATE2 salt, once mined |
-| `PARENT_LABEL` | ENS parent registration (`prophecy`) |
-| `ENS_REGISTRATION_SECRET` | ENS commit → register (bytes32; local only) |
-| `ENS_DURATION_SECONDS` | ENS registration duration |
-| `WORLD_APP_ID`, `WORLD_ACTION`, `WORLD_RP_ID` | World verification server |
-| `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |
+| `VITE_WORLD_APP_ID`, `VITE_WORLD_ACTION` | web |
+| `RPC_URL`, `PRIVATE_KEY` | contract deployment (people only) |
+| `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_SIGNER_KEY` | World verification server |

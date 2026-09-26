@@ -16,8 +16,8 @@ An agent prepares everything and runs a dry run. **A person runs the broadcast.*
    - Mine a CREATE2 salt whose address carries the hook permission flags.
    - Write the salt and both addresses into the script.
 3. **Constants:** `VIRTUAL_ETH` and the other constants match `docs/SPEC.md`. They cannot change after deployment.
-4. **Dry run:** `./script/run-sepolia.sh script/Deploy.s.sol` (needs `SEPOLIA_RPC_URL`; no send flag), then read the simulated addresses.
-5. **Hand off to a person:** they run the same command with the send flag and `DEPLOYER_PRIVATE_KEY`. See [`docs/INFRA.md`](../../../docs/INFRA.md).
+4. **Dry run:** `forge script script/Deploy.s.sol --rpc-url $RPC_URL` (no `--broadcast`), then read the simulated addresses.
+5. **Hand off to a person:** give them the exact broadcast command. They run it with their own `PRIVATE_KEY`.
 6. **After the broadcast**
    - Record the addresses in `contracts/deployments/sepolia.json`.
    - Update `.env.example` (names only, never values) and `docs/INTERFACE.md` if any address variable changed.

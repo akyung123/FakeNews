@@ -19,7 +19,7 @@ A launchpad that turns a one-line prophecy into a token. Buying raises the price
 | `contracts/` | Foundry: `Launchpad`, `ProphecyToken`, `ProphecyHook`, `LiquidityLocker` (currently a skeleton with older names) | `cd contracts && forge build && forge test` |
 | `web/` | Vite + React 19 + viem. Currently a prototype without a chain | `cd web && bun install && bun run build` |
 | `world/` (not yet) | World ID verification server | `cd world && bun test` |
-| `docs/` | Spec, decisions, interface, plan, notes, infra | — |
+| `docs/` | Spec, decisions, interface, plan, notes | — |
 
 ## Rules you must not break
 
