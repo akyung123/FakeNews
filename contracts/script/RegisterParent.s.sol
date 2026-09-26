@@ -103,6 +103,7 @@ contract RegisterParent is ScriptVm {
 
         _start();
         _mintIfNeeded(usdc, owner, amount);
+        // Owner must be a plain EOA: ETHRegistry safe-mints ERC-1155 to `owner`.
         // MockUSDC.approve(ETHRegistrar) then register(..., subregistry=0, resolver=0).
         usdc.approve(address(registrar), type(uint256).max);
         registrar.register(label, owner, secret, address(0), address(0), duration, address(usdc), bytes32(0));
