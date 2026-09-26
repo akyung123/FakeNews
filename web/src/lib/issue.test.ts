@@ -154,4 +154,11 @@ describe("designer World copy mapping", () => {
     expect(ISSUE_COPY.pending).not.toBe(ISSUE_COPY.checkFailed);
     expect(worldUserMessage("network")).toBe(ISSUE_COPY.checkFailed);
   });
+
+  it("uses existing banner copy for the register write, without prediction-market wording", () => {
+    expect(ISSUE_COPY.registerPending).toBe("Confirm the prophet name in your wallet.");
+    expect(ISSUE_COPY.registerSuccess).toBe("Prophet name is on Sepolia.");
+    const text = `${ISSUE_COPY.registerPending} ${ISSUE_COPY.registerSuccess}`.toLowerCase();
+    expect(text).not.toMatch(/coin|profit|yield|prediction|true|false/);
+  });
 });

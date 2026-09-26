@@ -20,6 +20,8 @@ export const ISSUE_COPY = {
   launch: "Issue prophecy",
   disabledLaunch: "Verify with World ID to launch",
   pending: "Still checking. This can take a minute the first time.",
+  registerPending: "Confirm the prophet name in your wallet.",
+  registerSuccess: "Prophet name is on Sepolia.",
   cancelled: "Verification cancelled. Launching stays locked until you verify.",
   portalRejected: "World ID couldn't confirm this check. Try again in World App.",
   checkFailed: "Something went wrong with the check. Please try again.",

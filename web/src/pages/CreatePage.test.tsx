@@ -203,6 +203,28 @@ describe("Screen 2 button gating", () => {
     assertNoRawCodes();
   });
 
+  it("shows a pending banner while registerProphet waits for the wallet", async () => {
+    const user = userEvent.setup();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    renderIssue(MOCK_ISSUE_SESSION, {
+      registerProphet: async () => {
+        await gate;
+      },
+    });
+    await fillFirstTimeForm(user);
+    await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
+    await waitFor(() => expect(launchButton()).toBeEnabled());
+    await user.click(launchButton());
+    await waitFor(() => expect(screen.getByTestId("register-pending")).toHaveTextContent(ISSUE_COPY.registerPending));
+    expect(launchButton()).toBeDisabled();
+    expect(screen.queryByRole("alert")).toBeNull();
+    release();
+    await waitFor(() => expect(screen.getByTestId("register-success")).toHaveTextContent(ISSUE_COPY.registerSuccess));
+  });
+
   it("calls registerProphet with { label, nullifier, serverSig } and keeps label off the signed payload", async () => {
     const user = userEvent.setup();
     const seen: RegisterProphetInput[] = [];
