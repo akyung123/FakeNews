@@ -1,6 +1,8 @@
 /**
  * Launchpad ABI from contracts/src/Launchpad.sol at 0ee30ce (current main).
  *
+ * Custom errors match the source (and forge `out/Launchpad.sol/Launchpad.json`
+ * when present): every `error` on Launchpad so viem can decode reverts.
  * Constructor ends at ens: (protocolFeeRecipient, worldSigner, ens).
  * Uniswap addresses are not constructor args; deployer-only one-time
  * setUniswap(poolManager, hook, locker). Launched has no deadline.

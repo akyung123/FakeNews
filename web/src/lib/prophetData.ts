@@ -12,6 +12,7 @@
  */
 import { CURVE_SUPPLY as PROTOTYPE_CURVE_SUPPLY } from "./curve";
 import { mockEnsAddress, mockEnsText, parseDeadlineText, ENS_TEXT_DEADLINE, ENS_TEXT_PROPHECY } from "./ens";
+import { isMockMode } from "./mode";
 import { GRADUATION_ETH, MOCK_PARENT_NAME, MOCK_PROPHETS, MOCK_PROPHECIES } from "./mock";
 import { marketCap, type Coin } from "./store";
 
@@ -44,6 +45,8 @@ export type ProphetPageData = {
   prophecies: ProphetProphecy[];
   departedCount: number;
   claimableFeeWei: bigint;
+  /** Set when the page came from prophetOf / creatorFeeOf, not MOCK_PROPHETS. */
+  fromChain?: boolean;
 };
 
 export function prophetEnsName(label: string, parent = MOCK_PARENT_NAME): string {
@@ -87,10 +90,15 @@ export function getProphecyByName(name: string, nowSec = Math.floor(Date.now() /
 }
 
 /**
- * Prototype Screen 3 (`CoinPage`) still reads a localStorage coin.
- * Map a name from this read interface onto that shape so `/n/:name` is not blank.
+ * Mock-mode Screen 3 only. Chain mode reads Launched + curve(token).
  */
-export function prototypeCoinFromName(name: string, nowSec?: number): Coin | null {
+export function prototypeCoinFromName(
+  name: string,
+  nowSec?: number,
+  options?: { mock?: boolean },
+): Coin | null {
+  const mock = options?.mock ?? isMockMode();
+  if (!mock) return null;
   const p = getProphecyByName(name, nowSec);
   if (!p) return null;
   const sold = p.complete ? PROTOTYPE_CURVE_SUPPLY : Number(p.sold / 10n ** 18n);
@@ -143,6 +151,45 @@ export function normalizeProphetLabel(input: string, parent = MOCK_PARENT_NAME):
   }
   if (trimmed.includes(".")) return null;
   return trimmed;
+}
+
+export function prophetPageFromChain(input: {
+  label: string;
+  wallet: Address;
+  claimableFeeWei: bigint;
+  prophecies?: ProphetProphecy[];
+  parentName?: string;
+}): ProphetPageData {
+  const prophecies = input.prophecies ?? [];
+  return {
+    prophet: {
+      label: input.label,
+      ensName: prophetEnsName(input.label, input.parentName),
+      wallet: input.wallet,
+    },
+    prophecies,
+    departedCount: prophecies.filter((p) => p.departed).length,
+    claimableFeeWei: input.claimableFeeWei,
+    fromChain: true,
+  };
+}
+
+/** Mock seed prophets (ringo / mina) — never a claimCreatorFee target in chain mode. */
+export function isMockProphetRecord(data: Pick<ProphetPageData, "fromChain" | "prophet">): boolean {
+  if (data.fromChain) return false;
+  const label = data.prophet.label.toLowerCase();
+  const wallet = data.prophet.wallet.toLowerCase();
+  return MOCK_PROPHETS.some((row) => row.label === label || row.wallet.toLowerCase() === wallet);
+}
+
+/** Chain mode hides claim on mock rows; a live own page still sends claimCreatorFee. */
+export function canClaimCreatorFee(
+  data: Pick<ProphetPageData, "fromChain" | "prophet">,
+  options: { chain?: boolean; claimFee?: unknown } = {},
+): boolean {
+  if (options.claimFee) return true;
+  if (!options.chain) return true;
+  return !isMockProphetRecord(data);
 }
 
 /**

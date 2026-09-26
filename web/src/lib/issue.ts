@@ -1,3 +1,4 @@
+import { MAX_PROPHECY_BYTES, isProphecyWithinLimit } from "./limits";
 import type { WorldErrorKind } from "./world";
 
 export type WorldStatus = "idle" | "pending" | "success" | "cancelled" | "failed";
@@ -27,6 +28,12 @@ export const ISSUE_COPY = {
   portalRejected: "World ID couldn't confirm this check. Try again in World App.",
   checkFailed: "Something went wrong with the check. Please try again.",
   nullifierReuse: "This human already has a prophet name. One human, one name.",
+  step1: "Step 1 of 2",
+  step2: "Step 2 of 2",
+  oneTransaction: "One transaction",
+  claimTitle: "Claim your name",
+  claimLead: "One name per person. World ID is asked only here.",
+  continueIssue: "Continue to issue",
 } as const;
 
 const PROPHET_LABEL = /^[a-z0-9]{3,16}$/;
@@ -41,8 +48,7 @@ export function isValidSlug(value: string): boolean {
 }
 
 export function isValidProphecy(value: string): boolean {
-  const text = value.trim();
-  return text.length >= 1 && text.length <= 140;
+  return isProphecyWithinLimit(value.trim(), MAX_PROPHECY_BYTES);
 }
 
 export function isValidDeadline(unixSeconds: number, nowSeconds: number): boolean {
@@ -72,22 +78,55 @@ export function isIssueFormValid(input: {
   );
 }
 
+export type RegisterStatus = "idle" | "pending" | "success" | "failed";
+
+/** Wallet already has a name, or registerProphet just succeeded. */
+export function isNamedProphet(input: {
+  returningProphet: boolean;
+  registerStatus?: RegisterStatus;
+}): boolean {
+  return input.returningProphet || input.registerStatus === "success";
+}
+
+/** Launch write — hidden until the wallet is a prophet (NotProphet). */
 export function isLaunchEnabled(input: {
   returningProphet: boolean;
   worldStatus: WorldStatus;
   formValid: boolean;
+  registerStatus?: RegisterStatus;
 }): boolean {
   if (!input.formValid) return false;
-  if (input.returningProphet) return true;
+  return isNamedProphet(input);
+}
+
+/** First-time name claim. Off once the wallet is already a prophet. */
+export function isRegisterSubmitEnabled(input: {
+  returningProphet: boolean;
+  worldStatus: WorldStatus;
+  formValid: boolean;
+  registerStatus?: RegisterStatus;
+}): boolean {
+  if (!input.formValid) return false;
+  if (isNamedProphet(input)) return false;
   return input.worldStatus === "success";
+}
+
+export function isIssueSubmitEnabled(input: {
+  returningProphet: boolean;
+  worldStatus: WorldStatus;
+  formValid: boolean;
+  registerStatus?: RegisterStatus;
+}): boolean {
+  return isLaunchEnabled(input) || isRegisterSubmitEnabled(input);
 }
 
 export function launchButtonLabel(input: {
   returningProphet: boolean;
   worldStatus: WorldStatus;
   canLaunch: boolean;
+  canRegister?: boolean;
 }): string {
-  if (input.canLaunch) return ISSUE_COPY.launch;
+  if (input.canLaunch || input.canRegister) return ISSUE_COPY.launch;
   if (!input.returningProphet && input.worldStatus !== "success") return ISSUE_COPY.disabledLaunch;
   return ISSUE_COPY.launch;
 }

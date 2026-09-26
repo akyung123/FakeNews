@@ -1,15 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import { MOCK_PARENT_NAME, MOCK_PROPHECIES, MOCK_PROPHETS } from "./mock";
 import {
+  canClaimCreatorFee,
   curveProgress,
   getProphecyByName,
   getProphetPage,
   isDeparted,
+  isMockProphetRecord,
   normalizeProphetLabel,
   prophecyDetailPath,
   prophecyEnsName,
   prophecyTradeLabel,
   prophetEnsName,
+  prophetPageFromChain,
   prototypeCoinFromName,
 } from "./prophetData";
 
@@ -84,6 +87,25 @@ describe("getProphetPage", () => {
   });
 });
 
+describe("chain vs mock prophet claim", () => {
+  test("mock rows hide claim in chain mode; a live own page still claims", () => {
+    const mock = getProphetPage("ringo", NOW)!;
+    expect(isMockProphetRecord(mock)).toBe(true);
+    expect(canClaimCreatorFee(mock, { chain: true })).toBe(false);
+    expect(canClaimCreatorFee(mock, { chain: false })).toBe(true);
+
+    const own = prophetPageFromChain({
+      label: "alice",
+      wallet: "0x3333333333333333333333333333333333333333",
+      claimableFeeWei: 1n,
+    });
+    expect(own.fromChain).toBe(true);
+    expect(isMockProphetRecord(own)).toBe(false);
+    expect(canClaimCreatorFee(own, { chain: true })).toBe(true);
+    expect(canClaimCreatorFee(mock, { chain: true, claimFee: async () => undefined })).toBe(true);
+  });
+});
+
 describe("curveProgress", () => {
   test("is 0 at the start, 1 when complete, and a fraction in between", () => {
     expect(curveProgress(0n, false)).toBe(0);
@@ -126,6 +148,10 @@ describe("getProphecyByName", () => {
     expect(coin!.prophecy).toBe("Every hackathon badge is an ENS name by 2028");
     expect(coin!.name).toBe("badges-2028.ringo.prophecy.eth");
     expect(coin!.ticker).toBe("BADGES-2028");
+  });
+
+  test("does not invent a prototype coin in chain mode", () => {
+    expect(prototypeCoinFromName("badges-2028.ringo.prophecy.eth", NOW, { mock: false })).toBeNull();
   });
 });
 
