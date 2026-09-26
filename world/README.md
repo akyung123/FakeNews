@@ -15,7 +15,7 @@ Official docs used while building this:
 ```bash
 cd world
 bun install
-cp .env.example .env   # fill in the names; never commit .env
+# export the required names below (infra owns env files)
 bun run dev            # http://localhost:8787
 ```
 
@@ -31,7 +31,7 @@ This server does not store nullifiers. The Launchpad does, so a restart cannot m
 
 ## Env
 
-Names only live in `.env.example`. Required:
+Infra owns env files. Required names:
 
 | Name | Used for |
 |---|---|
