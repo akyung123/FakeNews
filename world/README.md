@@ -42,7 +42,9 @@ Infra owns env files. Required names:
 | `WORLD_SIGNER_KEY` | EIP-191 key for INTERFACE section 3 |
 | `PORT` | Listen port (default `8787`) |
 
-Optional: `WORLD_ENVIRONMENT` (`production` or `staging`), `WORLD_PORTAL_URL` (override the Portal base URL).
+Optional: `WORLD_ENVIRONMENT` (`production` or `staging`), `WORLD_PORTAL_URL` (override the Portal base URL), `WORLD_CHAIN_ID`, `WORLD_LAUNCHPAD_ADDRESS`.
+
+If `WORLD_CHAIN_ID` or `WORLD_LAUNCHPAD_ADDRESS` is set, `/verify` rejects a request whose `chainId` or `launchpad` differs (`context_mismatch`). Addresses are compared case-insensitively.
 
 ## HTTP
 
@@ -83,7 +85,7 @@ Optional: `WORLD_ENVIRONMENT` (`production` or `staging`), `WORLD_PORTAL_URL` (o
 }
 ```
 
-Call `registerProphet(label, nullifier, serverSig)` with those two values. Failures: `malformed_payload` or `portal_rejected`.
+Call `registerProphet(label, nullifier, serverSig)` with those two values. Failures: `malformed_payload`, `portal_rejected`, or `context_mismatch`.
 
 `GET /health` — `{ "ok": true, "signer": "0x..." }`.
 

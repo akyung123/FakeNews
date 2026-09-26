@@ -19,3 +19,7 @@ export function malformed(detail: string): HttpError {
 export function portalRejected(detail: string, extra?: unknown): HttpError {
   return new HttpError(400, "portal_rejected", detail, extra);
 }
+
+export function contextMismatch(detail: string): HttpError {
+  return new HttpError(400, "context_mismatch", detail);
+}

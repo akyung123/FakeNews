@@ -1,4 +1,4 @@
-import { checksumAddress, type Address, type Hex } from "viem";
+import { checksumAddress, isAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 export type WorldEnvironment = "production" | "staging";
@@ -12,6 +12,8 @@ export type Config = {
   environment: WorldEnvironment;
   portalBaseUrl: string;
   port: number;
+  chainId?: bigint;
+  launchpad?: Address;
 };
 
 const DEFAULT_PORT = 8787;
@@ -27,6 +29,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   const environment = parseEnvironment(env.WORLD_ENVIRONMENT);
   const portalBaseUrl = (env.WORLD_PORTAL_URL ?? defaultPortalUrl(environment)).replace(/\/$/, "");
   const port = parsePort(env.PORT);
+  const chainId = parseOptionalChainId(env.WORLD_CHAIN_ID);
+  const launchpad = parseOptionalAddress(env.WORLD_LAUNCHPAD_ADDRESS, "WORLD_LAUNCHPAD_ADDRESS");
 
   if (!appId.startsWith("app_")) {
     throw new Error("WORLD_APP_ID must start with app_");
@@ -44,6 +48,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     environment,
     portalBaseUrl,
     port,
+    chainId,
+    launchpad,
   };
 }
 
@@ -90,4 +96,29 @@ function parsePort(value: string | undefined): number {
 
 function defaultPortalUrl(environment: WorldEnvironment): string {
   return environment === "staging" ? DEFAULT_PORTAL_STAGING : DEFAULT_PORTAL_PRODUCTION;
+}
+
+function parseOptionalChainId(value: string | undefined): bigint | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (/^(?:0x[0-9a-fA-F]+|[1-9][0-9]*)$/.test(trimmed)) {
+    const chainId = BigInt(trimmed);
+    if (chainId >= 1n) {
+      return chainId;
+    }
+  }
+  throw new Error("WORLD_CHAIN_ID must be a positive integer");
+}
+
+function parseOptionalAddress(value: string | undefined, name: string): Address | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  if (!isAddress(trimmed)) {
+    throw new Error(`${name} must be a 20-byte hex address`);
+  }
+  return trimmed;
 }
