@@ -17,6 +17,10 @@ import {ScriptVm} from "./ScriptVm.sol";
 /// After a send, paste WORLD_CHAIN_ID and WORLD_LAUNCHPAD_ADDRESS into Render
 /// and restart. Also print worldSigner address (never the private key).
 contract Deploy is ScriptVm {
+    /// Anvil dry-run only. Never accepted on Sepolia (or any non-31337 chain).
+    address internal constant PLACEHOLDER_FEE = address(uint160(0xfee));
+    address internal constant PLACEHOLDER_SIGNER = address(uint160(0x51e));
+
     event Deployed(string name, address addr);
     event CopyIntoWorldEnv(string name, address value);
     event CopyChainId(string name, uint256 value);
@@ -28,13 +32,28 @@ contract Deploy is ScriptVm {
 
         address protocolFeeRecipient = vm.envOr("PROTOCOL_FEE_RECIPIENT", address(0));
         address worldSigner = _worldSigner();
-        if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
+        if (chainId != 31337) {
+            require(vm.envExists("DEPLOYER_PRIVATE_KEY"), "set DEPLOYER_PRIVATE_KEY");
+            require(vm.envExists("PROTOCOL_FEE_RECIPIENT"), "set PROTOCOL_FEE_RECIPIENT");
+            require(
+                vm.envExists("WORLD_SIGNER_KEY") || vm.envExists("WORLD_SIGNER_ADDRESS"),
+                "set WORLD_SIGNER_KEY"
+            );
+            require(
+                protocolFeeRecipient != address(0) && protocolFeeRecipient != PLACEHOLDER_FEE,
+                "PROTOCOL_FEE_RECIPIENT cannot be zero or placeholder 0xfee"
+            );
+            require(
+                worldSigner != address(0) && worldSigner != PLACEHOLDER_SIGNER,
+                "worldSigner cannot be zero or placeholder 0x51e"
+            );
+        } else if (vm.envExists("DEPLOYER_PRIVATE_KEY")) {
             require(protocolFeeRecipient != address(0), "set PROTOCOL_FEE_RECIPIENT");
             require(worldSigner != address(0), "set WORLD_SIGNER_KEY");
         } else {
-            // Launchpad reverts on address(0). Placeholders keep dry-run working.
-            if (protocolFeeRecipient == address(0)) protocolFeeRecipient = address(uint160(0xfee));
-            if (worldSigner == address(0)) worldSigner = address(uint160(0x51e));
+            // Launchpad reverts on address(0). Placeholders keep anvil dry-run working.
+            if (protocolFeeRecipient == address(0)) protocolFeeRecipient = PLACEHOLDER_FEE;
+            if (worldSigner == address(0)) worldSigner = PLACEHOLDER_SIGNER;
         }
 
         _start();
