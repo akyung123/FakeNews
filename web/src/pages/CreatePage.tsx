@@ -80,7 +80,8 @@ export function IssueScreen({
     nowSeconds,
   });
   const canLaunch = isLaunchEnabled({ returningProphet, worldStatus, formValid });
-  const error = returningProphet ? null : worldUserMessage(worldError);
+  const pending = !returningProphet && worldStatus === "pending" ? ISSUE_COPY.pending : null;
+  const error = returningProphet || worldStatus === "pending" ? null : worldUserMessage(worldError);
   const submitLabel = launchButtonLabel({ returningProphet, worldStatus, canLaunch });
   const fullName = prophetLabel && slug ? prophecyName(slug, prophetLabel, parentName) : "";
 
@@ -209,6 +210,11 @@ export function IssueScreen({
           onVerified={setVerified}
         />
 
+        {pending ? (
+          <p className="banner-lock" data-testid="world-pending">
+            {pending}
+          </p>
+        ) : null}
         {error ? (
           <p className="banner-error" role="alert">
             {error}

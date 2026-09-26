@@ -70,6 +70,65 @@ function assertNoRawCodes() {
 }
 
 describe("Screen 2 button gating", () => {
+  it("shows a neutral pending state and keeps Issue off while the check is running", async () => {
+    const user = userEvent.setup();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const world: WorldClient = {
+      ...createWorldClient({ mock: true }),
+      async fetchRpContext() {
+        await gate;
+        return { ...MOCK_RP_CONTEXT_RESPONSE, rp_context: { ...MOCK_RP_CONTEXT_RESPONSE.rp_context } };
+      },
+    };
+    renderIssue(MOCK_ISSUE_SESSION, { world });
+    await fillFirstTimeForm(user);
+
+    await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
+
+    expect(screen.getByTestId("world-pending")).toHaveTextContent(ISSUE_COPY.pending);
+    expect(screen.queryByText(ISSUE_COPY.checkFailed)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(launchButton()).toBeDisabled();
+    expect(launchButton()).toHaveTextContent(ISSUE_COPY.disabledLaunch);
+    assertNoRawCodes();
+
+    release();
+    await waitFor(() => expect(launchButton()).toBeEnabled());
+    expect(screen.queryByTestId("world-pending")).toBeNull();
+    expect(screen.queryByText(ISSUE_COPY.checkFailed)).toBeNull();
+  });
+
+  it("maps a timeout or dropped check to the retry sentence only after it fails", async () => {
+    const user = userEvent.setup();
+    let rejectFetch!: (error: unknown) => void;
+    const hung = new Promise<never>((_, reject) => {
+      rejectFetch = reject;
+    });
+    const world: WorldClient = {
+      ...createWorldClient({ mock: true }),
+      async fetchRpContext() {
+        await hung;
+        return { ...MOCK_RP_CONTEXT_RESPONSE, rp_context: { ...MOCK_RP_CONTEXT_RESPONSE.rp_context } };
+      },
+    };
+    renderIssue(MOCK_ISSUE_SESSION, { world });
+    await fillFirstTimeForm(user);
+    await user.click(screen.getByRole("button", { name: ISSUE_COPY.prove }));
+
+    expect(screen.getByTestId("world-pending")).toBeInTheDocument();
+    expect(screen.queryByText(ISSUE_COPY.checkFailed)).toBeNull();
+    expect(launchButton()).toBeDisabled();
+
+    rejectFetch(new WorldClientError("network"));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(ISSUE_COPY.checkFailed));
+    expect(screen.queryByTestId("world-pending")).toBeNull();
+    expect(launchButton()).toBeDisabled();
+    assertNoRawCodes();
+  });
+
   it("keeps Issue disabled until World verification succeeds", async () => {
     const user = userEvent.setup();
     renderIssue();

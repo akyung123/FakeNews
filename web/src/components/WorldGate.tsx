@@ -110,6 +110,7 @@ function MockWorldGate({
     <section className="world-gate" data-testid="world-gate">
       <p className="strong">Proof of Human</p>
       <p className="faint">{ISSUE_COPY.worldHelp}</p>
+      {status === "pending" ? <p className="faint">{ISSUE_COPY.pending}</p> : null}
       {status === "success" ? (
         <p className="up">Verified. You can issue this prophecy.</p>
       ) : (
@@ -172,16 +173,20 @@ function LiveWorldGate({
       {status === "success" ? (
         <p className="up">Verified. You can issue this prophecy.</p>
       ) : (
-        <button
-          type="button"
-          className="btn primary"
-          onClick={() => {
-            onStatus("pending");
-            setOpen(true);
-          }}
-        >
-          {ISSUE_COPY.prove}
-        </button>
+        <>
+          {status === "pending" ? <p className="faint">{ISSUE_COPY.pending}</p> : null}
+          <button
+            type="button"
+            className="btn primary"
+            disabled={status === "pending"}
+            onClick={() => {
+              onStatus("pending");
+              setOpen(true);
+            }}
+          >
+            {ISSUE_COPY.prove}
+          </button>
+        </>
       )}
       {open ? (
         <IdKitHost
@@ -260,7 +265,7 @@ function IdKitHost({
   }, [wallet, world, onStatus]);
 
   if (loadError) return <p className="banner-error">{loadError}</p>;
-  if (!Widget || !rpContext) return <p className="faint">Preparing World ID…</p>;
+  if (!Widget || !rpContext) return <p className="faint">{ISSUE_COPY.pending}</p>;
 
   return (
     <Widget

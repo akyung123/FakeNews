@@ -73,6 +73,7 @@ describe("launch button gating", () => {
   it("stays off for a first-time prophet until World succeeds", () => {
     expect(isIssueFormValid(valid)).toBe(true);
     expect(isLaunchEnabled({ returningProphet: false, worldStatus: "idle", formValid: true })).toBe(false);
+    expect(isLaunchEnabled({ returningProphet: false, worldStatus: "pending", formValid: true })).toBe(false);
     expect(isLaunchEnabled({ returningProphet: false, worldStatus: "cancelled", formValid: true })).toBe(false);
     expect(isLaunchEnabled({ returningProphet: false, worldStatus: "failed", formValid: true })).toBe(false);
     expect(isLaunchEnabled({ returningProphet: false, worldStatus: "success", formValid: true })).toBe(true);
@@ -91,6 +92,9 @@ describe("launch button gating", () => {
   it("uses the designer disabled label until World succeeds", () => {
     expect(
       launchButtonLabel({ returningProphet: false, worldStatus: "idle", canLaunch: false }),
+    ).toBe(ISSUE_COPY.disabledLaunch);
+    expect(
+      launchButtonLabel({ returningProphet: false, worldStatus: "pending", canLaunch: false }),
     ).toBe(ISSUE_COPY.disabledLaunch);
     expect(
       launchButtonLabel({ returningProphet: false, worldStatus: "cancelled", canLaunch: false }),
@@ -141,5 +145,12 @@ describe("designer World copy mapping", () => {
     }
     expect(worldErrorMessage("cancelled", false)).toBe(ISSUE_COPY.cancelled);
     expect(worldErrorMessage("idle", false)).toBeNull();
+    expect(worldErrorMessage("pending", false)).toBeNull();
+  });
+
+  it("does not use the retry sentence while a check is still running", () => {
+    expect(ISSUE_COPY.pending).toBe("Still checking. This can take a minute the first time.");
+    expect(ISSUE_COPY.pending).not.toBe(ISSUE_COPY.checkFailed);
+    expect(worldUserMessage("network")).toBe(ISSUE_COPY.checkFailed);
   });
 });

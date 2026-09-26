@@ -17,6 +17,7 @@ import {
  *   POST {serverUrl}/verify      → Portal v4; errors portal_rejected / malformed_payload
  *   GET  {serverUrl}/health
  * Default server URL is http://localhost:8787.
+ * Live GET /rp-context and POST /verify wait up to 60s (sleeping World server).
  *
  * serverSig is EIP-191 personal_sign of
  * keccak256(abi.encode(uint256 chainId, address launchpad, address wallet, uint256 nullifier)).
@@ -102,10 +103,45 @@ export type WorldClientOptions = {
   chainId?: number;
   launchpad?: string;
   fetch?: typeof fetch;
+  /** Live `/rp-context` and `/verify` only. Default 60s for a sleeping World server. */
+  timeoutMs?: number;
 };
 
 const CANCELLED_CODES = new Set(["cancelled", "user_rejected", "verification_rejected"]);
 const SEPOLIA_CHAIN_ID = 11_155_111;
+
+/** First check can take a minute when the World server has been idle. */
+export const WORLD_REQUEST_TIMEOUT_MS = 60_000;
+
+function asWorldClientError(error: unknown): WorldClientError {
+  if (error instanceof WorldClientError) return error;
+  return new WorldClientError("network");
+}
+
+export async function fetchWithTimeout(
+  doFetch: typeof fetch,
+  input: string,
+  init: RequestInit | undefined,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await new Promise<Response>((resolve, reject) => {
+      const fail = () => reject(new WorldClientError("network"));
+      if (controller.signal.aborted) {
+        fail();
+        return;
+      }
+      controller.signal.addEventListener("abort", fail, { once: true });
+      doFetch(input, { ...init, signal: controller.signal }).then(resolve, (error) => {
+        reject(asWorldClientError(error));
+      });
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export function isWorldMockEnabled(value = import.meta.env.VITE_WORLD_MOCK): boolean {
   return value !== "0" && value !== "false";
@@ -149,6 +185,7 @@ export function createWorldClient(options: WorldClientOptions = {}): WorldClient
     "",
   );
   const doFetch = options.fetch ?? fetch;
+  const timeoutMs = options.timeoutMs ?? WORLD_REQUEST_TIMEOUT_MS;
 
   if (mock) {
     return {
@@ -177,12 +214,11 @@ export function createWorldClient(options: WorldClientOptions = {}): WorldClient
     launchpad,
     async fetchRpContext() {
       try {
-        const response = await doFetch(`${serverUrl}/rp-context`, { method: "GET" });
+        const response = await fetchWithTimeout(doFetch, `${serverUrl}/rp-context`, { method: "GET" }, timeoutMs);
         if (!response.ok) throw await errorFromResponse(response);
         return (await response.json()) as RpContextResponse;
       } catch (error) {
-        if (error instanceof WorldClientError) throw error;
-        throw new WorldClientError("network");
+        throw asWorldClientError(error);
       }
     },
     async verifyProof(input) {
@@ -190,21 +226,25 @@ export function createWorldClient(options: WorldClientOptions = {}): WorldClient
         throw new WorldClientError("malformed_payload");
       }
       try {
-        const response = await doFetch(`${serverUrl}/verify`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            wallet: input.wallet,
-            chainId,
-            launchpad,
-            idkitResponse: input.idkitResponse,
-          }),
-        });
+        const response = await fetchWithTimeout(
+          doFetch,
+          `${serverUrl}/verify`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              wallet: input.wallet,
+              chainId,
+              launchpad,
+              idkitResponse: input.idkitResponse,
+            }),
+          },
+          timeoutMs,
+        );
         if (!response.ok) throw await errorFromResponse(response);
         return (await response.json()) as WorldServerSignature;
       } catch (error) {
-        if (error instanceof WorldClientError) throw error;
-        throw new WorldClientError("network");
+        throw asWorldClientError(error);
       }
     },
     async checkHealth() {

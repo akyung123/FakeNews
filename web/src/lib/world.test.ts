@@ -12,6 +12,7 @@ import {
   createWorldClient,
   isWorldMockEnabled,
   WorldClientError,
+  WORLD_REQUEST_TIMEOUT_MS,
   worldErrorKindFromIdKit,
   worldErrorKindFromServerCode,
   worldStatusFromIdKitError,
@@ -163,6 +164,75 @@ describe("world client", () => {
         idkitResponse: MOCK_IDKIT_RESULT,
       }),
     ).rejects.toMatchObject({ kind: "malformed_payload" });
+  });
+
+  it("uses a 60s live timeout and maps only timeout or a dropped request to network", async () => {
+    expect(WORLD_REQUEST_TIMEOUT_MS).toBe(60_000);
+
+    const hanging = createWorldClient({
+      mock: false,
+      serverUrl: "http://world.test",
+      launchpad: MOCK_WORLD_LAUNCHPAD,
+      timeoutMs: 40,
+      fetch: () => new Promise(() => {}),
+    });
+    await expect(hanging.fetchRpContext()).rejects.toMatchObject({
+      kind: "network",
+      message: "World verification failed",
+    });
+    await expect(
+      hanging.verifyProof({
+        wallet: "0x2222222222222222222222222222222222222222",
+        idkitResponse: MOCK_IDKIT_RESULT,
+      }),
+    ).rejects.toMatchObject({ kind: "network" });
+
+    const slowOk = createWorldClient({
+      mock: false,
+      serverUrl: "http://world.test",
+      launchpad: MOCK_WORLD_LAUNCHPAD,
+      timeoutMs: 200,
+      fetch: async (input) => {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        const url = String(input);
+        if (url.endsWith("/rp-context")) {
+          return new Response(JSON.stringify(MOCK_RP_CONTEXT_RESPONSE), { status: 200 });
+        }
+        return new Response(JSON.stringify(MOCK_WORLD_VERIFY), { status: 200 });
+      },
+    });
+    await expect(slowOk.fetchRpContext()).resolves.toEqual(MOCK_RP_CONTEXT_RESPONSE);
+    await expect(
+      slowOk.verifyProof({
+        wallet: "0x2222222222222222222222222222222222222222",
+        idkitResponse: MOCK_IDKIT_RESULT,
+      }),
+    ).resolves.toEqual(MOCK_WORLD_VERIFY);
+  });
+
+  it("passes an abort signal on live /rp-context and /verify", async () => {
+    const signals: Array<AbortSignal | undefined> = [];
+    const client = createWorldClient({
+      mock: false,
+      serverUrl: "http://world.test",
+      launchpad: MOCK_WORLD_LAUNCHPAD,
+      fetch: async (input, init) => {
+        signals.push(init?.signal);
+        const url = String(input);
+        if (url.endsWith("/rp-context")) {
+          return new Response(JSON.stringify(MOCK_RP_CONTEXT_RESPONSE), { status: 200 });
+        }
+        return new Response(JSON.stringify(MOCK_WORLD_VERIFY), { status: 200 });
+      },
+    });
+    await client.fetchRpContext();
+    await client.verifyProof({
+      wallet: "0x2222222222222222222222222222222222222222",
+      idkitResponse: MOCK_IDKIT_RESULT,
+    });
+    expect(signals).toHaveLength(2);
+    expect(signals[0]).toBeInstanceOf(AbortSignal);
+    expect(signals[1]).toBeInstanceOf(AbortSignal);
   });
 
   it("treats a dropped connection as network and keeps codes off the Error message", async () => {
