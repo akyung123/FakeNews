@@ -11,7 +11,6 @@ import {
   readStoredProphetLabel,
   storeProphetLabel,
   toDatetimeLocalValue,
-  worldErrorKindFromRegisterProphet,
   worldUserMessage,
   type IssueSession,
   type WorldStatus,
@@ -77,6 +76,7 @@ export function IssueScreen({
   const [worldStatus, setWorldStatus] = useState<WorldStatus>("idle");
   const [worldError, setWorldError] = useState<WorldErrorKind | null>(null);
   const [verified, setVerified] = useState<WorldServerSignature | null>(null);
+  const [registerStatus, setRegisterStatus] = useState<"idle" | "pending" | "success" | "failed">("idle");
   const [writeBusy, setWriteBusy] = useState(false);
   const [writeError, setWriteError] = useState<string | null>(null);
 
@@ -91,16 +91,25 @@ export function IssueScreen({
     nowSeconds,
   });
   const canLaunch = isLaunchEnabled({ returningProphet, worldStatus, formValid });
+  const registerBusy = registerStatus === "pending";
+  const busy = registerBusy || writeBusy;
   const pending = writeBusy
     ? WRITE_COPY.pending
-    : !returningProphet && worldStatus === "pending"
-      ? ISSUE_COPY.pending
-      : null;
+    : registerBusy
+      ? ISSUE_COPY.registerPending
+      : !returningProphet && worldStatus === "pending"
+        ? ISSUE_COPY.pending
+        : null;
   const error =
     writeError ??
-    (returningProphet || worldStatus === "pending" || writeBusy ? null : worldUserMessage(worldError));
+    (registerStatus === "failed"
+      ? ISSUE_COPY.registerFailed
+      : returningProphet || worldStatus === "pending" || busy
+        ? null
+        : worldUserMessage(worldError));
   const submitLabel = launchButtonLabel({ returningProphet, worldStatus, canLaunch });
   const fullName = prophetLabel && slug ? prophecyName(slug, prophetLabel, parentName) : "";
+  const pendingTestId = writeBusy ? "write-pending" : registerBusy ? "register-pending" : "world-pending";
 
   return (
     <main className="narrow stack">
@@ -119,26 +128,26 @@ export function IssueScreen({
         className="block create"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!canLaunch || writeBusy) return;
+          if (!canLaunch || busy) return;
           if (!returningProphet && !verified) return;
           void (async () => {
-            setWriteBusy(true);
             setWriteError(null);
-            try {
-              if (!returningProphet && verified && registerProphet) {
-                try {
-                  await registerProphet({
-                    label: prophetLabel,
-                    nullifier: verified.nullifier,
-                    serverSig: verified.serverSig,
-                  });
-                } catch (err) {
-                  const kind = worldErrorKindFromRegisterProphet(err);
-                  setWorldError(kind);
-                  setWorldStatus("failed");
-                  return;
-                }
+            if (!returningProphet && verified && registerProphet) {
+              setRegisterStatus("pending");
+              try {
+                await registerProphet({
+                  label: prophetLabel,
+                  nullifier: verified.nullifier,
+                  serverSig: verified.serverSig,
+                });
+                setRegisterStatus("success");
+              } catch {
+                setRegisterStatus("failed");
+                return;
               }
+            }
+            setWriteBusy(true);
+            try {
               const token = await launchProphecy({
                 slug,
                 prophecy: prophecy.trim(),
@@ -257,8 +266,13 @@ export function IssueScreen({
         />
 
         {pending ? (
-          <p className="banner-lock" data-testid={writeBusy ? "write-pending" : "world-pending"}>
+          <p className="banner-lock" data-testid={pendingTestId}>
             {pending}
+          </p>
+        ) : null}
+        {registerStatus === "success" ? (
+          <p className="up" data-testid="register-success">
+            {ISSUE_COPY.registerSuccess}
           </p>
         ) : null}
         {error ? (
@@ -267,7 +281,7 @@ export function IssueScreen({
           </p>
         ) : null}
 
-        <button type="submit" className="btn primary full" disabled={!canLaunch || writeBusy}>
+        <button type="submit" className="btn primary full" disabled={!canLaunch || busy}>
           {submitLabel}
         </button>
         {!returningProphet && worldStatus !== "success" ? (
