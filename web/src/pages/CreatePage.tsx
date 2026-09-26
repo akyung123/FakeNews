@@ -238,6 +238,11 @@ export function IssueScreen({
                 else navigate(`/coin/${token}`);
                 return;
               }
+              if (!isMockMode()) {
+                // Chain mode never falls back to a local demo coin.
+                setWriteError(ISSUE_COPY.launchUnavailable);
+                return;
+              }
               const id = actions.create({
                 prophecy: prophecy.trim(),
                 name: fullName || slug,

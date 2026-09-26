@@ -19,6 +19,7 @@ import {
   WORLD_REQUEST_TIMEOUT_MS,
   worldClientWithServerFallback,
   worldErrorKindFromIdKit,
+  worldMockFallbackAllowed,
   worldErrorKindFromServerCode,
   worldStatusFromIdKitError,
 } from "./world";
@@ -312,7 +313,7 @@ describe("world client", () => {
     expect(resolved.isMock).toBe(false);
   });
 
-  it("falls back to the existing mock World step when the signature server answers with an error", async () => {
+  it("falls back to the mock World step on a server error only when VITE_WORLD_MOCK is 1", async () => {
     const live = createWorldClient({
       mock: false,
       serverUrl: "http://world.test",
@@ -320,10 +321,35 @@ describe("world client", () => {
       fetch: async () => new Response("", { status: 503 }),
     });
     const mock = createWorldClient({ mock: true });
-    const resolved = await worldClientWithServerFallback(live, () => mock);
+    const resolved = await worldClientWithServerFallback(live, () => mock, true);
     expect(resolved).toBe(mock);
     expect(resolved.isMock).toBe(true);
     expect(live.isMock).toBe(false);
+  });
+
+  it("reports a 5xx /health as an error instead of mocking when VITE_WORLD_MOCK is not 1", async () => {
+    const live = createWorldClient({
+      mock: false,
+      serverUrl: "http://world.test",
+      launchpad: MOCK_WORLD_LAUNCHPAD,
+      fetch: async () => new Response("", { status: 503 }),
+    });
+    let mocked = false;
+    const failure = await worldClientWithServerFallback(
+      live,
+      () => {
+        mocked = true;
+        return createWorldClient({ mock: true });
+      },
+      false,
+    ).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(WorldClientError);
+    expect((failure as WorldClientError).kind).toBe("network");
+    expect(mocked).toBe(false);
+    expect(worldMockFallbackAllowed("1")).toBe(true);
+    expect(worldMockFallbackAllowed(undefined)).toBe(false);
+    expect(worldMockFallbackAllowed("0")).toBe(false);
+    expect(worldMockFallbackAllowed("true")).toBe(false);
   });
 
   it("does not fall back to mock when the request is blocked before it reaches the server", async () => {

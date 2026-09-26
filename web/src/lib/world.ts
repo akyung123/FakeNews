@@ -184,23 +184,29 @@ async function errorFromResponse(response: Response): Promise<WorldClientError> 
   }
 }
 
+/** The mock World step is a fallback only when VITE_WORLD_MOCK is exactly "1". */
+export function worldMockFallbackAllowed(value = import.meta.env.VITE_WORLD_MOCK): boolean {
+  return value === "1";
+}
+
 /**
- * Live World ID stays on the signature server. If the server answers with an
- * error, only this client falls back to the existing mock World step. If the
- * request never gets an answer (an ad blocker, a network drop), the check
- * stays live and the person is told to unblock the server: a mock signature
- * would only fail later on chain. Auction writes stay on the real chain.
+ * Live World ID stays on the signature server. If `/health` fails — no answer
+ * (an ad blocker, a network drop) or a 5xx — the check shows an error with
+ * Retry instead of quietly switching to the mock step: a mock signature would
+ * only fail later on chain. Only VITE_WORLD_MOCK=1 allows the mock fallback.
  */
 export async function worldClientWithServerFallback(
   client: WorldClient = createWorldClient(),
   createMock: () => WorldClient = () => createWorldClient({ mock: true }),
+  allowMock: boolean = worldMockFallbackAllowed(),
 ): Promise<WorldClient> {
   if (client.isMock) return client;
   try {
     await client.checkHealth();
     return client;
   } catch (error) {
-    if (error instanceof WorldClientError && error.kind === "blocked") throw error;
+    const failure = error instanceof WorldClientError ? error : new WorldClientError("network");
+    if (failure.kind === "blocked" || !allowMock) throw failure;
     return createMock();
   }
 }

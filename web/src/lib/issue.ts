@@ -54,6 +54,7 @@ export const ISSUE_COPY = {
   connectingWallet: "Connecting your wallet…",
   checkingWallet: "Checking your wallet for a prophet name…",
   lookupFailed: "Couldn't check whether this wallet already has a name. Check your connection and try again.",
+  launchUnavailable: "Couldn't launch: this site isn't connected to the Launchpad. Nothing was sent.",
 } as const;
 
 /** Chain-mode input hints. Demo mode uses the sample placeholders in mock.ts. */
