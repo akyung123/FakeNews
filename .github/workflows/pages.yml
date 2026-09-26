@@ -7,6 +7,9 @@ name: pages
 #
 # Vite base is set here (`vite build --base /Prophecy/`). No change to
 # web/vite.config.* — other lanes own that file.
+#
+# Preview/demo must never ship mock World ID (PR #20: ON unless exactly 0 or false).
+# VITE_WORLD_MOCK is hard-coded OFF here. Public VITE_* come from Actions variables.
 
 on:
   push:
@@ -28,6 +31,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Hard-coded OFF. Must never be ON for preview/demo builds.
+      VITE_WORLD_MOCK: "0"
     defaults:
       run:
         working-directory: web
@@ -35,12 +41,25 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      - name: Guard World mock is off
+        working-directory: .
+        run: |
+          case "$VITE_WORLD_MOCK" in
+            0|false) ;;
+            *)
+              echo "VITE_WORLD_MOCK must be 0 or false on preview/demo builds (got '$VITE_WORLD_MOCK'). Recording with mock ON is not valid World ID evidence." >&2
+              exit 1
+              ;;
+          esac
       - name: Build
         env:
+          VITE_WORLD_MOCK: "0"
           VITE_RPC_URL: ${{ vars.VITE_RPC_URL }}
           VITE_LAUNCHPAD_ADDRESS: ${{ vars.VITE_LAUNCHPAD_ADDRESS }}
+          VITE_CHAIN_ID: ${{ vars.VITE_CHAIN_ID }}
           VITE_PARENT_NAME: ${{ vars.VITE_PARENT_NAME }}
           VITE_UNIVERSAL_RESOLVER: ${{ vars.VITE_UNIVERSAL_RESOLVER }}
+          VITE_WORLD_SERVER_URL: ${{ vars.VITE_WORLD_SERVER_URL }}
           VITE_WORLD_APP_ID: ${{ vars.VITE_WORLD_APP_ID }}
           VITE_WORLD_ACTION: ${{ vars.VITE_WORLD_ACTION }}
           VITE_WORLD_RP_ID: ${{ vars.VITE_WORLD_RP_ID }}
